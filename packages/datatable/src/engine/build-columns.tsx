@@ -472,7 +472,7 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
             data-column-id={column.id}
             data-column-index={currentCoord.columnIndex}
             className={cn(
-              "group relative h-full min-h-10 w-full px-2 py-1 text-sm text-slate-800",
+              "group relative box-border h-full min-h-10 w-full min-w-0 overflow-hidden px-2 py-1 text-sm text-slate-800",
               isRangeSelected ? "bg-[var(--dt-selection-bg)]" : "",
               isSelected ? "outline outline-2 outline-[var(--dt-active-cell-ring)] outline-offset-[-2px]" : ""
             )}

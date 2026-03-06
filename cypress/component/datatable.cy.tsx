@@ -8,6 +8,7 @@ type TaskRow = {
   title: string;
   status: string;
   amount: number;
+  website?: string;
 };
 
 const columns: ReadonlyArray<DataTableColumn<TaskRow>> = [
@@ -63,6 +64,30 @@ const alignmentColumns: ReadonlyArray<DataTableColumn<TaskRow>> = [
     header: "Amount",
     kind: "number",
     width: 120
+  }
+];
+
+const linkOverflowColumns: ReadonlyArray<DataTableColumn<TaskRow>> = [
+  {
+    id: "title",
+    field: "title",
+    header: "Title",
+    kind: "text",
+    width: 120
+  },
+  {
+    id: "website",
+    field: "website",
+    header: "Website",
+    kind: "link",
+    width: 120
+  },
+  {
+    id: "amount",
+    field: "amount",
+    header: "Amount",
+    kind: "number",
+    width: 100
   }
 ];
 
@@ -242,6 +267,48 @@ function AlignmentHarness({ tableId }: { tableId: string }): JSX.Element {
   );
 }
 
+function LinkOverflowHarness({ tableId }: { tableId: string }): JSX.Element {
+  const rows = useMemo<ReadonlyArray<TaskRow>>(
+    () => [
+      {
+        id: "1",
+        title: "Build UI",
+        status: "todo",
+        amount: 10,
+        website: "https://example.com/supercalifragilisticexpialidocioussupercalifragilisticexpialidocious"
+      }
+    ],
+    []
+  );
+
+  const dataSource = useMemo<DataTableDataSource<TaskRow>>(
+    () => ({
+      useRows: () => ({
+        rows,
+        hasMore: false,
+        isLoading: false,
+        isLoadingMore: false,
+        error: null,
+        loadMore: () => undefined,
+        refresh: () => undefined
+      })
+    }),
+    [rows]
+  );
+
+  return (
+    <div className="w-[420px] p-4">
+      <DataTable
+        tableId={tableId}
+        columns={linkOverflowColumns}
+        dataSource={dataSource}
+        getRowId={(row) => row.id}
+        features={{ rowSelect: false, rowActions: false, infiniteScroll: false, virtualization: false }}
+      />
+    </div>
+  );
+}
+
 describe("DataTable component", () => {
   it("edits a text cell", () => {
     cy.mount(<Harness tableId="cypress-table-edit" />);
@@ -344,6 +411,43 @@ describe("DataTable component", () => {
       });
   });
 
+  it("renders pinned columns with a darker header and body surface", () => {
+    cy.mount(<AlignmentHarness tableId="cypress-table-pinned-surface" />);
+
+    cy.get("[data-column-menu-trigger='title']").first().click({ force: true });
+    cy.contains("button", "Left").click({ force: true });
+
+    cy.get("th[data-column-id='title']")
+      .should("have.attr", "data-pinned-state", "left")
+      .then(($pinnedHeader) => {
+        const pinnedHeaderStyle = getComputedStyle($pinnedHeader[0]);
+
+        cy.get("th[data-column-id='status']")
+          .should("have.attr", "data-pinned-state", "center")
+          .then(($centerHeader) => {
+            const centerHeaderStyle = getComputedStyle($centerHeader[0]);
+            expect(pinnedHeaderStyle.backgroundImage).to.not.equal(centerHeaderStyle.backgroundImage);
+          });
+      });
+
+    cy.get(`tr[data-row-id='1'] [role='gridcell'][data-column-id='title']`)
+      .first()
+      .closest("td")
+      .should("have.attr", "data-pinned-state", "left")
+      .then(($pinnedCell) => {
+        const pinnedCellStyle = getComputedStyle($pinnedCell[0]);
+
+        cy.get(`tr[data-row-id='1'] [role='gridcell'][data-column-id='status']`)
+          .first()
+          .closest("td")
+          .should("have.attr", "data-pinned-state", "center")
+          .then(($centerCell) => {
+            const centerCellStyle = getComputedStyle($centerCell[0]);
+            expect(pinnedCellStyle.backgroundColor).to.not.equal(centerCellStyle.backgroundColor);
+          });
+      });
+  });
+
   it("resizes a column from the resize handle without changing header order", () => {
     cy.mount(<Harness tableId="cypress-table-resize-no-reorder" />);
 
@@ -412,6 +516,28 @@ describe("DataTable component", () => {
     assertBodyColumnWidthConsistency("amount", "1", "2");
   });
 
+  it("clips long link content inside the cell boundary", () => {
+    cy.mount(<LinkOverflowHarness tableId="cypress-table-link-overflow" />);
+
+    cy.get(`tr[data-row-id='1'] [role='gridcell'][data-column-id='website']`)
+      .first()
+      .then(($cell) => {
+        const cell = $cell[0];
+        const cellRect = cell.getBoundingClientRect();
+        const style = getComputedStyle(cell);
+
+        expect(style.overflowX, "website cell overflow should be clipped").to.equal("hidden");
+        expect(cell.scrollWidth, "website cell should still contain overflowing content").to.be.greaterThan(cell.clientWidth);
+
+        cy.wrap($cell)
+          .closest("td")
+          .then(($bodyCell) => {
+            const bodyRect = $bodyCell[0].getBoundingClientRect();
+            expect(Math.abs(cellRect.right - bodyRect.right), "website cell should stay within its column width").to.be.lte(1);
+          });
+      });
+  });
+
   it("adds a row from the draft row and deletes selected rows", () => {
     cy.mount(<Harness tableId="cypress-table-row-mutations" />);
 
@@ -433,6 +559,28 @@ describe("DataTable component", () => {
     cy.findByRole("grid").trigger("keydown", { key: "Enter" });
     cy.findByLabelText("Edit Status").select("done");
     cy.contains("Done").should("exist");
+  });
+
+  it("keeps arrow keys inside the active editor bound to the editor", () => {
+    cy.mount(<Harness tableId="cypress-table-editor-arrow-ownership" />);
+
+    cy.contains("Build UI").dblclick();
+    cy.findByLabelText("Edit Title").type("{rightarrow}{esc}");
+    cy.findByLabelText("Edit Title").should("not.exist");
+    cy.findByRole("grid").should("have.focus").trigger("keydown", { key: "Enter" });
+    cy.findByLabelText("Edit Title").should("exist");
+  });
+
+  it("restores grid focus after escape so keyboard navigation resumes immediately", () => {
+    cy.mount(<Harness tableId="cypress-table-post-escape-navigation" />);
+
+    cy.contains("Build UI").dblclick();
+    cy.findByLabelText("Edit Title").type("{esc}");
+    cy.findByLabelText("Edit Title").should("not.exist");
+    cy.findByRole("grid").should("have.focus");
+    cy.findByRole("grid").trigger("keydown", { key: "ArrowRight" });
+    cy.findByRole("grid").trigger("keydown", { key: "Enter" });
+    cy.findByLabelText("Edit Status").should("exist");
   });
 
   it("does not continuously emit virtualizer measurement warnings while idle", () => {

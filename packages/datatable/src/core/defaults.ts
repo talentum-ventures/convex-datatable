@@ -34,8 +34,11 @@ export const DEFAULT_THEME_TOKENS: DataTableThemeTokens = {
   radius: "14px",
   borderColor: "hsl(215 18% 85%)",
   headerBg: "linear-gradient(180deg, hsl(210 33% 98%), hsl(210 35% 95%))",
+  pinnedHeaderBg: "linear-gradient(180deg, hsl(210 28% 96%), hsl(210 28% 92.5%))",
   rowBg: "hsl(0 0% 100%)",
   rowHoverBg: "hsl(206 45% 97%)",
+  pinnedRowBg: "hsl(210 20% 97%)",
+  pinnedRowHoverBg: "hsl(206 42% 95%)",
   pinnedShadow: "0 0 0 1px hsl(213 20% 84%), 0 8px 24px -16px hsl(215 30% 35%)",
   activeCellRing: "hsl(206 90% 48%)",
   selectionBg: "hsl(205 86% 94%)"

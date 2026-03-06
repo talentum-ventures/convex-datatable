@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_FEATURE_FLAGS, DEFAULT_PAGE_SIZE } from "./defaults";
+import { DEFAULT_FEATURE_FLAGS, DEFAULT_PAGE_SIZE, DEFAULT_THEME_TOKENS } from "./defaults";
 
 describe("defaults", () => {
   it("uses productive-safe feature profile", () => {
@@ -25,5 +25,11 @@ describe("defaults", () => {
 
   it("defaults infinite page size to 50", () => {
     expect(DEFAULT_PAGE_SIZE).toBe(50);
+  });
+
+  it("includes pinned surface theme tokens", () => {
+    expect(DEFAULT_THEME_TOKENS.pinnedHeaderBg).toMatch(/^linear-gradient/);
+    expect(DEFAULT_THEME_TOKENS.pinnedRowBg).toBeTruthy();
+    expect(DEFAULT_THEME_TOKENS.pinnedRowHoverBg).toBeTruthy();
   });
 });

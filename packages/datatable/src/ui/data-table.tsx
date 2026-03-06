@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -130,13 +131,35 @@ function cellRange(start: CellCoord | null, end: CellCoord | null): { start: Cel
   return null;
 }
 
+function isEditableKeyboardTarget(target: EventTarget | null): boolean {
+  const element =
+    target instanceof HTMLElement ? target : target instanceof Node ? target.parentElement : null;
+
+  if (!element) {
+    return false;
+  }
+
+  if (
+    element instanceof HTMLInputElement ||
+    element instanceof HTMLTextAreaElement ||
+    element instanceof HTMLSelectElement
+  ) {
+    return true;
+  }
+
+  return element.isContentEditable;
+}
+
 type CssVarsStyle = CSSProperties & {
   "--dt-font-family": string;
   "--dt-radius": string;
   "--dt-border-color": string;
   "--dt-header-bg": string;
+  "--dt-pinned-header-bg": string;
   "--dt-row-bg": string;
   "--dt-row-hover-bg": string;
+  "--dt-pinned-row-bg": string;
+  "--dt-pinned-row-hover-bg": string;
   "--dt-pinned-shadow": string;
   "--dt-active-cell-ring": string;
   "--dt-selection-bg": string;
@@ -148,6 +171,7 @@ type ColumnMenuAnchor = "left" | "right";
 
 const COLUMN_MENU_WIDTH_PX = 288;
 const COLUMN_MENU_GUTTER_PX = 8;
+const useSafeLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 const TEXT_FILTER_OPERATORS: ReadonlyArray<FilterOperator> = [
   "contains",
@@ -314,8 +338,11 @@ function tableStyle(theme: DataTableThemeTokens): CssVarsStyle {
     "--dt-radius": theme.radius,
     "--dt-border-color": theme.borderColor,
     "--dt-header-bg": theme.headerBg,
+    "--dt-pinned-header-bg": theme.pinnedHeaderBg,
     "--dt-row-bg": theme.rowBg,
     "--dt-row-hover-bg": theme.rowHoverBg,
+    "--dt-pinned-row-bg": theme.pinnedRowBg,
+    "--dt-pinned-row-hover-bg": theme.pinnedRowHoverBg,
     "--dt-pinned-shadow": theme.pinnedShadow,
     "--dt-active-cell-ring": theme.activeCellRing,
     "--dt-selection-bg": theme.selectionBg
@@ -892,9 +919,10 @@ export function DataTable<TRow extends DataTableRowModel>({
 
   const tableRows = table.getRowModel().rows;
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
+  const previousEditingCellRef = useRef<EditingCell>(editingCell);
   const [containerWidth, setContainerWidth] = useState(0);
 
-  useEffect(() => {
+  useSafeLayoutEffect(() => {
     const containerNode = tableContainerRef.current;
     if (!containerNode) {
       return;
@@ -923,6 +951,30 @@ export function DataTable<TRow extends DataTableRowModel>({
     };
   }, []);
 
+  useEffect(() => {
+    const previousEditingCell = previousEditingCellRef.current;
+    previousEditingCellRef.current = editingCell;
+
+    if (!previousEditingCell || editingCell) {
+      return;
+    }
+
+    const containerNode = tableContainerRef.current;
+    if (!containerNode) {
+      return;
+    }
+
+    const activeElement = document.activeElement;
+    if (activeElement === document.body) {
+      containerNode.focus({ preventScroll: true });
+      return;
+    }
+
+    if (activeElement instanceof Node && containerNode.contains(activeElement)) {
+      containerNode.focus({ preventScroll: true });
+    }
+  }, [editingCell]);
+
   const resolveColumnMenuAnchor = useCallback((trigger: HTMLElement): ColumnMenuAnchor => {
     const triggerRect = trigger.getBoundingClientRect();
     const containerRect = tableContainerRef.current?.getBoundingClientRect();
@@ -931,38 +983,47 @@ export function DataTable<TRow extends DataTableRowModel>({
     return projectedLeft < minLeft ? "left" : "right";
   }, []);
 
-  const columnRenderLayout = useMemo(() => {
-    const visibleColumns = table.getVisibleLeafColumns().map((column) => {
-      const columnConfig = columnById.get(column.id);
-      const pinned = column.getIsPinned();
-      const pinnedSide: "left" | "center" | "right" =
-        pinned === "left" || pinned === "right" ? pinned : "center";
-      const maxSize = columnConfig?.maxWidth ?? column.columnDef.maxSize ?? null;
+  const hiddenColumnIds = new Set(
+    Object.entries(columnVisibility)
+      .filter(([, isVisible]) => isVisible === false)
+      .map(([columnId]) => columnId)
+  );
+  const leftPinnedColumnIds = new Set(columnPinning.left ?? []);
+  const rightPinnedColumnIds = new Set(columnPinning.right ?? []);
+  const columnOrderIndexById = new Map(
+    columnOrder.map((columnId, index) => [columnId, index] as const)
+  );
 
-      return {
-        id: column.id,
-        baseWidth: column.getSize(),
-        pinned: pinnedSide,
-        isDataColumn: Boolean(columnConfig),
-        canResize: column.getCanResize(),
-        maxWidth: maxSize
-      };
-    });
+  const columnRenderLayout = computeColumnLayout({
+    columns: table
+      .getVisibleLeafColumns()
+      .filter((column) => !hiddenColumnIds.has(column.id))
+      .slice()
+      .sort((left, right) => {
+        const leftIndex = columnOrderIndexById.get(left.id) ?? Number.MAX_SAFE_INTEGER;
+        const rightIndex = columnOrderIndexById.get(right.id) ?? Number.MAX_SAFE_INTEGER;
+        return leftIndex - rightIndex;
+      })
+      .map((column) => {
+        const columnConfig = columnById.get(column.id);
+        const pinnedSide: "left" | "center" | "right" = leftPinnedColumnIds.has(column.id)
+          ? "left"
+          : rightPinnedColumnIds.has(column.id)
+            ? "right"
+            : "center";
+        const maxSize = columnConfig?.maxWidth ?? column.columnDef.maxSize ?? null;
 
-    return computeColumnLayout({
-      columns: visibleColumns,
-      containerWidth
-    });
-  }, [
-    columnById,
-    columnOrder,
-    columnPinning,
-    columnSizing,
-    columnVisibility,
-    containerWidth,
-    table,
-    tableColumns
-  ]);
+        return {
+          id: column.id,
+          baseWidth: columnSizing[column.id] ?? column.getSize(),
+          pinned: pinnedSide,
+          isDataColumn: Boolean(columnConfig),
+          canResize: column.getCanResize(),
+          maxWidth: maxSize
+        };
+      }),
+    containerWidth
+  });
 
   const totalRows = mergedRows.length + (mergedFeatures.rowAdd ? 1 : 0);
 
@@ -1352,7 +1413,7 @@ export function DataTable<TRow extends DataTableRowModel>({
 
   const onGridKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
-      if (mergedFeatures.cellSelect) {
+      if (mergedFeatures.cellSelect && !isEditableKeyboardTarget(event.target)) {
         if (event.key === "ArrowDown") {
           event.preventDefault();
           moveActiveCell(1, 0, event.shiftKey);
@@ -2051,7 +2112,6 @@ export function DataTable<TRow extends DataTableRowModel>({
                       typeof header.column.columnDef.header === "number"
                         ? String(header.column.columnDef.header)
                         : fallbackHeader;
-                    const resizeHandler = header.getResizeHandler();
                     const pinnedState = header.column.getIsPinned();
                     const renderWidth = columnRenderLayout.renderWidthsById[header.column.id] ?? header.getSize();
                     const leftOffset = columnRenderLayout.leftPinnedOffsetById[header.column.id];
@@ -2077,15 +2137,15 @@ export function DataTable<TRow extends DataTableRowModel>({
                         data-column-id={columnConfig?.id}
                         data-column-sort-status={sortState || "none"}
                         data-column-filter-active={hasFilter ? "true" : "false"}
+                        data-pinned-state={pinnedState || "center"}
                         className={cn(
                           "group relative border-b border-r border-[var(--dt-border-color)] px-2 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600",
-                          header.column.getIsPinned()
-                            ? "sticky z-30 shadow-[var(--dt-pinned-shadow)]"
-                            : ""
+                          pinnedState
+                            ? "sticky z-30 shadow-[var(--dt-pinned-shadow)] [background:var(--dt-pinned-header-bg)]"
+                            : "[background:var(--dt-header-bg)]"
                         )}
                         style={{
                           ...fixedTrackStyle(renderWidth),
-                          background: "var(--dt-header-bg)",
                           boxShadow: dropIndicator,
                           left: pinnedState === "left" ? `${leftOffset ?? 0}px` : undefined,
                           right: pinnedState === "right" ? `${rightOffset ?? 0}px` : undefined
@@ -2392,12 +2452,12 @@ export function DataTable<TRow extends DataTableRowModel>({
                               onMouseDown={(event) => {
                                 event.preventDefault();
                                 event.stopPropagation();
-                                resizeHandler(event);
+                                header.getResizeHandler(event.currentTarget.ownerDocument)(event.nativeEvent);
                               }}
                               onTouchStart={(event) => {
                                 event.preventDefault();
                                 event.stopPropagation();
-                                resizeHandler(event);
+                                header.getResizeHandler(event.currentTarget.ownerDocument)(event.nativeEvent);
                               }}
                               aria-label={`Resize ${resizeLabel}`}
                             />
@@ -2506,7 +2566,7 @@ export function DataTable<TRow extends DataTableRowModel>({
                   <tr
                     key={rowModel.id}
                     ref={getRowRefHandler(rowId)}
-                    className="absolute left-0 bg-[var(--dt-row-bg)] transition-colors hover:bg-[var(--dt-row-hover-bg)]"
+                    className="group absolute left-0 bg-[var(--dt-row-bg)] transition-colors hover:bg-[var(--dt-row-hover-bg)]"
                     style={{
                       display: "flex",
                       transform: `translateY(${top}px)`,
@@ -2524,9 +2584,12 @@ export function DataTable<TRow extends DataTableRowModel>({
                       return (
                         <td
                           key={cell.id}
+                          data-pinned-state={pinned || "center"}
                           className={cn(
                             "border-r border-b border-[var(--dt-border-color)] align-top",
-                            pinned ? "sticky z-10 bg-[var(--dt-row-bg)] shadow-[var(--dt-pinned-shadow)]" : ""
+                            pinned
+                              ? "sticky z-10 shadow-[var(--dt-pinned-shadow)] [background:var(--dt-pinned-row-bg)] group-hover:[background:var(--dt-pinned-row-hover-bg)]"
+                              : ""
                           )}
                           style={{
                             ...fixedTrackStyle(renderWidth),

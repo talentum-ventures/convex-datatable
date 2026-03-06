@@ -277,8 +277,11 @@ export type DataTableThemeTokens = {
   radius: string;
   borderColor: string;
   headerBg: string;
+  pinnedHeaderBg: string;
   rowBg: string;
   rowHoverBg: string;
+  pinnedRowBg: string;
+  pinnedRowHoverBg: string;
   pinnedShadow: string;
   activeCellRing: string;
   selectionBg: string;
