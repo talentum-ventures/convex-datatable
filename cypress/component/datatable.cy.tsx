@@ -38,6 +38,71 @@ const columns: ReadonlyArray<DataTableColumn<TaskRow>> = [
   }
 ];
 
+const alignmentColumns: ReadonlyArray<DataTableColumn<TaskRow>> = [
+  {
+    id: "title",
+    field: "title",
+    header: "Title",
+    kind: "text",
+    width: 160
+  },
+  {
+    id: "status",
+    field: "status",
+    header: "Status",
+    kind: "select",
+    width: 140,
+    options: [
+      { value: "todo", label: "To do", colorClass: "bg-slate-100 text-slate-700" },
+      { value: "done", label: "Done", colorClass: "bg-emerald-100 text-emerald-700" }
+    ]
+  },
+  {
+    id: "amount",
+    field: "amount",
+    header: "Amount",
+    kind: "number",
+    width: 120
+  }
+];
+
+function assertHeaderBodyColumnAlignment(columnId: string, rowId: string): void {
+  cy.get(`th[data-column-id='${columnId}']`)
+    .first()
+    .then(($headerCell) => {
+      const headerRect = $headerCell[0].getBoundingClientRect();
+
+      cy.get(`tr[data-row-id='${rowId}'] [role='gridcell'][data-column-id='${columnId}']`)
+        .first()
+        .closest("td")
+        .then(($bodyCell) => {
+          const bodyRect = $bodyCell[0].getBoundingClientRect();
+          expect(Math.abs(headerRect.left - bodyRect.left), `${columnId} left edge alignment`).to.be.lte(1);
+          expect(Math.abs(headerRect.right - bodyRect.right), `${columnId} right edge alignment`).to.be.lte(1);
+          expect(Math.abs(headerRect.width - bodyRect.width), `${columnId} width alignment`).to.be.lte(1);
+        });
+    });
+}
+
+function assertBodyColumnWidthConsistency(columnId: string, firstRowId: string, secondRowId: string): void {
+  cy.get(`tr[data-row-id='${firstRowId}'] [role='gridcell'][data-column-id='${columnId}']`)
+    .first()
+    .closest("td")
+    .then(($firstBodyCell) => {
+      const firstRect = $firstBodyCell[0].getBoundingClientRect();
+
+      cy.get(`tr[data-row-id='${secondRowId}'] [role='gridcell'][data-column-id='${columnId}']`)
+        .first()
+        .closest("td")
+        .then(($secondBodyCell) => {
+          const secondRect = $secondBodyCell[0].getBoundingClientRect();
+          expect(Math.abs(firstRect.width - secondRect.width), `${columnId} row-to-row width consistency`).to.be.lte(1);
+          expect(Math.abs(firstRect.left - secondRect.left), `${columnId} row-to-row left edge consistency`).to.be.lte(1);
+          expect(Math.abs(firstRect.right - secondRect.right), `${columnId} row-to-row right edge consistency`).to.be.lte(1);
+        });
+    });
+}
+
 function Harness({ tableId }: { tableId: string }): JSX.Element {
   const [rows, setRows] = useState<ReadonlyArray<TaskRow>>([
     { id: "1", title: "Build UI", status: "todo", amount: 10 },
@@ -135,6 +200,43 @@ function VirtualizationHarness({ tableId }: { tableId: string }): JSX.Element {
         columns={columns}
         dataSource={dataSource}
         getRowId={(row) => row.id}
+      />
+    </div>
+  );
+}
+
+function AlignmentHarness({ tableId }: { tableId: string }): JSX.Element {
+  const rows = useMemo<ReadonlyArray<TaskRow>>(
+    () => [
+      { id: "1", title: "Build UI", status: "todo", amount: 10 },
+      { id: "2", title: "Ship", status: "done", amount: 20 }
+    ],
+    []
+  );
+
+  const dataSource = useMemo<DataTableDataSource<TaskRow>>(
+    () => ({
+      useRows: () => ({
+        rows,
+        hasMore: false,
+        isLoading: false,
+        isLoadingMore: false,
+        error: null,
+        loadMore: () => undefined,
+        refresh: () => undefined
+      })
+    }),
+    [rows]
+  );
+
+  return (
+    <div className="w-[1200px] p-4">
+      <DataTable
+        tableId={tableId}
+        columns={alignmentColumns}
+        dataSource={dataSource}
+        getRowId={(row) => row.id}
+        features={{ rowSelect: false, rowActions: false, infiniteScroll: false, virtualization: false }}
       />
     </div>
   );
@@ -275,6 +377,39 @@ describe("DataTable component", () => {
         const order = [...$cells].map((cell) => cell.getAttribute("data-column-id"));
         expect(order).to.deep.equal(["title", "status", "amount"]);
       });
+  });
+
+  it("keeps header and body column edges aligned in fill mode and after resize", () => {
+    cy.mount(<AlignmentHarness tableId="cypress-table-alignment" />);
+
+    assertHeaderBodyColumnAlignment("title", "1");
+    assertHeaderBodyColumnAlignment("status", "1");
+    assertHeaderBodyColumnAlignment("amount", "1");
+    assertBodyColumnWidthConsistency("title", "1", "2");
+    assertBodyColumnWidthConsistency("status", "1", "2");
+    assertBodyColumnWidthConsistency("amount", "1", "2");
+
+    let resizeStartX = 0;
+
+    cy.get("th[data-column-id='status']").then(($header) => {
+      const rect = $header[0].getBoundingClientRect();
+      resizeStartX = Math.round(rect.right - 1);
+      cy.get("[data-column-resize-handle='status']").trigger("mousedown", {
+        button: 0,
+        clientX: resizeStartX,
+        force: true
+      });
+    });
+
+    cy.document().trigger("mousemove", { clientX: resizeStartX + 120 });
+    cy.document().trigger("mouseup");
+
+    assertHeaderBodyColumnAlignment("title", "1");
+    assertHeaderBodyColumnAlignment("status", "1");
+    assertHeaderBodyColumnAlignment("amount", "1");
+    assertBodyColumnWidthConsistency("title", "1", "2");
+    assertBodyColumnWidthConsistency("status", "1", "2");
+    assertBodyColumnWidthConsistency("amount", "1", "2");
   });
 
   it("adds a row from the draft row and deletes selected rows", () => {

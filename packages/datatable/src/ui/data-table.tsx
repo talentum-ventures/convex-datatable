@@ -86,6 +86,7 @@ import { expandPasteMatrix, parseTsv, serializeTsv } from "../selection/clipboar
 import { normalizeRange } from "../selection/range";
 import { usePersistedState } from "../persistence/use-persisted-state";
 import { useRowHeights } from "../virtual/row-heights";
+import { computeColumnLayout } from "./column-layout";
 import { Button, Checkbox, Input } from "./primitives";
 
 type EditingCell = {
@@ -320,6 +321,17 @@ function tableStyle(theme: DataTableThemeTokens): CssVarsStyle {
     "--dt-selection-bg": theme.selectionBg
   };
   return style;
+}
+
+function fixedTrackStyle(width: number): CSSProperties {
+  const normalizedWidth = `${Math.max(0, Math.round(width))}px`;
+  return {
+    boxSizing: "border-box",
+    width: normalizedWidth,
+    minWidth: normalizedWidth,
+    maxWidth: normalizedWidth,
+    flex: `0 0 ${normalizedWidth}`
+  };
 }
 
 function resolveThemeTokens(
@@ -880,6 +892,36 @@ export function DataTable<TRow extends DataTableRowModel>({
 
   const tableRows = table.getRowModel().rows;
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    const containerNode = tableContainerRef.current;
+    if (!containerNode) {
+      return;
+    }
+
+    const applyWidth = (nextWidth: number): void => {
+      const normalized = Math.max(0, Math.floor(nextWidth));
+      setContainerWidth((current) => (current === normalized ? current : normalized));
+    };
+
+    applyWidth(containerNode.clientWidth);
+
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        applyWidth(entry.contentRect.width);
+      }
+    });
+
+    observer.observe(containerNode);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   const resolveColumnMenuAnchor = useCallback((trigger: HTMLElement): ColumnMenuAnchor => {
     const triggerRect = trigger.getBoundingClientRect();
@@ -888,6 +930,39 @@ export function DataTable<TRow extends DataTableRowModel>({
     const projectedLeft = triggerRect.right - COLUMN_MENU_WIDTH_PX;
     return projectedLeft < minLeft ? "left" : "right";
   }, []);
+
+  const columnRenderLayout = useMemo(() => {
+    const visibleColumns = table.getVisibleLeafColumns().map((column) => {
+      const columnConfig = columnById.get(column.id);
+      const pinned = column.getIsPinned();
+      const pinnedSide: "left" | "center" | "right" =
+        pinned === "left" || pinned === "right" ? pinned : "center";
+      const maxSize = columnConfig?.maxWidth ?? column.columnDef.maxSize ?? null;
+
+      return {
+        id: column.id,
+        baseWidth: column.getSize(),
+        pinned: pinnedSide,
+        isDataColumn: Boolean(columnConfig),
+        canResize: column.getCanResize(),
+        maxWidth: maxSize
+      };
+    });
+
+    return computeColumnLayout({
+      columns: visibleColumns,
+      containerWidth
+    });
+  }, [
+    columnById,
+    columnOrder,
+    columnPinning,
+    columnSizing,
+    columnVisibility,
+    containerWidth,
+    table,
+    tableColumns
+  ]);
 
   const totalRows = mergedRows.length + (mergedFeatures.rowAdd ? 1 : 0);
 
@@ -1923,20 +1998,31 @@ export function DataTable<TRow extends DataTableRowModel>({
           aria-colcount={visibleDataColumns.length}
         >
           <table
-            className="w-full border-separate border-spacing-0 text-left"
+            className="border-separate border-spacing-0 text-left"
             style={{
-              minWidth: `${table.getTotalSize()}px`,
+              boxSizing: "border-box",
+              display: "grid",
+              tableLayout: "fixed",
+              width: `${columnRenderLayout.tableRenderWidth}px`,
+              minWidth: `${columnRenderLayout.tableRenderWidth}px`,
               fontFamily: "var(--dt-font-family)"
             }}
           >
             <thead
               className="sticky top-0 z-30"
               style={{
+                display: "grid",
                 background: "var(--dt-header-bg)"
               }}
             >
               {table.getHeaderGroups().map((headerGroup) => (
-                <tr key={headerGroup.id}>
+                <tr
+                  key={headerGroup.id}
+                  style={{
+                    display: "flex",
+                    width: `${columnRenderLayout.tableRenderWidth}px`
+                  }}
+                >
                   {headerGroup.headers.map((header) => {
                     const columnConfig = columnById.get(header.column.id);
                     const isDataColumn = Boolean(columnConfig);
@@ -1966,6 +2052,10 @@ export function DataTable<TRow extends DataTableRowModel>({
                         ? String(header.column.columnDef.header)
                         : fallbackHeader;
                     const resizeHandler = header.getResizeHandler();
+                    const pinnedState = header.column.getIsPinned();
+                    const renderWidth = columnRenderLayout.renderWidthsById[header.column.id] ?? header.getSize();
+                    const leftOffset = columnRenderLayout.leftPinnedOffsetById[header.column.id];
+                    const rightOffset = columnRenderLayout.rightPinnedOffsetById[header.column.id];
 
                     return (
                       <th
@@ -1994,17 +2084,14 @@ export function DataTable<TRow extends DataTableRowModel>({
                             : ""
                         )}
                         style={{
-                          width: `${header.getSize()}px`,
+                          ...fixedTrackStyle(renderWidth),
                           background: "var(--dt-header-bg)",
                           boxShadow: dropIndicator,
-                          left: header.column.getIsPinned() === "left" ? `${header.getStart("left")}px` : undefined,
-                          right:
-                            header.column.getIsPinned() === "right"
-                              ? `${header.column.getAfter("right")}px`
-                              : undefined
+                          left: pinnedState === "left" ? `${leftOffset ?? 0}px` : undefined,
+                          right: pinnedState === "right" ? `${rightOffset ?? 0}px` : undefined
                         }}
                       >
-                        <div className="flex items-center justify-between gap-1">
+                        <div className="flex w-full items-center justify-between gap-1">
                           <div className="inline-flex min-w-0 items-center gap-1">
                             {canReorder && columnConfig ? (
                               <button
@@ -2325,8 +2412,11 @@ export function DataTable<TRow extends DataTableRowModel>({
 
             <tbody
               style={{
+                display: "grid",
                 height: `${totalHeight}px`,
-                position: "relative"
+                position: "relative",
+                width: `${columnRenderLayout.tableRenderWidth}px`,
+                minWidth: `${columnRenderLayout.tableRenderWidth}px`
               }}
             >
               {virtualItems.map((virtualRow) => {
@@ -2341,16 +2431,19 @@ export function DataTable<TRow extends DataTableRowModel>({
                   return (
                     <tr
                       key="__draft__"
-                      className="absolute left-0 w-full"
+                      className="absolute left-0"
                       style={{
+                        display: "flex",
                         transform: `translateY(${virtualRow.start}px)`,
-                        height: `${virtualRow.size}px`
+                        height: `${virtualRow.size}px`,
+                        width: `${columnRenderLayout.tableRenderWidth}px`
                       }}
                       data-index={rowIndex}
                     >
                       {table.getVisibleLeafColumns().map((column) => {
                         const columnConfig = columnById.get(column.id);
-                        const widthStyle = { width: `${column.getSize()}px` };
+                        const renderWidth = columnRenderLayout.renderWidthsById[column.id] ?? column.getSize();
+                        const widthStyle = fixedTrackStyle(renderWidth);
 
                         if (!columnConfig) {
                           return (
@@ -2413,16 +2506,21 @@ export function DataTable<TRow extends DataTableRowModel>({
                   <tr
                     key={rowModel.id}
                     ref={getRowRefHandler(rowId)}
-                    className="absolute left-0 w-full bg-[var(--dt-row-bg)] transition-colors hover:bg-[var(--dt-row-hover-bg)]"
+                    className="absolute left-0 bg-[var(--dt-row-bg)] transition-colors hover:bg-[var(--dt-row-hover-bg)]"
                     style={{
+                      display: "flex",
                       transform: `translateY(${top}px)`,
-                      minHeight: `${rowHeights.getFinalHeight(rowId)}px`
+                      minHeight: `${rowHeights.getFinalHeight(rowId)}px`,
+                      width: `${columnRenderLayout.tableRenderWidth}px`
                     }}
                     data-row-id={rowId}
                     data-index={rowIndex}
                   >
                     {rowModel.getVisibleCells().map((cell) => {
                       const pinned = cell.column.getIsPinned();
+                      const renderWidth = columnRenderLayout.renderWidthsById[cell.column.id] ?? cell.column.getSize();
+                      const leftOffset = columnRenderLayout.leftPinnedOffsetById[cell.column.id];
+                      const rightOffset = columnRenderLayout.rightPinnedOffsetById[cell.column.id];
                       return (
                         <td
                           key={cell.id}
@@ -2431,9 +2529,9 @@ export function DataTable<TRow extends DataTableRowModel>({
                             pinned ? "sticky z-10 bg-[var(--dt-row-bg)] shadow-[var(--dt-pinned-shadow)]" : ""
                           )}
                           style={{
-                            width: `${cell.column.getSize()}px`,
-                            left: pinned === "left" ? `${cell.column.getStart("left")}px` : undefined,
-                            right: pinned === "right" ? `${cell.column.getAfter("right")}px` : undefined
+                            ...fixedTrackStyle(renderWidth),
+                            left: pinned === "left" ? `${leftOffset ?? 0}px` : undefined,
+                            right: pinned === "right" ? `${rightOffset ?? 0}px` : undefined
                           }}
                         >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -2441,7 +2539,16 @@ export function DataTable<TRow extends DataTableRowModel>({
                       );
                     })}
                     {mergedFeatures.rowResize ? (
-                      <td className="relative w-0 p-0">
+                      <td
+                        className="relative p-0"
+                        style={{
+                          boxSizing: "border-box",
+                          width: "0px",
+                          minWidth: "0px",
+                          maxWidth: "0px",
+                          flex: "0 0 0px"
+                        }}
+                      >
                         <button
                           type="button"
                           className="absolute bottom-0 left-0 h-1 w-full cursor-row-resize bg-transparent hover:bg-sky-200"
