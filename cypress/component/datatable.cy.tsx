@@ -267,6 +267,43 @@ function AlignmentHarness({ tableId }: { tableId: string }): JSX.Element {
   );
 }
 
+function HorizontalScrollHarness({ tableId }: { tableId: string }): JSX.Element {
+  const rows = useMemo<ReadonlyArray<TaskRow>>(
+    () => [
+      { id: "1", title: "Build UI", status: "todo", amount: 10 },
+      { id: "2", title: "Ship", status: "done", amount: 20 }
+    ],
+    []
+  );
+
+  const dataSource = useMemo<DataTableDataSource<TaskRow>>(
+    () => ({
+      useRows: () => ({
+        rows,
+        hasMore: false,
+        isLoading: false,
+        isLoadingMore: false,
+        error: null,
+        loadMore: () => undefined,
+        refresh: () => undefined
+      })
+    }),
+    [rows]
+  );
+
+  return (
+    <div className="w-[220px] p-4">
+      <DataTable
+        tableId={tableId}
+        columns={alignmentColumns}
+        dataSource={dataSource}
+        getRowId={(row) => row.id}
+        features={{ rowSelect: false, rowActions: false, infiniteScroll: false, virtualization: false }}
+      />
+    </div>
+  );
+}
+
 function LinkOverflowHarness({ tableId }: { tableId: string }): JSX.Element {
   const rows = useMemo<ReadonlyArray<TaskRow>>(
     () => [
@@ -580,6 +617,49 @@ describe("DataTable component", () => {
     cy.findByRole("grid").trigger("keydown", { key: "Enter" });
     cy.findByLabelText("Edit Title").should("exist");
     cy.findByLabelText("Edit Status").should("not.exist");
+  });
+
+  it("scrolls horizontally to keep the active cell in view during keyboard navigation", () => {
+    cy.mount(<HorizontalScrollHarness tableId="cypress-table-keyboard-horizontal-scroll" />);
+
+    cy.get(`tr[data-row-id='1'] [role='gridcell'][data-column-id='title']`).click();
+    cy.findByRole("grid").focus();
+    cy.findByRole("grid").should(($grid) => {
+      expect($grid[0]?.scrollLeft ?? 0).to.equal(0);
+    });
+
+    cy.findByRole("grid").trigger("keydown", { key: "ArrowRight" });
+    cy.findByRole("grid").trigger("keydown", { key: "ArrowRight" });
+
+    cy.findByRole("grid").should(($grid) => {
+      expect($grid[0]?.scrollLeft ?? 0).to.be.greaterThan(0);
+    });
+
+    cy.get(`tr[data-row-id='1'] [role='gridcell'][data-column-id='amount']`).then(($cell) => {
+      const cellRect = $cell[0].getBoundingClientRect();
+
+      cy.findByRole("grid").then(($grid) => {
+        const gridRect = $grid[0].getBoundingClientRect();
+        expect(cellRect.right, "amount cell should be inside the scroll viewport").to.be.lte(gridRect.right + 1);
+      });
+    });
+  });
+
+  it("scrolls vertically to keep the active cell in view during keyboard navigation", () => {
+    cy.mount(<VirtualizationHarness tableId="cypress-table-keyboard-vertical-scroll" />);
+
+    cy.get(`tr[data-row-id='1'] [role='gridcell'][data-column-id='title']`).click();
+    cy.findByRole("grid").focus();
+
+    Array.from({ length: 20 }).forEach(() => {
+      cy.findByRole("grid").trigger("keydown", { key: "ArrowDown" });
+    });
+
+    cy.findByRole("grid").should(($grid) => {
+      expect($grid[0]?.scrollTop ?? 0).to.be.greaterThan(0);
+    });
+
+    cy.get(`[role='gridcell'][data-row-index='20'][data-column-id='title']`).should("exist");
   });
 
   it("keeps arrow keys inside the active editor bound to the editor", () => {
