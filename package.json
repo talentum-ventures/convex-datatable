@@ -1,0 +1,52 @@
+{
+  "name": "rolha-grid",
+  "version": "0.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.12.0 <23"
+  },
+  "packageManager": "bun@1.2.5",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "tests/*"
+  ],
+  "scripts": {
+    "check:demo-src-no-js": "if rg --files apps/demo/src -g '*.js' -g '*.jsx' > /dev/null; then echo 'Error: JavaScript source files are not allowed in apps/demo/src'; rg --files apps/demo/src -g '*.js' -g '*.jsx'; exit 1; fi",
+    "dev": "bun --filter @rolha/demo dev",
+    "build": "bun run check:demo-src-no-js && bun --filter @rolha/datatable build && bun --filter @rolha/demo build",
+    "typecheck": "bun run check:demo-src-no-js && tsgo --build --pretty false && bun run test:types",
+    "typecheck:datatable": "tsgo --project packages/datatable/tsconfig.json --noEmit --pretty false",
+    "typecheck:demo": "tsgo --project apps/demo/tsconfig.json --noEmit --pretty false",
+    "lint": "bun run check:demo-src-no-js && oxlint . --deny-warnings",
+    "lint:fix": "oxlint . --fix",
+    "format": "oxlint . --fix",
+    "format:check": "oxlint . --deny-warnings",
+    "test:unit": "vitest run",
+    "test:types": "tsc -p tests/types/tsconfig.json --noEmit",
+    "test:cypress:component": "VITE_CJS_IGNORE_WARNING=true env -u ELECTRON_RUN_AS_NODE cypress run --component --browser electron --headless",
+    "test:cypress:e2e": "VITE_CJS_IGNORE_WARNING=true env -u ELECTRON_RUN_AS_NODE start-server-and-test \"bun --filter @rolha/demo dev --host 127.0.0.1 --port 5173\" http://127.0.0.1:5173 \"cypress run --e2e --browser electron --headless --config baseUrl=http://127.0.0.1:5173\""
+  },
+  "devDependencies": {
+    "@cypress/react": "^9.0.0",
+    "@cypress/vite-dev-server": "^7.0.1",
+    "@testing-library/cypress": "^10.0.3",
+    "@testing-library/jest-dom": "^6.5.0",
+    "@testing-library/react": "^16.1.0",
+    "@typescript/native-preview": "^7.0.0-dev.20260216.1",
+    "@types/node": "^22.10.7",
+    "@types/react": "^18.3.17",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "cypress": "^14.0.0",
+    "jsdom": "^25.0.1",
+    "oxlint": "^1.29.0",
+    "postcss": "^8.5.1",
+    "start-server-and-test": "^2.1.2",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7",
+    "vitest": "^2.1.8"
+  }
+}

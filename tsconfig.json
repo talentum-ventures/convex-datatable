@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "baseUrl": "."
+  },
+  "files": [],
+  "references": [
+    { "path": "packages/datatable" },
+    { "path": "apps/demo" },
+    { "path": "tests/types" }
+  ]
+}

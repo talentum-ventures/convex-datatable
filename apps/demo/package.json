@@ -1,0 +1,24 @@
+{
+  "name": "@rolha/demo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0 <23"
+  },
+  "scripts": {
+    "check:no-js-src": "if rg --files src -g '*.js' -g '*.jsx' > /dev/null; then echo 'Error: JavaScript source files are not allowed in apps/demo/src'; rg --files src -g '*.js' -g '*.jsx'; exit 1; fi",
+    "dev": "vite",
+    "build": "bun run check:no-js-src && tsc -p tsconfig.json --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "bun run check:no-js-src && tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@rolha/datatable": "workspace:*",
+    "lucide-react": "^0.469.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "sonner": "^1.7.1",
+    "zod": "^3.24.1"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "types": ["cypress", "node"],
+    "jsx": "react-jsx",
+    "paths": {
+      "@rolha/datatable": ["packages/datatable/src/index.ts"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", "../cypress.config.ts"]
+}
