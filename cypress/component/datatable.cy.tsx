@@ -561,6 +561,27 @@ describe("DataTable component", () => {
     cy.contains("Done").should("exist");
   });
 
+  it("navigates selected cells by visual order when a column is pinned left", () => {
+    cy.mount(<Harness tableId="cypress-table-pinned-keyboard-navigation" />);
+
+    cy.get("[data-column-menu-trigger='status']").first().click({ force: true });
+    cy.contains("button", "Left").click({ force: true });
+    cy.get("body").click(0, 0);
+
+    cy.get(`tr[data-row-id='1'] [role='gridcell'][data-column-id='title']`).click();
+    cy.findByRole("grid").focus().trigger("keydown", { key: "ArrowRight" });
+    cy.findByRole("grid").trigger("keydown", { key: "Enter" });
+    cy.findByLabelText("Edit Amount").should("exist");
+    cy.findByLabelText("Edit Status").should("not.exist");
+    cy.findByLabelText("Edit Amount").type("{esc}");
+
+    cy.get(`tr[data-row-id='1'] [role='gridcell'][data-column-id='amount']`).click();
+    cy.findByRole("grid").focus().trigger("keydown", { key: "ArrowLeft" });
+    cy.findByRole("grid").trigger("keydown", { key: "Enter" });
+    cy.findByLabelText("Edit Title").should("exist");
+    cy.findByLabelText("Edit Status").should("not.exist");
+  });
+
   it("keeps arrow keys inside the active editor bound to the editor", () => {
     cy.mount(<Harness tableId="cypress-table-editor-arrow-ownership" />);
 

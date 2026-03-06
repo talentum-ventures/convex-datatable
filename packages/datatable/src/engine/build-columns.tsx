@@ -12,6 +12,7 @@ import type {
 } from "../core/types";
 import { cn } from "../core/cn";
 import { formatColumnValue, parseDateValue, parseTextNumber } from "../core/formatters";
+import { getVisibleDataColumnIdsInUiOrder } from "../ui/visible-column-order";
 
 type ActiveCell = CellCoord | null;
 
@@ -345,10 +346,7 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
     let cachedVisibleDataIndexById: Record<string, number> = {};
 
     const visibleDataIndexById = (table: Table<TRow>): Readonly<Record<string, number>> => {
-      const visibleDataIds = table
-        .getVisibleLeafColumns()
-        .map((entry) => entry.id)
-        .filter((id) => id !== "__select__" && id !== "__actions__");
+      const visibleDataIds = getVisibleDataColumnIdsInUiOrder(table);
       const nextSignature = visibleDataIds.join("|");
 
       if (nextSignature === cachedVisibleDataIds) {

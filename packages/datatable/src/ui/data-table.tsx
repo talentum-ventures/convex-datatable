@@ -14,6 +14,7 @@ import {
   flexRender,
   getCoreRowModel,
   useReactTable,
+  type Column,
   type ColumnDef,
   type ColumnFiltersState,
   type ColumnPinningState,
@@ -88,6 +89,7 @@ import { normalizeRange } from "../selection/range";
 import { usePersistedState } from "../persistence/use-persisted-state";
 import { useRowHeights } from "../virtual/row-heights";
 import { computeColumnLayout } from "./column-layout";
+import { getVisibleDataColumnIdsInUiOrder, getVisibleLeafColumnIdsInUiOrder } from "./visible-column-order";
 import { Button, Checkbox, Input } from "./primitives";
 
 type EditingCell = {
@@ -908,14 +910,14 @@ export function DataTable<TRow extends DataTableRowModel>({
     [columnVisibility, orderedColumns]
   );
 
-  const visibleDataColumns = useMemo(
-    () =>
-      table
-        .getVisibleLeafColumns()
-        .map((column) => columnById.get(column.id))
-        .filter((column): column is DataTableColumn<TRow> => Boolean(column)),
-    [columnById, table]
-  );
+  const visibleLeafColumnIdsInUiOrder = getVisibleLeafColumnIdsInUiOrder(table);
+  const visibleLeafColumnsInUiOrder = visibleLeafColumnIdsInUiOrder
+    .map((columnId) => table.getColumn(columnId))
+    .filter((column): column is Column<TRow, DataTableCellValue> => Boolean(column));
+  const visibleDataColumnIdsInUiOrder = getVisibleDataColumnIdsInUiOrder(table);
+  const visibleDataColumns = visibleDataColumnIdsInUiOrder
+    .map((columnId) => columnById.get(columnId))
+    .filter((column): column is DataTableColumn<TRow> => Boolean(column));
 
   const tableRows = table.getRowModel().rows;
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
@@ -983,45 +985,21 @@ export function DataTable<TRow extends DataTableRowModel>({
     return projectedLeft < minLeft ? "left" : "right";
   }, []);
 
-  const hiddenColumnIds = new Set(
-    Object.entries(columnVisibility)
-      .filter(([, isVisible]) => isVisible === false)
-      .map(([columnId]) => columnId)
-  );
-  const leftPinnedColumnIds = new Set(columnPinning.left ?? []);
-  const rightPinnedColumnIds = new Set(columnPinning.right ?? []);
-  const columnOrderIndexById = new Map(
-    columnOrder.map((columnId, index) => [columnId, index] as const)
-  );
-
   const columnRenderLayout = computeColumnLayout({
-    columns: table
-      .getVisibleLeafColumns()
-      .filter((column) => !hiddenColumnIds.has(column.id))
-      .slice()
-      .sort((left, right) => {
-        const leftIndex = columnOrderIndexById.get(left.id) ?? Number.MAX_SAFE_INTEGER;
-        const rightIndex = columnOrderIndexById.get(right.id) ?? Number.MAX_SAFE_INTEGER;
-        return leftIndex - rightIndex;
-      })
-      .map((column) => {
-        const columnConfig = columnById.get(column.id);
-        const pinnedSide: "left" | "center" | "right" = leftPinnedColumnIds.has(column.id)
-          ? "left"
-          : rightPinnedColumnIds.has(column.id)
-            ? "right"
-            : "center";
-        const maxSize = columnConfig?.maxWidth ?? column.columnDef.maxSize ?? null;
+    columns: visibleLeafColumnsInUiOrder.map((column) => {
+      const columnConfig = columnById.get(column.id);
+      const pinnedState = column.getIsPinned();
+      const maxSize = columnConfig?.maxWidth ?? column.columnDef.maxSize ?? null;
 
-        return {
-          id: column.id,
-          baseWidth: columnSizing[column.id] ?? column.getSize(),
-          pinned: pinnedSide,
-          isDataColumn: Boolean(columnConfig),
-          canResize: column.getCanResize(),
-          maxWidth: maxSize
-        };
-      }),
+      return {
+        id: column.id,
+        baseWidth: columnSizing[column.id] ?? column.getSize(),
+        pinned: pinnedState === "left" || pinnedState === "right" ? pinnedState : "center",
+        isDataColumn: Boolean(columnConfig),
+        canResize: column.getCanResize(),
+        maxWidth: maxSize
+      };
+    }),
     containerWidth
   });
 
@@ -2500,7 +2478,7 @@ export function DataTable<TRow extends DataTableRowModel>({
                       }}
                       data-index={rowIndex}
                     >
-                      {table.getVisibleLeafColumns().map((column) => {
+                      {visibleLeafColumnsInUiOrder.map((column) => {
                         const columnConfig = columnById.get(column.id);
                         const renderWidth = columnRenderLayout.renderWidthsById[column.id] ?? column.getSize();
                         const widthStyle = fixedTrackStyle(renderWidth);
