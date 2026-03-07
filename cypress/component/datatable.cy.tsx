@@ -8,6 +8,7 @@ type TaskRow = {
   title: string;
   status: string;
   amount: number;
+  notes?: string;
   website?: string;
 };
 
@@ -88,6 +89,27 @@ const linkOverflowColumns: ReadonlyArray<DataTableColumn<TaskRow>> = [
     header: "Amount",
     kind: "number",
     width: 100
+  }
+];
+
+const measuredRowColumns: ReadonlyArray<DataTableColumn<TaskRow>> = [
+  {
+    id: "notes",
+    field: "notes",
+    header: "Notes",
+    kind: "longText",
+    width: 150
+  },
+  {
+    id: "status",
+    field: "status",
+    header: "Status",
+    kind: "select",
+    width: 120,
+    options: [
+      { value: "todo", label: "To do", colorClass: "bg-slate-100 text-slate-700" },
+      { value: "done", label: "Done", colorClass: "bg-emerald-100 text-emerald-700" }
+    ]
   }
 ];
 
@@ -346,6 +368,56 @@ function LinkOverflowHarness({ tableId }: { tableId: string }): JSX.Element {
   );
 }
 
+function MeasuredRowsHarness({ tableId }: { tableId: string }): JSX.Element {
+  const rows = useMemo<ReadonlyArray<TaskRow>>(
+    () => [
+      {
+        id: "1",
+        title: "Build UI",
+        status: "todo",
+        amount: 10,
+        notes:
+          "This row uses long text content that wraps across multiple lines so ResizeObserver has a larger measured height to apply."
+      },
+      {
+        id: "2",
+        title: "Ship",
+        status: "done",
+        amount: 20,
+        notes: "Short note"
+      }
+    ],
+    []
+  );
+
+  const dataSource = useMemo<DataTableDataSource<TaskRow>>(
+    () => ({
+      useRows: () => ({
+        rows,
+        hasMore: false,
+        isLoading: false,
+        isLoadingMore: false,
+        error: null,
+        loadMore: () => undefined,
+        refresh: () => undefined
+      })
+    }),
+    [rows]
+  );
+
+  return (
+    <div className="w-[360px] p-4">
+      <DataTable
+        tableId={tableId}
+        columns={measuredRowColumns}
+        dataSource={dataSource}
+        getRowId={(row) => row.id}
+        features={{ rowSelect: false, rowActions: false, infiniteScroll: false, virtualization: false }}
+      />
+    </div>
+  );
+}
+
 describe("DataTable component", () => {
   it("edits a text cell", () => {
     cy.mount(<Harness tableId="cypress-table-edit" />);
@@ -573,6 +645,37 @@ describe("DataTable component", () => {
             expect(Math.abs(cellRect.right - bodyRect.right), "website cell should stay within its column width").to.be.lte(1);
           });
       });
+  });
+
+  it("stacks non-virtualized rows using measured row heights", () => {
+    cy.mount(<MeasuredRowsHarness tableId="cypress-table-measured-row-heights" />);
+
+    cy.get("tbody").should(($tbody) => {
+      const tbody = $tbody[0];
+      const firstRow = tbody.querySelector("tr[data-row-id='1']");
+      const secondRow = tbody.querySelector("tr[data-row-id='2']");
+
+      expect(firstRow, "first row should render").to.not.equal(null);
+      expect(secondRow, "second row should render").to.not.equal(null);
+
+      if (!(firstRow instanceof HTMLTableRowElement) || !(secondRow instanceof HTMLTableRowElement)) {
+        throw new Error("Expected measured rows to render as table rows");
+      }
+
+      const firstRect = firstRow.getBoundingClientRect();
+      const secondRect = secondRow.getBoundingClientRect();
+      const tbodyRect = tbody.getBoundingClientRect();
+
+      expect(firstRect.height, "first row should grow beyond the base min height").to.be.greaterThan(40);
+      expect(
+        Math.abs(secondRect.top - firstRect.bottom),
+        "second row should start where the first row ends"
+      ).to.be.lte(1);
+      expect(
+        Math.abs(tbodyRect.height - (secondRect.bottom - tbodyRect.top)),
+        "tbody height should reach the last rendered row"
+      ).to.be.lte(1);
+    });
   });
 
   it("adds a row from the draft row and deletes selected rows", () => {

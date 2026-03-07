@@ -88,6 +88,7 @@ import { expandPasteMatrix, parseTsv, serializeTsv } from "../selection/clipboar
 import { normalizeRange } from "../selection/range";
 import { usePersistedState } from "../persistence/use-persisted-state";
 import { useRowHeights } from "../virtual/row-heights";
+import { buildStaticVirtualItems, getStaticVirtualTotalHeight } from "../virtual/static-virtual-items";
 import { computeColumnLayout } from "./column-layout";
 import { getVisibleDataColumnIdsInUiOrder, getVisibleLeafColumnIdsInUiOrder } from "./visible-column-order";
 import { Button, Checkbox, Input } from "./primitives";
@@ -363,8 +364,8 @@ function fixedTrackStyle(width: number): CSSProperties {
   };
 }
 
-function renderedWidthForColumn<TRow extends DataTableRowModel>(
-  column: Column<TRow, DataTableCellValue>,
+function renderedWidthForColumn<TRow extends DataTableRowModel, TValue>(
+  column: Column<TRow, TValue>,
   renderWidthsById: Readonly<Record<string, number>>
 ): number {
   return renderWidthsById[column.id] ?? column.getSize();
@@ -1182,20 +1183,27 @@ export function DataTable<TRow extends DataTableRowModel>({
     [setRowElement]
   );
 
+  const staticVirtualItems = useMemo(() => {
+    if (mergedFeatures.virtualization) {
+      return [];
+    }
+
+    return buildStaticVirtualItems({
+      count: totalRows,
+      getSize: (index) => {
+        const row = mergedRows[index];
+        return row ? rowHeights.getFinalHeight(getRowId(row)) : minHeight;
+      }
+    });
+  }, [getRowId, mergedFeatures.virtualization, mergedRows, minHeight, rowHeights, totalRows]);
+
   const virtualItems = mergedFeatures.virtualization
     ? rowVirtualizer.getVirtualItems()
-    : Array.from({ length: totalRows }, (_, index) => ({
-        key: index,
-        index,
-        start: index * minHeight,
-        size: minHeight,
-        end: (index + 1) * minHeight,
-        lane: 0
-      }));
+    : staticVirtualItems;
 
   const totalHeight = mergedFeatures.virtualization
     ? rowVirtualizer.getTotalSize()
-    : totalRows * minHeight;
+    : getStaticVirtualTotalHeight(staticVirtualItems);
 
   const onGridScroll = useCallback(() => {
     if (!mergedFeatures.infiniteScroll || !rowsResult.hasMore || rowsResult.isLoadingMore) {
