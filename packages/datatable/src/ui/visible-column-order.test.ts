@@ -66,4 +66,39 @@ describe("visible column order", () => {
 
     expect(getVisibleDataColumnIdsInUiOrder(table)).toEqual(["title", "status"]);
   });
+
+  it("keeps select first and actions last around pinned data columns", () => {
+    const table = createTable({
+      left: ["__select__", "status"],
+      center: ["title"],
+      right: ["amount", "__actions__"]
+    });
+
+    expect(getVisibleLeafColumnIdsInUiOrder(table)).toEqual([
+      "__select__",
+      "status",
+      "title",
+      "amount",
+      "__actions__"
+    ]);
+  });
+
+  it("returns pinned data order without utility columns when select is disabled", () => {
+    const table = createTable({
+      left: ["status"],
+      center: ["title"],
+      right: ["amount", "__actions__"]
+    });
+
+    expect(getVisibleDataColumnIdsInUiOrder(table)).toEqual(["status", "title", "amount"]);
+  });
+
+  it("returns only data columns when the actions column is absent", () => {
+    const table = createTable({
+      left: ["__select__", "status"],
+      center: ["title", "amount"]
+    });
+
+    expect(getVisibleLeafColumnIdsInUiOrder(table)).toEqual(["__select__", "status", "title", "amount"]);
+  });
 });

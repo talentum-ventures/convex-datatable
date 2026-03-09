@@ -102,6 +102,15 @@ import { usePersistedState } from "../persistence/use-persisted-state";
 import { useRowHeights } from "../virtual/row-heights";
 import { buildStaticVirtualItems, getStaticVirtualTotalHeight } from "../virtual/static-virtual-items";
 import { computeColumnLayout } from "./column-layout";
+import {
+  ACTIONS_COLUMN_ID,
+  SELECT_COLUMN_ID,
+  buildManagedColumnOrder,
+  buildManagedColumnPinning,
+  reorderDataColumnsByPinZone,
+  sanitizeDataColumnOrder,
+  sanitizeDataColumnPinning
+} from "./managed-columns";
 import { getVisibleDataColumnIdsInUiOrder, getVisibleLeafColumnIdsInUiOrder } from "./visible-column-order";
 import { Button, Checkbox, Input } from "./primitives";
 
@@ -194,7 +203,7 @@ export function canHandleGridPaste({
 }
 
 export function shouldCenterHeaderContent(columnId: string): boolean {
-  return columnId === "__select__";
+  return columnId === SELECT_COLUMN_ID;
 }
 
 function appendSkipSuffix(message: string, skippedNonEditable: number): string {
@@ -325,6 +334,12 @@ function isActiveFilterValue(value: DataTableFilter["value"]): boolean {
 }
 
 function pinZoneForColumnId(columnId: string, pinning: ColumnPinningState): PinZone {
+  if (columnId === SELECT_COLUMN_ID) {
+    return "left";
+  }
+  if (columnId === ACTIONS_COLUMN_ID) {
+    return "right";
+  }
   if ((pinning.left ?? []).includes(columnId)) {
     return "left";
   }
@@ -332,34 +347,6 @@ function pinZoneForColumnId(columnId: string, pinning: ColumnPinningState): PinZ
     return "right";
   }
   return "center";
-}
-
-function reorderIds(
-  ids: ReadonlyArray<string>,
-  sourceId: string,
-  targetId: string,
-  placement: DropPlacement
-): string[] {
-  const sourceIndex = ids.indexOf(sourceId);
-  const targetIndex = ids.indexOf(targetId);
-  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) {
-    return [...ids];
-  }
-
-  const next = [...ids];
-  const [moved] = next.splice(sourceIndex, 1);
-  if (!moved) {
-    return [...ids];
-  }
-
-  const nextTargetIndex = next.indexOf(targetId);
-  if (nextTargetIndex < 0) {
-    return [...ids];
-  }
-
-  const insertIndex = placement === "before" ? nextTargetIndex : nextTargetIndex + 1;
-  next.splice(insertIndex, 0, moved);
-  return next;
 }
 
 function useRowObservers(): {
@@ -579,6 +566,7 @@ export function DataTable<TRow extends DataTableRowModel>({
   const [rangeStart, setRangeStart] = useState<CellCoord | null>(null);
   const [columnMenuId, setColumnMenuId] = useState<string | null>(null);
   const [columnMenuAnchorById, setColumnMenuAnchorById] = useState<Readonly<Record<string, ColumnMenuAnchor>>>({});
+  const [rowActionMenuRowId, setRowActionMenuRowId] = useState<RowId | null>(null);
   const [filterOperatorDrafts, setFilterOperatorDrafts] = useState<Readonly<Record<string, FilterOperator>>>({});
   const [draggingColumnId, setDraggingColumnId] = useState<string | null>(null);
   const [dragOverTarget, setDragOverTarget] = useState<{ columnId: string; placement: DropPlacement } | null>(null);
@@ -590,10 +578,27 @@ export function DataTable<TRow extends DataTableRowModel>({
   const commitCounter = useRef(0);
   const commitWindow = useRef<number[]>([]);
   const interactionSequence = useRef(0);
+  const dataColumnIds = useMemo(() => columns.map((column) => column.id), [columns]);
+  const normalizedColumnOrder = useMemo(
+    () =>
+      sanitizeDataColumnOrder({
+        dataColumnIds,
+        userColumnOrder: columnOrder
+      }),
+    [columnOrder, dataColumnIds]
+  );
+  const normalizedColumnPinning = useMemo(
+    () =>
+      sanitizeDataColumnPinning({
+        dataColumnIds,
+        userColumnPinning: columnPinning
+      }),
+    [columnPinning, dataColumnIds]
+  );
 
   const orderedColumns = useMemo(
-    () => orderColumns(columns, columnOrder),
-    [columns, columnOrder]
+    () => orderColumns(columns, normalizedColumnOrder),
+    [columns, normalizedColumnOrder]
   );
 
   const queryState = useMemo(
@@ -640,23 +645,33 @@ export function DataTable<TRow extends DataTableRowModel>({
       internalToPersistedState({
         sorting,
         filters: columnFilters,
-        columnOrder,
+        columnOrder: normalizedColumnOrder,
         columnVisibility,
-        columnPinning,
+        columnPinning: normalizedColumnPinning,
         columnSizing
       }),
-    [columnFilters, columnOrder, columnPinning, columnSizing, columnVisibility, sorting]
+    [columnFilters, columnSizing, columnVisibility, normalizedColumnOrder, normalizedColumnPinning, sorting]
   );
 
   const hydrateFromPersistence = useCallback((state: PersistedTableState) => {
     const internal = persistedStateToInternal(state);
     setSorting(internal.sorting);
     setColumnFilters(internal.filters);
-    setColumnOrder(internal.columnOrder);
+    setColumnOrder(
+      sanitizeDataColumnOrder({
+        dataColumnIds,
+        userColumnOrder: internal.columnOrder
+      })
+    );
     setColumnVisibility(internal.columnVisibility);
-    setColumnPinning(internal.columnPinning);
+    setColumnPinning(
+      sanitizeDataColumnPinning({
+        dataColumnIds,
+        userColumnPinning: internal.columnPinning
+      })
+    );
     setColumnSizing(internal.columnSizing);
-  }, []);
+  }, [dataColumnIds]);
 
   usePersistedState({
     tableId,
@@ -669,8 +684,8 @@ export function DataTable<TRow extends DataTableRowModel>({
     if (columnOrder.length > 0) {
       return;
     }
-    setColumnOrder(columns.map((column) => column.id));
-  }, [columnOrder.length, columns]);
+    setColumnOrder(dataColumnIds);
+  }, [columnOrder.length, dataColumnIds]);
 
   useEffect(() => {
     if (!columnMenuId) {
@@ -702,6 +717,38 @@ export function DataTable<TRow extends DataTableRowModel>({
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [columnMenuId]);
+
+  useEffect(() => {
+    if (!rowActionMenuRowId) {
+      return;
+    }
+
+    const onPointerDown = (event: MouseEvent): void => {
+      if (!(event.target instanceof Element)) {
+        setRowActionMenuRowId(null);
+        return;
+      }
+
+      if (event.target.closest("[data-dt-row-action-menu-root='true']")) {
+        return;
+      }
+
+      setRowActionMenuRowId(null);
+    };
+
+    const onKeyDown = (event: globalThis.KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        setRowActionMenuRowId(null);
+      }
+    };
+
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [rowActionMenuRowId]);
 
   const onCellSelect = useCallback((coord: CellCoord) => {
     if (isDebugMode) {
@@ -866,18 +913,21 @@ export function DataTable<TRow extends DataTableRowModel>({
     },
     [dataSource, getRowId, mergedFeatures.rowDelete]
   );
+  const deleteEnabled = mergedFeatures.rowDelete && Boolean(dataSource.deleteRows);
+  const customRowActionsEnabled = mergedFeatures.rowActions && (rowActions?.length ?? 0) > 0;
+  const hasActionColumn = deleteEnabled || customRowActionsEnabled;
 
   const actionColumn = useMemo(() => {
-    if (!mergedFeatures.rowActions) {
+    if (!hasActionColumn) {
       return null;
     }
 
     const column: ColumnDef<TRow, DataTableCellValue> = {
-      id: "__actions__",
-      header: "Actions",
-      size: 200,
-      minSize: 160,
-      maxSize: 320,
+      id: ACTIONS_COLUMN_ID,
+      header: () => <span className="sr-only">Row actions</span>,
+      size: 65,
+      minSize: 65,
+      maxSize: 65,
       accessorFn: () => "",
       enableHiding: false,
       enablePinning: true,
@@ -885,51 +935,74 @@ export function DataTable<TRow extends DataTableRowModel>({
       cell: (context) => {
         const row = context.row.original;
         const rowId = getRowId(row);
-        const customActions = (rowActions ?? []).filter((action) => action.isVisible?.(row) ?? true);
+        const visibleRowActions = customRowActionsEnabled
+          ? (rowActions ?? []).filter((action) => action.isVisible?.(row) ?? true)
+          : [];
+        const isMenuOpen = rowActionMenuRowId === rowId;
+        const hasCustomActions = visibleRowActions.length > 0;
+        const shouldShowDelete = deleteEnabled;
 
         return (
-          <div className="flex flex-wrap items-center gap-1 py-1">
-            {mergedFeatures.editing ? (
+          <div className="flex items-center justify-center gap-0.5 py-1">
+            {shouldShowDelete ? (
               <Button
                 variant="ghost"
                 size="sm"
+                className="h-7 w-7 px-0 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+                aria-label={`Delete row ${rowId}`}
                 onClick={() => {
-                  const firstEditable = orderedColumns.find((columnConfig) => columnConfig.isEditable ?? false);
-                  if (!firstEditable) {
-                    return;
-                  }
-                  setEditingCell({ rowId, columnId: firstEditable.id });
-                }}
-              >
-                Edit
-              </Button>
-            ) : null}
-            {mergedFeatures.rowDelete && dataSource.deleteRows ? (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => {
+                  setRowActionMenuRowId(null);
                   void deleteRowsNow([row]);
                 }}
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                Delete
               </Button>
             ) : null}
-            {customActions.map((action) => (
-              <Button
-                key={`${rowId}-${action.id}`}
-                variant={action.variant === "destructive" ? "destructive" : "secondary"}
-                size="sm"
-                disabled={action.isDisabled?.(row) ?? false}
-                onClick={() => {
-                  void action.onSelect({ row, rowId });
-                }}
-              >
-                {action.icon ? <action.icon className="h-3.5 w-3.5" /> : null}
-                {action.label}
-              </Button>
-            ))}
+
+            {hasCustomActions ? (
+              <div className="relative" data-dt-row-action-menu-root="true">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 px-0"
+                  aria-label={`Open actions for row ${rowId}`}
+                  aria-haspopup="menu"
+                  data-row-action-menu-trigger={rowId}
+                  aria-expanded={isMenuOpen}
+                  onClick={() => {
+                    setRowActionMenuRowId((current) => (current === rowId ? null : rowId));
+                  }}
+                >
+                  <MoreVertical className="h-3.5 w-3.5" />
+                </Button>
+
+                {isMenuOpen ? (
+                  <div
+                    role="menu"
+                    aria-label={`Actions for row ${rowId}`}
+                    className="absolute right-0 top-full z-50 mt-1 min-w-40 rounded-md border border-slate-200 bg-white p-1 shadow-xl"
+                  >
+                    {visibleRowActions.map((action) => (
+                      <Button
+                        key={`${rowId}-${action.id}`}
+                        variant={action.variant === "destructive" ? "destructive" : "ghost"}
+                        size="sm"
+                        role="menuitem"
+                        className="w-full justify-start"
+                        disabled={action.isDisabled?.(row) ?? false}
+                        onClick={() => {
+                          setRowActionMenuRowId(null);
+                          void action.onSelect({ row, rowId });
+                        }}
+                      >
+                        {action.icon ? <action.icon className="h-3.5 w-3.5" /> : null}
+                        {action.label}
+                      </Button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         );
       }
@@ -937,13 +1010,12 @@ export function DataTable<TRow extends DataTableRowModel>({
 
     return column;
   }, [
-    dataSource.deleteRows,
+    customRowActionsEnabled,
     deleteRowsNow,
+    deleteEnabled,
     getRowId,
-    mergedFeatures.editing,
-    mergedFeatures.rowActions,
-    mergedFeatures.rowDelete,
-    orderedColumns,
+    hasActionColumn,
+    rowActionMenuRowId,
     rowActions
   ]);
 
@@ -953,7 +1025,7 @@ export function DataTable<TRow extends DataTableRowModel>({
     }
 
     const column: ColumnDef<TRow, DataTableCellValue> = {
-      id: "__select__",
+      id: SELECT_COLUMN_ID,
       header: () => (
         <Checkbox
           aria-label="Select all rows"
@@ -1029,40 +1101,26 @@ export function DataTable<TRow extends DataTableRowModel>({
     }
     return output;
   }, [actionColumn, dataColumnDefs, rowSelectColumn]);
-  const fullColumnOrder = useMemo(() => {
-    const dataColumnIds = columns.map((column) => column.id);
-    const dataColumnIdSet = new Set(dataColumnIds);
-    const seenColumnIds = new Set<string>();
-    const orderedDataColumnIds: string[] = [];
-
-    for (const columnId of columnOrder) {
-      if (columnId === "__select__" || columnId === "__actions__") {
-        continue;
-      }
-
-      if (!dataColumnIdSet.has(columnId) || seenColumnIds.has(columnId)) {
-        continue;
-      }
-
-      seenColumnIds.add(columnId);
-      orderedDataColumnIds.push(columnId);
-    }
-
-    const remainingDataColumnIds = dataColumnIds.filter((columnId) => !seenColumnIds.has(columnId));
-    const output: string[] = [];
-
-    if (rowSelectColumn) {
-      output.push("__select__");
-    }
-
-    output.push(...orderedDataColumnIds, ...remainingDataColumnIds);
-
-    if (actionColumn) {
-      output.push("__actions__");
-    }
-
-    return output;
-  }, [actionColumn, columnOrder, columns, rowSelectColumn]);
+  const fullColumnOrder = useMemo(
+    () =>
+      buildManagedColumnOrder({
+        dataColumnIds,
+        userColumnOrder: normalizedColumnOrder,
+        includeSelect: Boolean(rowSelectColumn),
+        includeActions: Boolean(actionColumn)
+      }),
+    [actionColumn, dataColumnIds, normalizedColumnOrder, rowSelectColumn]
+  );
+  const managedColumnPinning = useMemo(
+    () =>
+      buildManagedColumnPinning({
+        dataColumnIds,
+        userColumnPinning: normalizedColumnPinning,
+        includeSelect: Boolean(rowSelectColumn),
+        includeActions: Boolean(actionColumn)
+      }),
+    [actionColumn, dataColumnIds, normalizedColumnPinning, rowSelectColumn]
+  );
 
   const table = useReactTable({
     data: mergedRows,
@@ -1081,7 +1139,7 @@ export function DataTable<TRow extends DataTableRowModel>({
       columnFilters,
       columnOrder: fullColumnOrder,
       columnVisibility,
-      columnPinning,
+      columnPinning: managedColumnPinning,
       columnSizing,
       rowSelection
     },
@@ -1092,13 +1150,43 @@ export function DataTable<TRow extends DataTableRowModel>({
       setColumnFilters((current) => applyUpdater(updater, current));
     },
     onColumnOrderChange: (updater) => {
-      setColumnOrder((current) => applyUpdater(updater, current));
+      setColumnOrder((current) => {
+        const next = applyUpdater(
+          updater,
+          buildManagedColumnOrder({
+            dataColumnIds,
+            userColumnOrder: current,
+            includeSelect: Boolean(rowSelectColumn),
+            includeActions: Boolean(actionColumn)
+          })
+        );
+
+        return sanitizeDataColumnOrder({
+          dataColumnIds,
+          userColumnOrder: next
+        });
+      });
     },
     onColumnVisibilityChange: (updater) => {
       setColumnVisibility((current) => applyUpdater(updater, current));
     },
     onColumnPinningChange: (updater) => {
-      setColumnPinning((current) => applyUpdater(updater, current));
+      setColumnPinning((current) => {
+        const next = applyUpdater(
+          updater,
+          buildManagedColumnPinning({
+            dataColumnIds,
+            userColumnPinning: current,
+            includeSelect: Boolean(rowSelectColumn),
+            includeActions: Boolean(actionColumn)
+          })
+        );
+
+        return sanitizeDataColumnPinning({
+          dataColumnIds,
+          userColumnPinning: next
+        });
+      });
     },
     onColumnSizingChange: (updater) => {
       setColumnSizing((current) => applyUpdater(updater, current));
@@ -2172,29 +2260,21 @@ export function DataTable<TRow extends DataTableRowModel>({
   }, []);
 
   const moveColumnByDrop = useCallback((sourceColumnId: string, targetColumnId: string, placement: DropPlacement) => {
-    setColumnOrder((current) => {
-      if (sourceColumnId === targetColumnId) {
-        return current;
-      }
-      const sourceZone = pinZoneForColumnId(sourceColumnId, columnPinning);
-      const targetZone = pinZoneForColumnId(targetColumnId, columnPinning);
-      if (sourceZone !== targetZone) {
-        return current;
-      }
-
-      const next = reorderIds(current, sourceColumnId, targetColumnId, placement);
-      if (next.length !== current.length) {
-        return current;
-      }
-
-      const unchanged = next.every((entry, index) => entry === current[index]);
-      if (unchanged) {
-        return current;
-      }
-
-      return next;
+    const next = reorderDataColumnsByPinZone({
+      columnOrder: normalizedColumnOrder,
+      columnPinning: normalizedColumnPinning,
+      sourceColumnId,
+      targetColumnId,
+      placement
     });
-  }, [columnPinning]);
+
+    if (!next.changed) {
+      return;
+    }
+
+    setColumnOrder(next.columnOrder);
+    setColumnPinning(next.columnPinning);
+  }, [normalizedColumnOrder, normalizedColumnPinning]);
 
   const onHeaderDragStart = useCallback(
     (event: DragEvent<HTMLElement>, columnId: string): void => {
@@ -2605,6 +2685,7 @@ export function DataTable<TRow extends DataTableRowModel>({
                     const renderWidth = columnRenderLayout.renderWidthsById[header.column.id] ?? header.getSize();
                     const leftOffset = columnRenderLayout.leftPinnedOffsetById[header.column.id];
                     const rightOffset = columnRenderLayout.rightPinnedOffsetById[header.column.id];
+                    const isActionHeader = header.column.id === ACTIONS_COLUMN_ID;
 
                     return (
                       <th
@@ -2629,6 +2710,7 @@ export function DataTable<TRow extends DataTableRowModel>({
                         data-pinned-state={pinnedState || "center"}
                         className={cn(
                           "group relative border-b border-r border-[var(--dt-border-color)] px-2 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600",
+                          isActionHeader ? "border-l border-l-[var(--dt-border-color)]" : "",
                           pinnedState
                             ? "sticky z-30 shadow-[var(--dt-pinned-shadow)] [background:var(--dt-pinned-header-bg)]"
                             : "[background:var(--dt-header-bg)]"
@@ -2975,7 +3057,14 @@ export function DataTable<TRow extends DataTableRowModel>({
 
                         if (!columnConfig) {
                           return (
-                            <td key={`draft-${column.id}`} style={widthStyle} className="border-r border-b border-slate-200 bg-slate-50" />
+                            <td
+                              key={`draft-${column.id}`}
+                              style={widthStyle}
+                              className={cn(
+                                "border-r border-b border-slate-200 bg-slate-50",
+                                column.id === ACTIONS_COLUMN_ID ? "border-l border-l-slate-200" : ""
+                              )}
+                            />
                           );
                         }
 
@@ -3073,12 +3162,16 @@ export function DataTable<TRow extends DataTableRowModel>({
 
                 const rowId = getRowId(row);
                 const top = virtualRow.start;
+                const isRowActionMenuOpen = rowActionMenuRowId === rowId;
 
                 return (
                   <tr
                     key={rowModel.id}
                     ref={getRowRefHandler(rowId)}
-                    className="group absolute left-0 bg-[var(--dt-row-bg)] transition-colors hover:bg-[var(--dt-row-hover-bg)]"
+                    className={cn(
+                      "group absolute left-0 overflow-visible bg-[var(--dt-row-bg)] transition-colors hover:bg-[var(--dt-row-hover-bg)]",
+                      isRowActionMenuOpen ? "z-50" : "z-0"
+                    )}
                     style={{
                       display: "flex",
                       transform: `translateY(${top}px)`,
@@ -3093,14 +3186,20 @@ export function DataTable<TRow extends DataTableRowModel>({
                       const renderWidth = columnRenderLayout.renderWidthsById[cell.column.id] ?? cell.column.getSize();
                       const leftOffset = columnRenderLayout.leftPinnedOffsetById[cell.column.id];
                       const rightOffset = columnRenderLayout.rightPinnedOffsetById[cell.column.id];
+                      const isActionCell = cell.column.id === ACTIONS_COLUMN_ID;
+                      const isOpenActionMenuCell = isActionCell && rowActionMenuRowId === rowId;
                       return (
                         <td
                           key={cell.id}
                           data-pinned-state={pinned || "center"}
                           className={cn(
                             "border-r border-b border-[var(--dt-border-color)] align-top",
+                            isActionCell ? "relative overflow-visible border-l border-l-[var(--dt-border-color)]" : "",
+                            isOpenActionMenuCell ? "z-40" : "",
                             pinned
-                              ? "sticky z-10 shadow-[var(--dt-pinned-shadow)] [background:var(--dt-pinned-row-bg)] group-hover:[background:var(--dt-pinned-row-hover-bg)]"
+                              ? isOpenActionMenuCell
+                                ? "sticky z-40 shadow-[var(--dt-pinned-shadow)] [background:var(--dt-pinned-row-bg)] group-hover:[background:var(--dt-pinned-row-hover-bg)]"
+                                : "sticky z-10 shadow-[var(--dt-pinned-shadow)] [background:var(--dt-pinned-row-bg)] group-hover:[background:var(--dt-pinned-row-hover-bg)]"
                               : ""
                           )}
                           style={{

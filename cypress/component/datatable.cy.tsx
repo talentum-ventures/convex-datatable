@@ -6,7 +6,8 @@ import {
   type CollaboratorPresence,
   type DataTableColumn,
   type DataTableDataSource,
-  type DataTableFeatureFlags
+  type DataTableFeatureFlags,
+  type DataTableRowAction
 } from "@rolha/datatable";
 import { Toaster, toast } from "sonner";
 import { applyServerQuery } from "../../apps/demo/src/demo-query";
@@ -293,10 +294,12 @@ function dispatchPlainTextPaste(win: Window, node: Element, text: string): boole
 
 function Harness({
   tableId,
-  features
+  features,
+  rowActions
 }: {
   tableId: string;
   features?: DataTableFeatureFlags;
+  rowActions?: ReadonlyArray<DataTableRowAction<TaskRow>>;
 }): JSX.Element {
   const [rows, setRows] = useState<ReadonlyArray<TaskRow>>([
     { id: "1", title: "Build UI", status: "todo", amount: 10 },
@@ -365,10 +368,41 @@ function Harness({
         dataSource={dataSource}
         getRowId={(row) => row.id}
         features={tableFeatures}
+        rowActions={rowActions}
       />
       <output data-testid="title-raw">{rows[0]?.title ?? ""}</output>
       <output data-testid="status-raw">{rows[0]?.status ?? ""}</output>
       <output data-testid="amount-raw">{String(rows[0]?.amount ?? "")}</output>
+    </div>
+  );
+}
+
+function RowActionsHarness({ tableId }: { tableId: string }): JSX.Element {
+  const rowActions = useMemo<ReadonlyArray<DataTableRowAction<TaskRow>>>(
+    () => [
+      {
+        id: "archive",
+        label: "Archive",
+        onSelect: ({ rowId }) => {
+          toast.message(`Archived ${rowId}`);
+        }
+      },
+      {
+        id: "lock",
+        label: "Lock",
+        isDisabled: (row) => row.status === "done",
+        onSelect: ({ rowId }) => {
+          toast.message(`Locked ${rowId}`);
+        }
+      }
+    ],
+    []
+  );
+
+  return (
+    <div className="p-4">
+      <Harness tableId={tableId} rowActions={rowActions} />
+      <Toaster />
     </div>
   );
 }
@@ -1010,14 +1044,111 @@ describe("DataTable component", () => {
     cy.findByRole("columnheader", { name: /Amount/i }).should("exist");
   });
 
-  it("keeps utility columns at the table edges", () => {
+  it("keeps managed utility columns around pinned data columns", () => {
     cy.mount(<Harness tableId="cypress-table-utility-column-order" />);
 
-    cy.get("th[data-column-id]").then(($headers) => {
-      const headerIds = [...$headers].map((header) => header.getAttribute("data-column-id"));
-      expect(headerIds[0]).to.equal("__select__");
-      expect(headerIds[headerIds.length - 1]).to.equal("__actions__");
+    cy.get("[data-column-menu-trigger='status']").first().click({ force: true });
+    cy.contains("button", "Left").click({ force: true });
+    cy.get("body").click(0, 0);
+
+    cy.get("[data-column-menu-trigger='amount']").first().click({ force: true });
+    cy.contains("button", "Right").click({ force: true });
+    cy.get("body").click(0, 0);
+
+    cy.get("thead th").then(($headers) => {
+      const headerIds = [...$headers].map((header) => {
+        if (header.querySelector("input[aria-label='Select all rows']")) {
+          return "__select__";
+        }
+
+        const columnId = header.getAttribute("data-column-id");
+        if (columnId) {
+          return columnId;
+        }
+
+        if (header.textContent?.includes("Row actions")) {
+          return "__actions__";
+        }
+
+        return "unknown";
+      });
+
+      expect(headerIds).to.deep.equal(["__select__", "status", "title", "amount", "__actions__"]);
     });
+
+    cy.get("tr[data-row-id='1'] > td").then(($cells) => {
+      const cellIds = [...$cells].map((cell) => {
+        if (cell.querySelector("input[aria-label='Select row 1']")) {
+          return "__select__";
+        }
+
+        const gridCell = cell.querySelector("[role='gridcell'][data-column-id]");
+        if (gridCell instanceof HTMLElement) {
+          return gridCell.dataset.columnId ?? "unknown";
+        }
+
+        if (cell.querySelector("[aria-label='Delete row 1']")) {
+          return "__actions__";
+        }
+
+        return "unknown";
+      });
+
+      expect(cellIds).to.deep.equal(["__select__", "status", "title", "amount", "__actions__"]);
+    });
+  });
+
+  it("renders compact row actions with overflow menu items", () => {
+    cy.mount(<RowActionsHarness tableId="cypress-table-row-actions" />);
+
+    cy.contains("th", "Actions").should("not.exist");
+    cy.contains("button", "Edit").should("not.exist");
+    cy.contains("button", "Archive").should("not.exist");
+
+    cy.findByLabelText("Delete row 1").should("exist");
+    cy.findByRole("button", { name: "Delete row 1" }).should("have.text", "");
+
+    cy.findByLabelText("Open actions for row 1").click();
+    cy.findByRole("menu", { name: "Actions for row 1" }).within(() => {
+      cy.findByRole("menuitem", { name: "Archive" }).should("exist");
+      cy.findByRole("menuitem", { name: "Lock" }).should("exist");
+    });
+
+    cy.get("body").click(0, 0);
+    cy.findByRole("menu", { name: "Actions for row 1" }).should("not.exist");
+
+    cy.findByLabelText("Open actions for row 1").click();
+    cy.findByRole("menuitem", { name: "Archive" }).click();
+    cy.findByRole("menu", { name: "Actions for row 1" }).should("not.exist");
+    cy.contains("Archived 1").should("exist");
+  });
+
+  it("shows disabled custom row actions inside the overflow menu", () => {
+    cy.mount(<RowActionsHarness tableId="cypress-table-row-actions-disabled" />);
+
+    cy.findByLabelText("Open actions for row 2").click();
+    cy.findByRole("menu", { name: "Actions for row 2" }).within(() => {
+      cy.findByRole("menuitem", { name: "Lock" }).should("be.disabled");
+    });
+  });
+
+  it("does not render an empty actions column when no row-level actions are available", () => {
+    cy.mount(
+      <Harness
+        tableId="cypress-table-no-actions-column"
+        features={{
+          rowDelete: false,
+          rowActions: false,
+          rowSelect: false,
+          infiniteScroll: false,
+          virtualization: false
+        }}
+      />
+    );
+
+    cy.get("thead th").should("have.length", 3);
+    cy.findByLabelText("Delete row 1").should("not.exist");
+    cy.findByLabelText("Open actions for row 1").should("not.exist");
   });
 
   it("shows hide in the pin action row and only shows unpin for pinned columns", () => {
@@ -1132,6 +1263,49 @@ describe("DataTable component", () => {
       .then(($cells) => {
         const order = [...$cells].map((cell) => cell.getAttribute("data-column-id"));
         expect(order).to.deep.equal(["title", "status", "amount"]);
+      });
+  });
+
+  it("reorders left-pinned columns and preserves the updated order after unpinning", () => {
+    cy.mount(<Harness tableId="cypress-table-reorder-pinned-left" />);
+
+    cy.get("[data-column-menu-trigger='title']").first().click({ force: true });
+    cy.contains("button", "Left").click({ force: true });
+    cy.get("body").click(0, 0);
+
+    cy.get("[data-column-menu-trigger='amount']").first().click({ force: true });
+    cy.contains("button", "Left").click({ force: true });
+    cy.get("body").click(0, 0);
+
+    cy.window().then((win) => {
+      const dataTransfer = new win.DataTransfer();
+
+      cy.get("[data-column-reorder-handle='amount']").trigger("dragstart", { dataTransfer, force: true });
+      cy.get("th[data-column-id='title']").then(($target) => {
+        const rect = $target[0].getBoundingClientRect();
+        cy.wrap($target).trigger("dragover", { dataTransfer, clientX: rect.left + 2 });
+        cy.wrap($target).trigger("drop", { dataTransfer, clientX: rect.left + 2 });
+      });
+      cy.get("[data-column-reorder-handle='amount']").trigger("dragend", { dataTransfer, force: true });
+    });
+
+    cy.get("thead tr")
+      .first()
+      .find("th[data-column-id]")
+      .then(($cells) => {
+        const order = [...$cells].map((cell) => cell.getAttribute("data-column-id"));
+        expect(order).to.deep.equal(["amount", "title", "status"]);
+      });
+
+    cy.get("[data-column-menu-trigger='amount']").first().click({ force: true });
+    cy.contains("button", "Unpin").click({ force: true });
+
+    cy.get("thead tr")
+      .first()
+      .find("th[data-column-id]")
+      .then(($cells) => {
+        const order = [...$cells].map((cell) => cell.getAttribute("data-column-id"));
+        expect(order).to.deep.equal(["title", "amount", "status"]);
       });
   });
 

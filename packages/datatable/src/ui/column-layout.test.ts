@@ -150,11 +150,11 @@ describe("column layout", () => {
       },
       {
         id: "__actions__",
-        baseWidth: 200,
+        baseWidth: 65,
         pinned: "right",
         isDataColumn: false,
         canResize: true,
-        maxWidth: 320
+        maxWidth: 65
       },
       {
         id: "locked",
@@ -166,14 +166,14 @@ describe("column layout", () => {
       }
     ];
 
-    const result = layout(columns, 564);
+    const result = layout(columns, 436);
     expect(result.renderWidthsById).toEqual({
-      name: 200,
+      name: 207,
       __select__: 44,
-      __actions__: 200,
+      __actions__: 65,
       locked: 120
     });
-    expect(result.tableRenderWidth).toBe(564);
+    expect(result.tableRenderWidth).toBe(436);
   });
 
   it("keeps base width when there are no eligible fill columns", () => {
@@ -196,11 +196,11 @@ describe("column layout", () => {
       },
       {
         id: "__actions__",
-        baseWidth: 200,
+        baseWidth: 65,
         pinned: "right",
         isDataColumn: false,
         canResize: true,
-        maxWidth: 320
+        maxWidth: 65
       }
     ];
 
@@ -208,9 +208,9 @@ describe("column layout", () => {
     expect(result.renderWidthsById).toEqual({
       __select__: 44,
       locked: 140,
-      __actions__: 200
+      __actions__: 65
     });
-    expect(result.tableRenderWidth).toBe(384);
+    expect(result.tableRenderWidth).toBe(249);
   });
 
   it("computes pinned offsets from render widths", () => {
@@ -240,31 +240,31 @@ describe("column layout", () => {
         maxWidth: null
       },
       {
-        id: "__actions__",
-        baseWidth: 200,
-        pinned: "right",
-        isDataColumn: false,
-        canResize: true,
-        maxWidth: 320
-      },
-      {
         id: "website",
         baseWidth: 180,
         pinned: "right",
         isDataColumn: true,
         canResize: true,
         maxWidth: null
+      },
+      {
+        id: "__actions__",
+        baseWidth: 65,
+        pinned: "right",
+        isDataColumn: false,
+        canResize: true,
+        maxWidth: 65
       }
     ];
 
-    const result = layout(columns, 704);
+    const result = layout(columns, 569);
     expect(result.leftPinnedOffsetById).toEqual({
       __select__: 0,
       name: 44
     });
     expect(result.rightPinnedOffsetById).toEqual({
-      website: 0,
-      __actions__: 180
+      __actions__: 0,
+      website: 65
     });
   });
 });

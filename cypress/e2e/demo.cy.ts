@@ -13,6 +13,13 @@ describe("demo app", () => {
     cy.contains("Hidden columns (1)").click();
     cy.get("[data-hidden-column-row='website']").contains("button", "Show").click();
     cy.findByRole("columnheader", { name: /Website/i }).should("exist");
+    cy.contains("th", "Actions").should("not.exist");
+    cy.findByLabelText("Open actions for row 1").click();
+    cy.findByRole("menu", { name: "Actions for row 1" }).within(() => {
+      cy.findByRole("menuitem", { name: "Open" }).should("exist");
+    });
+    cy.get("body").click(0, 0);
+    cy.findByRole("menu", { name: "Actions for row 1" }).should("not.exist");
 
     cy.get("th[data-column-id='name']")
       .first()
