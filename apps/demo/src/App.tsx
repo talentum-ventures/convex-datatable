@@ -5,11 +5,11 @@ import {
   DataTableContainer,
   type DataTableColumn,
   type DataTableDataSource,
-  type DataTableFilter,
   type DataTableRowAction,
   type DataTableQueryState
 } from "@rolha/datatable";
 import { z } from "zod";
+import { applyServerQuery } from "./demo-query";
 
 type DemoRow = {
   id: string;
@@ -187,120 +187,6 @@ function generateRows(): ReadonlyArray<DemoRow> {
       website: `https://example.com/projects/${index}`,
       createdAt: `2026-02-${String((index % 28) + 1).padStart(2, "0")}`,
       meta: `#${index}`
-    });
-  }
-
-  return output;
-}
-
-function compareValues(left: string | number | boolean | null, right: string | number | boolean | null): number {
-  if (left === right) {
-    return 0;
-  }
-
-  if (left === null) {
-    return -1;
-  }
-
-  if (right === null) {
-    return 1;
-  }
-
-  if (typeof left === "number" && typeof right === "number") {
-    return left - right;
-  }
-
-  return String(left).localeCompare(String(right));
-}
-
-function filterRow(row: DemoRow, filter: DataTableFilter): boolean {
-  const raw = row[filter.columnId as keyof DemoRow];
-
-  const text = Array.isArray(raw)
-    ? raw.join(",")
-    : typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean"
-      ? String(raw)
-      : raw === null
-        ? ""
-        : "";
-
-  if (filter.op === "contains") {
-    return text.toLowerCase().includes(String(filter.value ?? "").toLowerCase());
-  }
-
-  if (filter.op === "startsWith") {
-    return text.toLowerCase().startsWith(String(filter.value ?? "").toLowerCase());
-  }
-
-  if (filter.op === "endsWith") {
-    return text.toLowerCase().endsWith(String(filter.value ?? "").toLowerCase());
-  }
-
-  if (filter.op === "eq") {
-    return text === String(filter.value ?? "");
-  }
-
-  if (filter.op === "neq") {
-    return text !== String(filter.value ?? "");
-  }
-
-  if (filter.op === "in") {
-    if (!Array.isArray(filter.value)) {
-      return false;
-    }
-    return filter.value.includes(text);
-  }
-
-  if (filter.op === "gt" || filter.op === "gte" || filter.op === "lt" || filter.op === "lte") {
-    const numericRaw = Number(text);
-    const numericFilter = Number(filter.value);
-    if (Number.isNaN(numericRaw) || Number.isNaN(numericFilter)) {
-      return false;
-    }
-
-    if (filter.op === "gt") {
-      return numericRaw > numericFilter;
-    }
-    if (filter.op === "gte") {
-      return numericRaw >= numericFilter;
-    }
-    if (filter.op === "lt") {
-      return numericRaw < numericFilter;
-    }
-    return numericRaw <= numericFilter;
-  }
-
-  return true;
-}
-
-function applyServerQuery(rows: ReadonlyArray<DemoRow>, state: DataTableQueryState): ReadonlyArray<DemoRow> {
-  let output = [...rows];
-
-  for (const filter of state.filters) {
-    output = output.filter((row) => filterRow(row, filter));
-  }
-
-  const sortEntry = state.sorting[0];
-  if (sortEntry) {
-    output.sort((left, right) => {
-      const leftValue = left[sortEntry.columnId as keyof DemoRow];
-      const rightValue = right[sortEntry.columnId as keyof DemoRow];
-
-      const comparableLeft =
-        typeof leftValue === "string" || typeof leftValue === "number" || typeof leftValue === "boolean"
-          ? leftValue
-          : leftValue === null
-            ? null
-            : String(leftValue);
-      const comparableRight =
-        typeof rightValue === "string" || typeof rightValue === "number" || typeof rightValue === "boolean"
-          ? rightValue
-          : rightValue === null
-            ? null
-            : String(rightValue);
-
-      const result = compareValues(comparableLeft, comparableRight);
-      return sortEntry.direction === "asc" ? result : -result;
     });
   }
 

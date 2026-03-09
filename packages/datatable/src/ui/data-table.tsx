@@ -155,7 +155,7 @@ function isEditableKeyboardTarget(target: EventTarget | null): boolean {
     return true;
   }
 
-  return element.closest("[data-dt-editor-root='true']") !== null;
+  return element.closest("[data-dt-editor-root='true'], [data-dt-editor-dialog='true']") !== null;
 }
 
 type CssVarsStyle = CSSProperties & {
@@ -190,7 +190,7 @@ const TEXT_FILTER_OPERATORS: ReadonlyArray<FilterOperator> = [
 ];
 const NUMBER_FILTER_OPERATORS: ReadonlyArray<FilterOperator> = ["eq", "neq", "gt", "gte", "lt", "lte"];
 const DATE_FILTER_OPERATORS: ReadonlyArray<FilterOperator> = ["eq", "neq", "gt", "gte", "lt", "lte"];
-const SELECT_FILTER_OPERATORS: ReadonlyArray<FilterOperator> = ["eq", "neq", "in"];
+const SELECT_FILTER_OPERATORS: ReadonlyArray<FilterOperator> = ["in"];
 const MULTISELECT_FILTER_OPERATORS: ReadonlyArray<FilterOperator> = ["in"];
 
 function filterOperatorsForColumn<TRow extends DataTableRowModel>(
@@ -1524,7 +1524,7 @@ export function DataTable<TRow extends DataTableRowModel>({
     (event: KeyboardEvent<HTMLDivElement>) => {
       const targetOwnsKeyboard = isEditableKeyboardTarget(event.target);
 
-      if (mergedFeatures.cellSelect && !targetOwnsKeyboard) {
+      if (mergedFeatures.cellSelect && !targetOwnsKeyboard && !editingCell) {
         if (event.key === "ArrowDown") {
           event.preventDefault();
           moveActiveCell(1, 0, event.shiftKey);
@@ -1586,6 +1586,7 @@ export function DataTable<TRow extends DataTableRowModel>({
     [
       activeCell,
       copySelection,
+      editingCell,
       getRowId,
       mergedFeatures.cellSelect,
       mergedFeatures.clipboardPaste,
@@ -1752,24 +1753,6 @@ export function DataTable<TRow extends DataTableRowModel>({
       return [];
     },
     [filterByColumnId]
-  );
-
-  const setColumnFilterSingleSelectValue = useCallback(
-    (column: DataTableColumn<TRow>, value: string): void => {
-      if (value.length === 0) {
-        setColumnFilter(column.id, null);
-        return;
-      }
-
-      const operator = selectedFilterOperator(column);
-      const nextValue = operator === "in" ? [value] : value;
-      setColumnFilter(column.id, {
-        columnId: column.id,
-        op: operator,
-        value: nextValue
-      });
-    },
-    [selectedFilterOperator, setColumnFilter]
   );
 
   const toggleColumnFilterInValue = useCallback(
@@ -2404,7 +2387,7 @@ export function DataTable<TRow extends DataTableRowModel>({
                                         {canPin && !isPinned ? (
                                           <>
                                             <Button
-                                              variant={pinnedState === "left" ? "secondary" : "ghost"}
+                                              variant="ghost"
                                               size="sm"
                                               onClick={() => {
                                                 updatePinnedColumn(columnConfig.id, "left");
@@ -2414,7 +2397,7 @@ export function DataTable<TRow extends DataTableRowModel>({
                                               Left
                                             </Button>
                                             <Button
-                                              variant={pinnedState === "right" ? "secondary" : "ghost"}
+                                              variant="ghost"
                                               size="sm"
                                               onClick={() => {
                                                 updatePinnedColumn(columnConfig.id, "right");
@@ -2491,49 +2474,7 @@ export function DataTable<TRow extends DataTableRowModel>({
                                         </div>
                                       )}
 
-                                      {columnConfig.kind === "select" ? (
-                                        activeFilterOperator === "in" ? (
-                                          <div className="max-h-36 space-y-1 overflow-auto rounded-md border border-slate-200 p-2">
-                                            {columnConfig.options.map((option) => {
-                                              return (
-                                                <label
-                                                  key={`${columnConfig.id}-${option.value}`}
-                                                  className="flex items-center gap-2 text-xs text-slate-700"
-                                                >
-                                                  <Checkbox
-                                                    checked={selectedFilterValues.includes(option.value)}
-                                                    onChange={(event) => {
-                                                      toggleColumnFilterInValue(
-                                                        columnConfig,
-                                                        option.value,
-                                                        event.target.checked
-                                                      );
-                                                    }}
-                                                  />
-                                                  {option.label}
-                                                </label>
-                                              );
-                                            })}
-                                          </div>
-                                        ) : (
-                                          <select
-                                            value={textFilterValue}
-                                            onChange={(event) => {
-                                              setColumnFilterSingleSelectValue(columnConfig, event.target.value);
-                                            }}
-                                            className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm outline-none ring-offset-2 focus:ring-2 focus:ring-sky-500"
-                                          >
-                                            <option value="">Any</option>
-                                            {columnConfig.options.map((option) => (
-                                              <option key={`${columnConfig.id}-${option.value}`} value={option.value}>
-                                                {option.label}
-                                              </option>
-                                            ))}
-                                          </select>
-                                        )
-                                      ) : null}
-
-                                      {columnConfig.kind === "multiselect" ? (
+                                      {columnConfig.kind === "select" || columnConfig.kind === "multiselect" ? (
                                         <div className="max-h-36 space-y-1 overflow-auto rounded-md border border-slate-200 p-2">
                                           {columnConfig.options.map((option) => {
                                             return (

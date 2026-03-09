@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { ColumnDef, Table } from "@tanstack/react-table";
 import { Check, ExternalLink, Link as LinkIcon, Pencil } from "lucide-react";
@@ -241,7 +241,7 @@ function useDropdownPosition(anchorRef: NodeContainerRef): CSSProperties {
   const [style, setStyle] = useState<CSSProperties>({
     left: 0,
     top: 0,
-    visibility: "hidden"
+    opacity: 0
   });
 
   useEffect(() => {
@@ -264,7 +264,7 @@ function useDropdownPosition(anchorRef: NodeContainerRef): CSSProperties {
       setStyle({
         left: rect.left,
         top: rect.bottom + 4,
-        visibility: "visible"
+        opacity: 1
       });
     };
 
@@ -302,6 +302,38 @@ function useDropdownPosition(anchorRef: NodeContainerRef): CSSProperties {
   return style;
 }
 
+function focusListbox(node: HTMLDivElement | null): void {
+  if (!node) {
+    return;
+  }
+
+  node.focus({ preventScroll: true });
+}
+
+function usePortaledListboxFocus(listRef: { current: HTMLDivElement | null }): void {
+  useLayoutEffect(() => {
+    const node = listRef.current;
+    if (!node) {
+      return;
+    }
+
+    focusListbox(node);
+
+    const ownerWindow = node.ownerDocument.defaultView;
+    if (!ownerWindow) {
+      return;
+    }
+
+    const frameId = ownerWindow.requestAnimationFrame(() => {
+      focusListbox(node);
+    });
+
+    return () => {
+      ownerWindow.cancelAnimationFrame(frameId);
+    };
+  }, [listRef]);
+}
+
 function OptionBadge({
   option,
   isSelected,
@@ -325,6 +357,49 @@ function OptionBadge({
       {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
       {option.label}
     </span>
+  );
+}
+
+function multiSelectValues(value: DataTableCellValue): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.map((entry) => String(entry));
+}
+
+function MultiSelectBadges({
+  columnId,
+  options,
+  values
+}: {
+  columnId: string;
+  options: ReadonlyArray<SelectOption>;
+  values: ReadonlyArray<string>;
+}): JSX.Element {
+  if (values.length === 0) {
+    return <span className="text-slate-400">-</span>;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {values.map((entry) => {
+        const option = findOption(options, entry);
+        const Icon = option?.icon;
+        return (
+          <span
+            key={`${columnId}-${entry}`}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+              option?.colorClass ?? "bg-slate-100 text-slate-700"
+            )}
+          >
+            {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
+            {option?.label ?? entry}
+          </span>
+        );
+      })}
+    </div>
   );
 }
 
@@ -439,9 +514,7 @@ function SelectMenuEditor<TRow extends DataTableRowModel>({
     return selectedIndex >= 0 ? selectedIndex : 0;
   });
 
-  useEffect(() => {
-    listRef.current?.focus({ preventScroll: true });
-  }, []);
+  usePortaledListboxFocus(listRef);
 
   useEffect(() => {
     const activeNode = listRef.current?.querySelector<HTMLElement>("[data-select-option-active='true']");
@@ -585,6 +658,193 @@ function SelectMenuEditor<TRow extends DataTableRowModel>({
   );
 }
 
+type MultiSelectMenuEditorProps<TRow extends DataTableRowModel> = DefaultEditorProps<TRow> & {
+  column: Extract<DataTableColumn<TRow>, { kind: "multiselect" }>;
+};
+
+function MultiSelectMenuEditor<TRow extends DataTableRowModel>({
+  column,
+  value,
+  onCommit,
+  onCancel
+}: MultiSelectMenuEditorProps<TRow>): JSX.Element {
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const portalRoot = typeof document === "undefined" ? null : document.body;
+  const dropdownStyle = useDropdownPosition(wrapperRef);
+  const finalizedRef = useRef(false);
+  const [draftValues, setDraftValues] = useState(() => multiSelectValues(value));
+  const [activeIndex, setActiveIndex] = useState(() => {
+    const selectedValues = multiSelectValues(value);
+    const selectedIndex = column.options.findIndex((option) => selectedValues.includes(option.value));
+    return selectedIndex >= 0 ? selectedIndex : 0;
+  });
+
+  usePortaledListboxFocus(listRef);
+
+  useEffect(() => {
+    const activeNode = listRef.current?.querySelector<HTMLElement>("[data-select-option-active='true']");
+    activeNode?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex]);
+
+  const commit = (nextValues = draftValues): void => {
+    if (finalizedRef.current) {
+      return;
+    }
+
+    finalizedRef.current = true;
+    onCommit(nextValues);
+  };
+
+  const toggleValue = (optionValue: string): void => {
+    setDraftValues((current) => {
+      const isSelected = current.includes(optionValue);
+      if (isSelected) {
+        return current.filter((entry) => entry !== optionValue);
+      }
+
+      return [...current, optionValue];
+    });
+  };
+
+  const moveActive = (delta: number): void => {
+    if (column.options.length === 0) {
+      return;
+    }
+
+    const lastIndex = column.options.length - 1;
+    setActiveIndex((current) => Math.min(lastIndex, Math.max(0, current + delta)));
+  };
+
+  return (
+    <div
+      ref={wrapperRef}
+      data-dt-editor-root="true"
+      className="relative h-full w-full"
+      onBlur={(event) => {
+        const nextTarget = event.relatedTarget;
+        if (containsInRefs(nextTarget, [wrapperRef, dialogRef])) {
+          return;
+        }
+        commit();
+      }}
+    >
+      <div className="flex h-full w-full items-center">
+        {draftValues.length > 0 ? (
+          <MultiSelectBadges columnId={column.id} options={column.options} values={draftValues} />
+        ) : (
+          <span className="text-sm text-slate-400">Select values</span>
+        )}
+      </div>
+
+      {portalRoot
+        ? createPortal(
+            <div
+              ref={dialogRef}
+              role="dialog"
+              aria-label={`${column.header} editor`}
+              data-dt-editor-dialog="true"
+              className="fixed z-30 min-w-[220px] max-w-[320px] rounded-xl border border-slate-200 bg-white p-2 shadow-xl"
+              style={dropdownStyle}
+            >
+              <div
+                ref={listRef}
+                role="listbox"
+                tabIndex={0}
+                aria-label={`Edit ${column.header}`}
+                aria-activedescendant={`${column.id}-option-${activeIndex}`}
+                aria-multiselectable="true"
+                className="flex max-h-56 flex-col gap-1 overflow-auto rounded-lg outline-none"
+                onKeyDown={(event) => {
+                  event.stopPropagation();
+
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    onCancel();
+                    return;
+                  }
+
+                  if (event.key === "ArrowDown" || event.key === "ArrowRight") {
+                    event.preventDefault();
+                    moveActive(1);
+                    return;
+                  }
+
+                  if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
+                    event.preventDefault();
+                    moveActive(-1);
+                    return;
+                  }
+
+                  if (event.key === "Home") {
+                    event.preventDefault();
+                    setActiveIndex(0);
+                    return;
+                  }
+
+                  if (event.key === "End") {
+                    event.preventDefault();
+                    setActiveIndex(Math.max(0, column.options.length - 1));
+                    return;
+                  }
+
+                  if (event.key === " " && !event.metaKey && !event.ctrlKey && !event.altKey) {
+                    event.preventDefault();
+                    const option = column.options[activeIndex];
+                    if (option) {
+                      toggleValue(option.value);
+                    }
+                    return;
+                  }
+
+                  if (event.key === "Tab" || event.key === "Enter") {
+                    event.preventDefault();
+                    commit();
+                  }
+                }}
+              >
+                {column.options.map((option, index) => {
+                  const isSelected = draftValues.includes(option.value);
+                  const isActive = index === activeIndex;
+
+                  return (
+                    <button
+                      key={`${column.id}-${option.value}`}
+                      id={`${column.id}-option-${index}`}
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      data-select-option-active={isActive ? "true" : "false"}
+                      className={cn(
+                        "flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left",
+                        isActive ? "bg-slate-100" : "bg-transparent hover:bg-slate-50"
+                      )}
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                      }}
+                      onMouseEnter={() => {
+                        setActiveIndex(index);
+                      }}
+                      onClick={() => {
+                        toggleValue(option.value);
+                        listRef.current?.focus({ preventScroll: true });
+                      }}
+                    >
+                      <OptionBadge option={option} isSelected={isSelected} isActive={isActive} />
+                      {isSelected ? <Check className="h-3.5 w-3.5 text-emerald-700" /> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>,
+            portalRoot
+          )
+        : null}
+    </div>
+  );
+}
+
 type DateEditorProps<TRow extends DataTableRowModel> = DefaultEditorProps<TRow> & {
   initialText: string;
 };
@@ -694,6 +954,18 @@ function DefaultEditor<TRow extends DataTableRowModel>({
     );
   }
 
+  if (column.kind === "multiselect") {
+    return (
+      <MultiSelectMenuEditor
+        column={column}
+        row={row}
+        value={value}
+        onCommit={onCommit}
+        onCancel={onCancel}
+      />
+    );
+  }
+
   const initialText = editorTextValue(column, value);
 
   if (column.kind === "date") {
@@ -740,31 +1012,7 @@ function renderDefaultCell<TRow extends DataTableRowModel>(
   }
 
   if (column.kind === "multiselect") {
-    const values = Array.isArray(value) ? value : [];
-    if (values.length === 0) {
-      return <span className="text-slate-400">-</span>;
-    }
-
-    return (
-      <div className="flex flex-wrap gap-1">
-        {values.map((entry) => {
-          const option = findOption(column.options, entry);
-          const Icon = option?.icon;
-          return (
-            <span
-              key={`${column.id}-${entry}`}
-              className={cn(
-                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-                option?.colorClass ?? "bg-slate-100 text-slate-700"
-              )}
-            >
-              {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
-              {option?.label ?? entry}
-            </span>
-          );
-        })}
-      </div>
-    );
+    return <MultiSelectBadges columnId={column.id} options={column.options} values={multiSelectValues(value)} />;
   }
 
   if (column.kind === "link") {
@@ -949,7 +1197,7 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
             data-column-index={currentCoord.columnIndex}
             className={cn(
               "group relative box-border h-full min-h-10 w-full min-w-0 px-2 py-1 text-sm text-slate-800",
-              isEditing && (column.kind === "select" || column.kind === "date")
+              isEditing && (column.kind === "select" || column.kind === "multiselect" || column.kind === "date")
                 ? "z-20 overflow-visible"
                 : "overflow-hidden",
               isEditing ? "bg-white" : isRangeSelected ? "bg-[var(--dt-selection-bg)]" : "",

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { DataTable, type DataTableColumn, type DataTableDataSource } from "@rolha/datatable";
+import { applyServerQuery } from "../../apps/demo/src/demo-query";
 
 type TaskRow = {
   id: string;
@@ -15,6 +16,17 @@ type TaskRow = {
 type DateRow = {
   id: string;
   due: string;
+};
+
+type MultiSelectRow = {
+  id: string;
+  tags: ReadonlyArray<string>;
+};
+
+type FilterableMultiSelectRow = {
+  id: string;
+  title: string;
+  tags: ReadonlyArray<string>;
 };
 
 const columns: ReadonlyArray<DataTableColumn<TaskRow>> = [
@@ -135,6 +147,45 @@ const dateColumns: ReadonlyArray<DataTableColumn<DateRow>> = [
     header: "Due",
     kind: "date",
     isEditable: true
+  }
+];
+
+const multiSelectColumns: ReadonlyArray<DataTableColumn<MultiSelectRow>> = [
+  {
+    id: "tags",
+    field: "tags",
+    header: "Tags",
+    kind: "multiselect",
+    isEditable: true,
+    width: 220,
+    options: [
+      { value: "urgent", label: "Urgent", colorClass: "bg-rose-100 text-rose-700" },
+      { value: "design", label: "Design", colorClass: "bg-violet-100 text-violet-700" },
+      { value: "backend", label: "Backend", colorClass: "bg-slate-100 text-slate-700" },
+      { value: "ops", label: "Ops", colorClass: "bg-sky-100 text-sky-700" }
+    ]
+  }
+];
+
+const multiSelectFilterColumns: ReadonlyArray<DataTableColumn<FilterableMultiSelectRow>> = [
+  {
+    id: "title",
+    field: "title",
+    header: "Title",
+    kind: "text",
+    width: 180
+  },
+  {
+    id: "tags",
+    field: "tags",
+    header: "Tags",
+    kind: "multiselect",
+    width: 220,
+    options: [
+      { value: "urgent", label: "Urgent", colorClass: "bg-rose-100 text-rose-700" },
+      { value: "backend", label: "Backend", colorClass: "bg-slate-100 text-slate-700" },
+      { value: "ops", label: "Ops", colorClass: "bg-sky-100 text-sky-700" }
+    ]
   }
 ];
 
@@ -525,6 +576,89 @@ function DateHarness({ tableId }: { tableId: string }): JSX.Element {
   );
 }
 
+function MultiSelectFilterHarness({ tableId }: { tableId: string }): JSX.Element {
+  const rows = useMemo<ReadonlyArray<FilterableMultiSelectRow>>(
+    () => [
+      { id: "1", title: "Ops only", tags: ["ops"] },
+      { id: "2", title: "Urgent Ops", tags: ["urgent", "ops"] },
+      { id: "3", title: "Backend only", tags: ["backend"] }
+    ],
+    []
+  );
+
+  const dataSource = useMemo<DataTableDataSource<FilterableMultiSelectRow>>(
+    () => ({
+      useRows: (query) => ({
+        rows: applyServerQuery(rows, query),
+        hasMore: false,
+        isLoading: false,
+        isLoadingMore: false,
+        error: null,
+        loadMore: () => undefined,
+        refresh: () => undefined
+      })
+    }),
+    [rows]
+  );
+
+  return (
+    <div className="p-4">
+      <DataTable
+        tableId={tableId}
+        columns={multiSelectFilterColumns}
+        dataSource={dataSource}
+        getRowId={(row) => row.id}
+        features={{ columnFilter: true, rowSelect: false, rowActions: false, infiniteScroll: false, virtualization: false }}
+      />
+    </div>
+  );
+}
+
+function MultiSelectHarness({ tableId }: { tableId: string }): JSX.Element {
+  const [rows, setRows] = useState<ReadonlyArray<MultiSelectRow>>([{ id: "1", tags: ["urgent", "backend"] }]);
+
+  const dataSource = useMemo<DataTableDataSource<MultiSelectRow>>(
+    () => ({
+      useRows: () => ({
+        rows,
+        hasMore: false,
+        isLoading: false,
+        isLoadingMore: false,
+        error: null,
+        loadMore: () => undefined,
+        refresh: () => undefined
+      }),
+      updateRows: async (changes) => {
+        setRows((current) =>
+          current.map((row) => {
+            const patch = changes.find((entry) => entry.rowId === row.id)?.patch;
+            return patch
+              ? {
+                  ...row,
+                  ...patch
+                }
+              : row;
+          })
+        );
+      }
+    }),
+    [rows]
+  );
+
+  return (
+    <div className="w-[360px] p-4">
+      <DataTable
+        tableId={tableId}
+        columns={multiSelectColumns}
+        dataSource={dataSource}
+        getRowId={(row) => row.id}
+        features={{ editing: true, rowSelect: false, rowActions: false, infiniteScroll: false, virtualization: false }}
+      />
+      <output data-testid="tags-raw">{rows[0]?.tags.join(",") ?? ""}</output>
+    </div>
+  );
+}
+
 describe("DataTable component", () => {
   it("edits a text cell", () => {
     cy.mount(<Harness tableId="cypress-table-edit" />);
@@ -591,14 +725,29 @@ describe("DataTable component", () => {
     cy.mount(<Harness tableId="cypress-table-filter" />);
 
     cy.get("[data-column-menu-trigger='status']").first().click({ force: true });
-    cy.get("[role='dialog'][aria-label='Status options']")
-      .find("select")
-      .last()
-      .select("To do", { force: true });
+    cy.get("[role='dialog'][aria-label='Status options']").within(() => {
+      cy.contains("Operator: in").should("exist");
+      cy.contains("label", "To do").find("input").check({ force: true });
+    });
 
     cy.contains("Build UI").should("exist");
-    cy.contains("Ship").should("exist");
+    cy.contains("Ship").should("not.exist");
     cy.get("th[data-column-id='status']").should("have.attr", "data-column-filter-active", "true");
+  });
+
+  it("applies multiselect filters using membership semantics", () => {
+    cy.mount(<MultiSelectFilterHarness tableId="cypress-table-multiselect-filter" />);
+
+    cy.get("[data-column-menu-trigger='tags']").first().click({ force: true });
+    cy.get("[role='dialog'][aria-label='Tags options']").within(() => {
+      cy.contains("Operator: in").should("exist");
+      cy.contains("label", "Ops").find("input").check({ force: true });
+    });
+
+    cy.contains("Ops only").should("exist");
+    cy.contains("Urgent Ops").should("exist");
+    cy.contains("Backend only").should("not.exist");
+    cy.get("th[data-column-id='tags']").should("have.attr", "data-column-filter-active", "true");
   });
 
   it("reorders columns via drag and drop in the same pin zone", () => {
@@ -866,7 +1015,9 @@ describe("DataTable component", () => {
         .first()
         .should("have.class", "bg-emerald-100");
     });
+    cy.findByRole("listbox", { name: /Edit Status/i }).should("have.attr", "aria-activedescendant", "status-option-0");
     cy.findByRole("listbox", { name: /Edit Status/i }).trigger("keydown", { key: "ArrowDown", force: true });
+    cy.findByRole("listbox", { name: /Edit Status/i }).should("have.attr", "aria-activedescendant", "status-option-1");
     cy.findByRole("listbox", { name: /Edit Status/i }).trigger("keydown", { key: "Enter", force: true });
     cy.contains("Done").should("exist");
   });
@@ -895,6 +1046,39 @@ describe("DataTable component", () => {
       });
     cy.findByLabelText("Edit Due").should("not.exist");
     cy.get("[data-testid='due-raw']").should("have.text", "2026-04-09");
+  });
+
+  it("edits multiselect cells with badges and a listbox dialog", () => {
+    cy.mount(<MultiSelectHarness tableId="cypress-table-multiselect-edit" />);
+
+    cy.get("[role='gridcell'][data-column-id='tags']").dblclick();
+
+    cy.findByRole("listbox", { name: /Edit Tags/i })
+      .should("have.focus")
+      .should("have.attr", "aria-multiselectable", "true")
+      .then(($listbox) => {
+        const dialog = $listbox.closest("[role='dialog']")[0];
+        expect(dialog?.parentElement, "multiselect editor dialog should portal to body").to.equal(
+          $listbox[0].ownerDocument.body
+        );
+      });
+
+    cy.get("[role='gridcell'][data-column-id='tags']").within(() => {
+      cy.contains("span", "Urgent").should("exist");
+      cy.contains("span", "Backend").should("exist");
+    });
+
+    cy.findByRole("listbox", { name: /Edit Tags/i }).within(() => {
+      cy.contains("[role='option']", "Design")
+        .find("span")
+        .first()
+        .should("have.class", "bg-violet-100");
+      cy.contains("[role='option']", "Design").click();
+    });
+
+    cy.findByRole("listbox", { name: /Edit Tags/i }).trigger("keydown", { key: "Enter", force: true });
+    cy.findByRole("listbox", { name: /Edit Tags/i }).should("not.exist");
+    cy.get("[data-testid='tags-raw']").should("have.text", "urgent,backend,design");
   });
 
   it("navigates selected cells by visual order when a column is pinned left", () => {
