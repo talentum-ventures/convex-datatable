@@ -1,7 +1,13 @@
 /// <reference types="@testing-library/cypress" />
 
 import { useMemo, useState } from "react";
-import { DataTable, type DataTableColumn, type DataTableDataSource, type DataTableFeatureFlags } from "@rolha/datatable";
+import {
+  DataTable,
+  type CollaboratorPresence,
+  type DataTableColumn,
+  type DataTableDataSource,
+  type DataTableFeatureFlags
+} from "@rolha/datatable";
 import { Toaster, toast } from "sonner";
 import { applyServerQuery } from "../../apps/demo/src/demo-query";
 
@@ -285,18 +291,6 @@ function dispatchPlainTextPaste(win: Window, node: Element, text: string): boole
   return pasteEvent.defaultPrevented;
 }
 
-function setInputValue(node: HTMLInputElement, value: string): void {
-  const ownerWindow = node.ownerDocument.defaultView;
-  const prototype = ownerWindow?.HTMLInputElement.prototype ?? HTMLInputElement.prototype;
-  const valueDescriptor = Object.getOwnPropertyDescriptor(prototype, "value");
-  const inputEvent = new Event("input", { bubbles: true });
-  const changeEvent = new Event("change", { bubbles: true });
-
-  valueDescriptor?.set?.call(node, value);
-  node.dispatchEvent(inputEvent);
-  node.dispatchEvent(changeEvent);
-}
-
 function Harness({
   tableId,
   features
@@ -375,6 +369,75 @@ function Harness({
       <output data-testid="title-raw">{rows[0]?.title ?? ""}</output>
       <output data-testid="status-raw">{rows[0]?.status ?? ""}</output>
       <output data-testid="amount-raw">{String(rows[0]?.amount ?? "")}</output>
+    </div>
+  );
+}
+
+function PresenceHarness({ tableId }: { tableId: string }): JSX.Element {
+  const rows = useMemo<ReadonlyArray<TaskRow>>(
+    () => [
+      { id: "1", title: "Build UI", status: "todo", amount: 10 },
+      { id: "2", title: "Ship", status: "done", amount: 20 }
+    ],
+    []
+  );
+  const collaborators = useMemo<ReadonlyArray<CollaboratorPresence>>(
+    () => [
+      {
+        userId: "maya",
+        name: "Maya",
+        color: "#2563eb",
+        activeCell: {
+          rowId: "1",
+          columnId: "title"
+        }
+      },
+      {
+        userId: "rui",
+        name: "Rui",
+        color: "#dc2626",
+        activeCell: {
+          rowId: "1",
+          columnId: "title"
+        }
+      },
+      {
+        userId: "ana",
+        name: "Ana",
+        color: "#059669",
+        activeCell: {
+          rowId: "2",
+          columnId: "status"
+        }
+      }
+    ],
+    []
+  );
+  const dataSource = useMemo<DataTableDataSource<TaskRow>>(
+    () => ({
+      useRows: () => ({
+        rows,
+        hasMore: false,
+        isLoading: false,
+        isLoadingMore: false,
+        error: null,
+        loadMore: () => undefined,
+        refresh: () => undefined
+      })
+    }),
+    [rows]
+  );
+
+  return (
+    <div className="p-4">
+      <DataTable
+        tableId={tableId}
+        columns={columns}
+        dataSource={dataSource}
+        getRowId={(row) => row.id}
+        collaborators={collaborators}
+        features={{ rowSelect: false, rowActions: false, infiniteScroll: false, virtualization: false }}
+      />
     </div>
   );
 }
@@ -828,6 +891,110 @@ describe("DataTable component", () => {
     cy.contains("Build table").should("exist");
   });
 
+  it("undoes and redoes a cell edit with keyboard shortcuts", () => {
+    cy.mount(<Harness tableId="cypress-table-edit-undo-redo" features={{ undo: true }} />);
+
+    cy.contains("Build UI").dblclick();
+    cy.findByLabelText("Edit Title")
+      .should("have.attr", "contenteditable", "true")
+      .type("{selectall}{backspace}Undo title");
+    cy.findByLabelText("Edit Title").blur();
+    cy.findByTestId("title-raw").should("have.text", "Undo title");
+
+    cy.findByRole("grid").focus().trigger("keydown", { key: "z", ctrlKey: true });
+    cy.findByTestId("title-raw").should("have.text", "Build UI");
+
+    cy.findByRole("grid").focus().trigger("keydown", { key: "Z", ctrlKey: true, shiftKey: true });
+    cy.findByTestId("title-raw").should("have.text", "Undo title");
+  });
+
+  it("undoes and redoes paste operations", () => {
+    cy.mount(<Harness tableId="cypress-table-paste-undo-redo" features={{ undo: true }} />);
+
+    cy.get("[role='gridcell'][data-column-id='title']").first().click();
+
+    cy.window().then((win) =>
+      cy.findByRole("grid").then(($grid) => {
+        const defaultPrevented = dispatchPlainTextPaste(win, $grid[0], "Paste title");
+        expect(defaultPrevented).to.equal(true);
+      })
+    );
+
+    cy.findByTestId("title-raw").should("have.text", "Paste title");
+    cy.findByTestId("status-raw").should("have.text", "todo");
+    cy.findByTestId("amount-raw").should("have.text", "10");
+
+    cy.findByRole("grid").focus().trigger("keydown", { key: "z", ctrlKey: true });
+    cy.findByTestId("title-raw").should("have.text", "Build UI");
+    cy.findByTestId("status-raw").should("have.text", "todo");
+    cy.findByTestId("amount-raw").should("have.text", "10");
+
+    cy.findByRole("grid").focus().trigger("keydown", { key: "y", ctrlKey: true });
+    cy.findByTestId("title-raw").should("have.text", "Paste title");
+    cy.findByTestId("status-raw").should("have.text", "todo");
+    cy.findByTestId("amount-raw").should("have.text", "10");
+  });
+
+  it("clears redo history after a new edit", () => {
+    cy.mount(<Harness tableId="cypress-table-redo-cleared" features={{ undo: true }} />);
+
+    cy.contains("Build UI").dblclick();
+    cy.findByLabelText("Edit Title").type("{selectall}{backspace}First change");
+    cy.findByLabelText("Edit Title").blur();
+    cy.findByTestId("title-raw").should("have.text", "First change");
+
+    cy.findByRole("grid").focus().trigger("keydown", { key: "z", ctrlKey: true });
+    cy.findByTestId("title-raw").should("have.text", "Build UI");
+
+    cy.contains("Build UI").dblclick();
+    cy.findByLabelText("Edit Title").type("{selectall}{backspace}Second change");
+    cy.findByLabelText("Edit Title").blur();
+    cy.findByTestId("title-raw").should("have.text", "Second change");
+
+    cy.findByRole("grid").focus().trigger("keydown", { key: "y", ctrlKey: true });
+    cy.findByTestId("title-raw").should("have.text", "Second change");
+  });
+
+  it("renders collaborator outlines and stacked labels on matching cells", () => {
+    cy.mount(<PresenceHarness tableId="cypress-table-collaborators" />);
+
+    cy.get("tr[data-row-id='1'] [role='gridcell'][data-column-id='title']")
+      .as("sharedCell")
+      .should("have.attr", "data-has-collaborators", "true");
+
+    cy.get("@sharedCell")
+      .find("[data-dt-collaborator-outline]")
+      .should("have.length", 2);
+    cy.get("@sharedCell")
+      .find("[data-dt-collaborator-outline='maya']")
+      .invoke("attr", "style")
+      .should("contain", "#2563eb");
+    cy.get("@sharedCell")
+      .find("[data-dt-collaborator-outline='rui']")
+      .invoke("attr", "style")
+      .should("contain", "#dc2626");
+    cy.get("@sharedCell")
+      .find("[data-dt-collaborator-label]")
+      .should("have.length", 2);
+    cy.get("@sharedCell")
+      .find("[data-dt-collaborator-label='maya']")
+      .should("have.text", "Maya");
+    cy.get("@sharedCell")
+      .find("[data-dt-collaborator-label='rui']")
+      .should("have.text", "Rui");
+
+    cy.get("tr[data-row-id='2'] [role='gridcell'][data-column-id='status']")
+      .should("have.attr", "data-has-collaborators", "true")
+      .find("[data-dt-collaborator-label='ana']")
+      .should("have.text", "Ana");
+
+    cy.get("tr[data-row-id='2'] [role='gridcell'][data-column-id='amount']").should(
+      "have.attr",
+      "data-has-collaborators",
+      "false"
+    );
+  });
+
   it("toggles column visibility", () => {
     cy.mount(<Harness tableId="cypress-table-visibility" />);
 
@@ -841,6 +1008,16 @@ describe("DataTable component", () => {
     cy.contains("Hidden columns (1)").click();
     cy.get("[data-hidden-column-row='amount']").contains("button", "Show").click();
     cy.findByRole("columnheader", { name: /Amount/i }).should("exist");
+  });
+
+  it("keeps utility columns at the table edges", () => {
+    cy.mount(<Harness tableId="cypress-table-utility-column-order" />);
+
+    cy.get("th[data-column-id]").then(($headers) => {
+      const headerIds = [...$headers].map((header) => header.getAttribute("data-column-id"));
+      expect(headerIds[0]).to.equal("__select__");
+      expect(headerIds[headerIds.length - 1]).to.equal("__actions__");
+    });
   });
 
   it("shows hide in the pin action row and only shows unpin for pinned columns", () => {
@@ -1142,8 +1319,8 @@ describe("DataTable component", () => {
     cy.mount(<Harness tableId="cypress-table-row-mutations" />);
 
     cy.contains("Add row").click();
-    cy.findByPlaceholderText("Add Title").type("New task");
-    cy.findByPlaceholderText("Add Status").type("todo{enter}");
+    cy.findByLabelText("Edit Title").type("New task{enter}");
+    cy.contains("Add row").click();
 
     cy.contains("New task").should("exist");
 
@@ -1455,17 +1632,38 @@ describe("DataTable component", () => {
     );
   });
 
-  it("creates a row from valid draft select and multiselect labels", () => {
+  it("creates a row from the draft row with the shared select and multiselect editors", () => {
     cy.stub(toast, "success").as("toastSuccess");
     cy.mount(<StrictOptionParsingHarness tableId="cypress-table-option-draft-valid" />);
 
-    cy.get("input[placeholder='Add Status']").then(($input) => {
-      setInputValue($input[0], "To do");
+    cy.contains("Add row").click();
+    cy.findByRole("listbox", { name: /Edit Status/i })
+      .should("have.focus")
+      .then(($listbox) => {
+        const dialog = $listbox.closest("[role='dialog']")[0];
+        expect(dialog?.parentElement, "draft select editor dialog should portal to body").to.equal(
+          $listbox[0].ownerDocument.body
+        );
+      });
+    cy.findByRole("listbox", { name: /Edit Status/i }).within(() => {
+      cy.contains("[role='option']", "To do").click();
     });
-    cy.get("input[placeholder='Add Tags']").then(($input) => {
-      setInputValue($input[0], "Urgent, Design");
+
+    cy.get("tr[data-row-id='__draft__'] [role='gridcell'][data-column-id='tags']").click();
+    cy.findByRole("listbox", { name: /Edit Tags/i })
+      .should("have.focus")
+      .then(($listbox) => {
+        const dialog = $listbox.closest("[role='dialog']")[0];
+        expect(dialog?.parentElement, "draft multiselect editor dialog should portal to body").to.equal(
+          $listbox[0].ownerDocument.body
+        );
+      });
+    cy.findByRole("listbox", { name: /Edit Tags/i }).within(() => {
+      cy.contains("[role='option']", "Urgent").click();
+      cy.contains("[role='option']", "Design").click();
     });
-    cy.get("input[placeholder='Add Tags']").focus().trigger("keydown", { key: "Enter" });
+    cy.findByRole("listbox", { name: /Edit Tags/i }).trigger("keydown", { key: "Enter", force: true });
+    cy.contains("Add row").click();
 
     cy.findByTestId("row-count").should("have.text", "2");
     cy.findByTestId("status-raw").should("have.text", "todo");
@@ -1473,19 +1671,14 @@ describe("DataTable component", () => {
     cy.get("@toastSuccess").should("have.been.calledWith", "Row added");
   });
 
-  it("blocks draft row creation when select or multiselect text is invalid", () => {
-    cy.stub(toast, "error").as("toastError");
+  it("keeps the draft row pending until the add action is confirmed", () => {
     cy.mount(<StrictOptionParsingHarness tableId="cypress-table-option-draft-invalid" />);
 
-    cy.get("input[placeholder='Add Status']").then(($input) => {
-      setInputValue($input[0], "Missing option");
+    cy.contains("Add row").click();
+    cy.findByRole("listbox", { name: /Edit Status/i }).within(() => {
+      cy.contains("[role='option']", "To do").click();
     });
-    cy.get("input[placeholder='Add Status']").focus().trigger("keydown", { key: "Enter" });
 
-    cy.get("@toastError").should(
-      "have.been.calledWith",
-      "Cannot add row: invalid select/multiselect values in Status."
-    );
     cy.findByTestId("row-count").should("have.text", "1");
     cy.findByTestId("status-raw").should("have.text", "done");
     cy.findByTestId("tags-raw").should("have.text", "urgent");

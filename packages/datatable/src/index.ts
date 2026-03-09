@@ -1,10 +1,15 @@
 export { DataTable, DataTableContainer } from "./ui/data-table";
 export { useConvexDataSource } from "./convex/use-convex-data-source";
+export { useConvexPresence } from "./convex/use-convex-presence";
 export type {
   CellCoord,
   CellRange,
+  CollaboratorCellCoord,
+  CollaboratorPresence,
   ColumnId,
   ConvexDataSourceConfig,
+  ConvexPresenceConfig,
+  ConvexPresenceEntry,
   DataTableCellEditorContext,
   DataTableCellRenderContext,
   DataTableColumn,

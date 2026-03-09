@@ -12,6 +12,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./convex": {
+      "types": "./dist/convex/index.d.ts",
+      "import": "./dist/convex/index.js"
+    },
+    "./convex-server": {
+      "types": "./dist/convex/server.d.ts",
+      "import": "./dist/convex/server.js"
     }
   },
   "scripts": {
@@ -19,8 +27,14 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "peerDependencies": {
+    "convex": "^1.32.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
+  },
+  "peerDependenciesMeta": {
+    "convex": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@tanstack/react-table": "^8.20.5",
@@ -32,5 +46,8 @@
     "sonner": "^1.7.1",
     "tailwind-merge": "^2.5.5",
     "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "convex": "^1.32.0"
   }
 }

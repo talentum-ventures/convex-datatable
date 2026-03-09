@@ -21,6 +21,7 @@ describe("defaults", () => {
     expect(DEFAULT_FEATURE_FLAGS.rowDelete).toBe(false);
     expect(DEFAULT_FEATURE_FLAGS.editing).toBe(false);
     expect(DEFAULT_FEATURE_FLAGS.clipboardPaste).toBe(false);
+    expect(DEFAULT_FEATURE_FLAGS.undo).toBe(false);
   });
 
   it("defaults infinite page size to 50", () => {

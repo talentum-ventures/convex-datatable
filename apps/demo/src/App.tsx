@@ -506,7 +506,8 @@ export function App(): JSX.Element {
       clipboardPaste: true,
       cellSelect: true,
       rowResize: false,
-      virtualization: false
+      virtualization: true,
+      undo: true
     }),
     []
   );

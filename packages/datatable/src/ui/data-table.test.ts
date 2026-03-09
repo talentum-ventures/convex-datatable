@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canHandleGridPaste } from "./data-table";
+import { canHandleGridPaste, shouldCenterHeaderContent } from "./data-table";
 
 describe("grid paste ownership", () => {
   const baseArgs = {
@@ -63,5 +63,16 @@ describe("grid paste ownership", () => {
     expect(canHandleGridPaste({ ...baseArgs, target: select })).toBe(false);
     expect(canHandleGridPaste({ ...baseArgs, target: contentEditable })).toBe(false);
     expect(canHandleGridPaste({ ...baseArgs, target: editorRoot })).toBe(false);
+  });
+});
+
+describe("header content alignment", () => {
+  it("centers the select column header content", () => {
+    expect(shouldCenterHeaderContent("__select__")).toBe(true);
+  });
+
+  it("keeps standard columns on the default header layout", () => {
+    expect(shouldCenterHeaderContent("name")).toBe(false);
+    expect(shouldCenterHeaderContent("__actions__")).toBe(false);
   });
 });

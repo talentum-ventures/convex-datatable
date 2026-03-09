@@ -4,6 +4,7 @@ import type { ColumnDef, Table } from "@tanstack/react-table";
 import { Check, ExternalLink, Link as LinkIcon, Pencil } from "lucide-react";
 import type {
   CellCoord,
+  CollaboratorPresence,
   DataTableCellValue,
   DataTableColumn,
   DataTableReactValue,
@@ -37,6 +38,7 @@ export type BuildColumnsArgs<TRow extends DataTableRowModel> = {
   editingCell: EditingCell;
   activeCell: ActiveCell;
   rangeStart: ActiveCell;
+  collaborators: ReadonlyArray<CollaboratorPresence>;
   onStartEdit: (rowId: RowId, columnId: string) => void;
   onCommit: CellCommit<TRow>;
   onCancelEdit: () => void;
@@ -1137,6 +1139,7 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
   editingCell,
   activeCell,
   rangeStart,
+  collaborators,
   onStartEdit,
   onCommit,
   onCancelEdit,
@@ -1147,10 +1150,12 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
   const activeCellRef = useRef<ActiveCell>(activeCell);
   const rangeStartRef = useRef<ActiveCell>(rangeStart);
   const editingCellRef = useRef<EditingCell>(editingCell);
+  const collaboratorsRef = useRef<ReadonlyArray<CollaboratorPresence>>(collaborators);
 
   activeCellRef.current = activeCell;
   rangeStartRef.current = rangeStart;
   editingCellRef.current = editingCell;
+  collaboratorsRef.current = collaborators;
 
   return useMemo(() => {
     let cachedVisibleDataIds = "";
@@ -1210,6 +1215,10 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
         const isEditing =
           currentEditingCell?.rowId === rowId && currentEditingCell?.columnId === column.id;
         const canEdit = enableEditing && (column.isEditable ?? false);
+        const collaboratorsInCell = collaboratorsRef.current.filter(
+          (collaborator) =>
+            collaborator.activeCell?.rowId === rowId && collaborator.activeCell?.columnId === column.id
+        );
 
         const content = isEditing ? (
           renderColumnEditor({
@@ -1239,6 +1248,7 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
             data-row-index={currentCoord.rowIndex}
             data-column-id={column.id}
             data-column-index={currentCoord.columnIndex}
+            data-has-collaborators={collaboratorsInCell.length > 0 ? "true" : "false"}
             className={cn(
               "group relative box-border h-full min-h-10 w-full min-w-0 px-2 py-1 text-sm text-slate-800",
               isEditing && (column.kind === "select" || column.kind === "multiselect" || column.kind === "date")
@@ -1260,6 +1270,32 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
               }
             }}
           >
+            {collaboratorsInCell.map((collaborator, index) => (
+              <span
+                key={`${collaborator.userId}-outline`}
+                aria-hidden="true"
+                data-dt-collaborator-outline={collaborator.userId}
+                className="pointer-events-none absolute rounded-[3px]"
+                style={{
+                  inset: `${index * 3}px`,
+                  boxShadow: `inset 0 0 0 2px ${collaborator.color}`
+                }}
+              />
+            ))}
+            {collaboratorsInCell.length > 0 ? (
+              <span className="pointer-events-none absolute right-1 top-0 z-10 flex -translate-y-1/2 flex-col items-end gap-1">
+                {collaboratorsInCell.map((collaborator) => (
+                  <span
+                    key={`${collaborator.userId}-label`}
+                    data-dt-collaborator-label={collaborator.userId}
+                    className="max-w-[10rem] truncate rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white shadow-sm"
+                    style={{ backgroundColor: collaborator.color }}
+                  >
+                    {collaborator.name}
+                  </span>
+                ))}
+              </span>
+            ) : null}
             {content}
             {canEdit && !isEditing ? (
               <span className="pointer-events-none absolute right-1 top-1 hidden rounded bg-slate-100 p-0.5 text-slate-500 group-hover:block">

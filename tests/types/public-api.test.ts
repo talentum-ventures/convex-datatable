@@ -1,12 +1,22 @@
 import { describe, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 import type {
+  CollaboratorCellCoord,
+  CollaboratorPresence,
   ConvexDataSourceConfig,
+  ConvexPresenceConfig,
   DataTableColumn,
   DataTableDataSource,
   DataTableProps,
   DataTableRowAction
 } from "@rolha/datatable";
+import { useConvexPresence } from "@rolha/datatable";
+import {
+  clearStalePresenceHandler,
+  getPresenceHandler,
+  heartbeatHandler,
+  presenceFields
+} from "@rolha/datatable/convex-server";
 
 type InvoiceRow = {
   id: string;
@@ -111,7 +121,21 @@ const props: DataTableProps<InvoiceRow> = {
     tags: z.array(z.string()),
     createdAt: z.string()
   }),
-  rowActions: [rowAction]
+  rowActions: [rowAction],
+  collaborators: [
+    {
+      userId: "remote-user",
+      name: "Remote",
+      color: "#2563eb",
+      activeCell: {
+        rowId: "invoice-1",
+        columnId: "description"
+      }
+    }
+  ],
+  onActiveCellChange: (cell) => {
+    expectTypeOf(cell).toEqualTypeOf<CollaboratorCellCoord | null>();
+  }
 };
 
 describe("public api", () => {
@@ -132,6 +156,29 @@ describe("public api", () => {
     };
 
     expectTypeOf(config.tableId).toEqualTypeOf<string>();
+  });
+
+  it("keeps collaborative presence hooks typed", () => {
+    const config: ConvexPresenceConfig = {
+      tableId: "invoice-table",
+      userId: "local-user",
+      userName: "Local",
+      usePresenceData: () => [],
+      sendHeartbeat: () => undefined
+    };
+
+    expectTypeOf(config.userId).toEqualTypeOf<string>();
+    expectTypeOf(useConvexPresence).parameters.toEqualTypeOf<[ConvexPresenceConfig]>();
+    expectTypeOf(useConvexPresence(config).collaborators).toEqualTypeOf<
+      ReadonlyArray<CollaboratorPresence>
+    >();
+  });
+
+  it("exposes the Convex server helpers on the public subpath", () => {
+    expectTypeOf(presenceFields.tableId).toBeObject();
+    expectTypeOf(heartbeatHandler).toBeFunction();
+    expectTypeOf(getPresenceHandler).toBeFunction();
+    expectTypeOf(clearStalePresenceHandler).toBeFunction();
   });
 
   it("rejects invalid field access", () => {

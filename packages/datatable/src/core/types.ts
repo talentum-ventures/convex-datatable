@@ -90,6 +90,7 @@ export type DataTableFeatureFlags = {
   cellSelect?: boolean;
   clipboardCopy?: boolean;
   clipboardPaste?: boolean;
+  undo?: boolean;
   infiniteScroll?: boolean;
   virtualization?: boolean;
 };
@@ -312,6 +313,39 @@ export type DataTableDataSource<TRow extends DataTableRowModel> = {
 
 export type DataTableOnError = (message: string) => void;
 
+export type CollaboratorCellCoord = {
+  rowId: RowId;
+  columnId: ColumnId;
+};
+
+export type CollaboratorPresence = {
+  userId: string;
+  name: string;
+  color: string;
+  activeCell: CollaboratorCellCoord | null;
+};
+
+export type ConvexPresenceEntry = {
+  tableId: string;
+  userId: string;
+  userName: string;
+  userColor: string;
+  activeRowId: RowId | null;
+  activeColumnId: ColumnId | null;
+  lastSeen: number;
+};
+
+export type ConvexPresenceConfig = {
+  tableId: string;
+  userId: string;
+  userName: string;
+  userColor?: string;
+  usePresenceData: (tableId: string) => ReadonlyArray<ConvexPresenceEntry>;
+  sendHeartbeat: (entry: ConvexPresenceEntry) => void | Promise<void>;
+  debounceMs?: number;
+  heartbeatIntervalMs?: number;
+};
+
 export type RowSchemaIssue = {
   path: ReadonlyArray<PropertyKey>;
   message: string;
@@ -337,6 +371,8 @@ export type DataTableProps<TRow extends DataTableRowModel> = {
   pageSize?: number;
   theme?: Partial<DataTableThemeTokens>;
   className?: string;
+  collaborators?: ReadonlyArray<CollaboratorPresence>;
+  onActiveCellChange?: (cell: CollaboratorCellCoord | null) => void;
   onError?: DataTableOnError;
 };
 

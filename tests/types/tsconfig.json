@@ -4,7 +4,9 @@
     "noEmit": true,
     "types": ["vitest/globals", "node"],
     "paths": {
-      "@rolha/datatable": ["../../packages/datatable/src/index.ts"]
+      "@rolha/datatable": ["../../packages/datatable/src/index.ts"],
+      "@rolha/datatable/convex": ["../../packages/datatable/src/convex/index.ts"],
+      "@rolha/datatable/convex-server": ["../../packages/datatable/src/convex/server.ts"]
     }
   },
   "include": ["./**/*.ts"]

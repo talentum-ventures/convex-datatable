@@ -26,6 +26,7 @@ import {
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
+  Check,
   ChevronDown,
   ChevronUp,
   Copy,
@@ -34,6 +35,7 @@ import {
   GripVertical,
   LoaderCircle,
   MoreVertical,
+  Pencil,
   Pin,
   PinOff,
   Plus,
@@ -58,8 +60,11 @@ import {
   parseClipboardToCellValue,
   serializeCellForClipboard
 } from "../core/cell-value";
+import { useUndoStack, type UndoEntry } from "../core/use-undo-stack";
 import type {
   CellCoord,
+  CollaboratorCellCoord,
+  CollaboratorPresence,
   DataTableCellValue,
   DataTableColumn,
   DataTableFilter,
@@ -69,6 +74,7 @@ import type {
   DataTableThemeTokens,
   FilterOperator,
   PersistedTableState,
+  RowPatch,
   RowId
 } from "../core/types";
 import { validateCell, validateRow } from "../core/validation";
@@ -187,6 +193,10 @@ export function canHandleGridPaste({
   return !isEditableKeyboardTarget(target);
 }
 
+export function shouldCenterHeaderContent(columnId: string): boolean {
+  return columnId === "__select__";
+}
+
 function appendSkipSuffix(message: string, skippedNonEditable: number): string {
   if (skippedNonEditable === 0) {
     return message;
@@ -203,6 +213,31 @@ function invalidOptionPasteMessage(appliedCells: number, skippedInvalidOptionCel
   }
 
   return `Paste skipped ${skippedInvalidOptionCells} invalid select/multiselect ${cellLabel}.`;
+}
+
+function buildUndoSnapshotUpdate<TRow extends DataTableRowModel>(
+  entry: UndoEntry<TRow>,
+  direction: "previous" | "next"
+): {
+  optimisticUpdate: Record<RowId, TRow>;
+  patches: ReadonlyArray<RowPatch<TRow>>;
+} {
+  const optimisticUpdate: Record<RowId, TRow> = {};
+  const patches: RowPatch<TRow>[] = [];
+
+  for (const change of entry.changes) {
+    const row = direction === "previous" ? change.previousRow : change.nextRow;
+    optimisticUpdate[change.rowId] = row;
+    patches.push({
+      rowId: change.rowId,
+      patch: row
+    });
+  }
+
+  return {
+    optimisticUpdate,
+    patches
+  };
 }
 
 function hasDraftCellValue(value: DataTableCellValue): boolean {
@@ -231,6 +266,7 @@ type CssVarsStyle = CSSProperties & {
 type PinZone = "left" | "center" | "right";
 type DropPlacement = "before" | "after";
 type ColumnMenuAnchor = "left" | "right";
+const EMPTY_COLLABORATORS: ReadonlyArray<CollaboratorPresence> = [];
 
 const COLUMN_MENU_WIDTH_PX = 288;
 const COLUMN_MENU_GUTTER_PX = 8;
@@ -516,6 +552,8 @@ export function DataTable<TRow extends DataTableRowModel>({
   pageSize,
   theme,
   className,
+  collaborators,
+  onActiveCellChange,
   onError
 }: DataTableProps<TRow>): JSX.Element {
   const mergedFeatures = useMemo(() => asRequiredFeatureFlags(features), [features]);
@@ -548,6 +586,7 @@ export function DataTable<TRow extends DataTableRowModel>({
   const [deletedRows, setDeletedRows] = useState<Record<RowId, TRow>>({});
   const [draftRow, setDraftRow] = useState<Partial<TRow>>({});
   const [draftEditingColumnId, setDraftEditingColumnId] = useState<string | null>(null);
+  const undoStack = useUndoStack<TRow>();
   const commitCounter = useRef(0);
   const commitWindow = useRef<number[]>([]);
   const interactionSequence = useRef(0);
@@ -710,6 +749,22 @@ export function DataTable<TRow extends DataTableRowModel>({
         return;
       }
 
+      const undoEntry = mergedFeatures.undo
+        ? {
+            changes: [
+              {
+                rowId,
+                previousRow: row,
+                nextRow: updateResult.nextRow
+              }
+            ]
+          }
+        : null;
+
+      if (undoEntry) {
+        undoStack.pushUndo(undoEntry);
+      }
+
       setOptimisticRows((current) => ({
         ...current,
         [rowId]: updateResult.nextRow
@@ -723,6 +778,9 @@ export function DataTable<TRow extends DataTableRowModel>({
       try {
         await dataSource.updateRows([updateResult.patch]);
       } catch (error) {
+        if (undoEntry) {
+          undoStack.discard(undoEntry);
+        }
         setOptimisticRows((current) => {
           const next = { ...current };
           delete next[rowId];
@@ -731,7 +789,7 @@ export function DataTable<TRow extends DataTableRowModel>({
         toast.error(`Failed to update row: ${String(error)}`);
       }
     },
-    [dataSource, rowSchema]
+    [dataSource, mergedFeatures.undo, rowSchema, undoStack]
   );
 
   const dataColumnDefs = useColumnDefs({
@@ -740,6 +798,7 @@ export function DataTable<TRow extends DataTableRowModel>({
     editingCell,
     activeCell,
     rangeStart,
+    collaborators: collaborators ?? EMPTY_COLLABORATORS,
     onStartEdit,
     onCommit: commitCellEdit,
     onCancelEdit,
@@ -970,6 +1029,40 @@ export function DataTable<TRow extends DataTableRowModel>({
     }
     return output;
   }, [actionColumn, dataColumnDefs, rowSelectColumn]);
+  const fullColumnOrder = useMemo(() => {
+    const dataColumnIds = columns.map((column) => column.id);
+    const dataColumnIdSet = new Set(dataColumnIds);
+    const seenColumnIds = new Set<string>();
+    const orderedDataColumnIds: string[] = [];
+
+    for (const columnId of columnOrder) {
+      if (columnId === "__select__" || columnId === "__actions__") {
+        continue;
+      }
+
+      if (!dataColumnIdSet.has(columnId) || seenColumnIds.has(columnId)) {
+        continue;
+      }
+
+      seenColumnIds.add(columnId);
+      orderedDataColumnIds.push(columnId);
+    }
+
+    const remainingDataColumnIds = dataColumnIds.filter((columnId) => !seenColumnIds.has(columnId));
+    const output: string[] = [];
+
+    if (rowSelectColumn) {
+      output.push("__select__");
+    }
+
+    output.push(...orderedDataColumnIds, ...remainingDataColumnIds);
+
+    if (actionColumn) {
+      output.push("__actions__");
+    }
+
+    return output;
+  }, [actionColumn, columnOrder, columns, rowSelectColumn]);
 
   const table = useReactTable({
     data: mergedRows,
@@ -986,7 +1079,7 @@ export function DataTable<TRow extends DataTableRowModel>({
     state: {
       sorting,
       columnFilters,
-      columnOrder,
+      columnOrder: fullColumnOrder,
       columnVisibility,
       columnPinning,
       columnSizing,
@@ -1060,6 +1153,23 @@ export function DataTable<TRow extends DataTableRowModel>({
 
     return indexById;
   }, [visibleDataColumns]);
+  const resolvedActiveCell = useMemo<CollaboratorCellCoord | null>(() => {
+    if (!activeCell) {
+      return null;
+    }
+
+    const row = mergedRows[activeCell.rowIndex];
+    const column = visibleDataColumns[activeCell.columnIndex];
+
+    if (!row || !column) {
+      return null;
+    }
+
+    return {
+      rowId: getRowId(row),
+      columnId: column.id
+    };
+  }, [activeCell, getRowId, mergedRows, visibleDataColumns]);
   const firstVisibleDraftColumnId = useMemo(() => {
     for (const column of visibleLeafColumnsInUiOrder) {
       const columnConfig = columnById.get(column.id);
@@ -1070,11 +1180,6 @@ export function DataTable<TRow extends DataTableRowModel>({
 
     return orderedColumns[0]?.id ?? null;
   }, [columnById, orderedColumns, visibleLeafColumnsInUiOrder]);
-  const draftHasValues = useMemo(
-    () => Object.values(draftRow).some((value) => hasDraftCellValue(value)),
-    [draftRow]
-  );
-
   const tableRows = table.getRowModel().rows;
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
   const previousEditingCellRef = useRef<EditingCell>(editingCell);
@@ -1108,6 +1213,14 @@ export function DataTable<TRow extends DataTableRowModel>({
       observer.disconnect();
     };
   }, []);
+
+  useEffect(() => {
+    if (!onActiveCellChange) {
+      return;
+    }
+
+    onActiveCellChange(resolvedActiveCell);
+  }, [onActiveCellChange, resolvedActiveCell]);
 
   useEffect(() => {
     const previousEditingCell = previousEditingCellRef.current;
@@ -1594,6 +1707,27 @@ export function DataTable<TRow extends DataTableRowModel>({
         return;
       }
 
+      const undoEntry = mergedFeatures.undo
+        ? {
+            changes: Object.entries(optimisticUpdate).map(([rowId, nextRow]) => {
+              const previousRow = previousRows.get(rowId);
+              if (!previousRow) {
+                throw new Error(`Missing previous row snapshot for ${rowId}`);
+              }
+
+              return {
+                rowId,
+                previousRow,
+                nextRow
+              };
+            })
+          }
+        : null;
+
+      if (undoEntry) {
+        undoStack.pushUndo(undoEntry);
+      }
+
       setOptimisticRows((current) => ({
         ...current,
         ...optimisticUpdate
@@ -1609,6 +1743,9 @@ export function DataTable<TRow extends DataTableRowModel>({
           toast.success("Paste applied");
         }
       } catch (error) {
+        if (undoEntry) {
+          undoStack.discard(undoEntry);
+        }
         setOptimisticRows((current) => {
           const next = { ...current };
           for (const rowId of Object.keys(optimisticUpdate)) {
@@ -1629,16 +1766,18 @@ export function DataTable<TRow extends DataTableRowModel>({
       mergedFeatures.clipboardPaste,
       mergedFeatures.cellSelect,
       mergedFeatures.editing,
+      mergedFeatures.undo,
       mergedRows,
       rangeStart,
       rowSchema,
       visibleDataColumns,
-      editingCell
+      editingCell,
+      undoStack
     ]
   );
 
   const onGridKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLDivElement>) => {
+    async (event: KeyboardEvent<HTMLDivElement>) => {
       const targetOwnsKeyboard = isEditableKeyboardTarget(event.target);
 
       if (mergedFeatures.cellSelect && !targetOwnsKeyboard && !editingCell) {
@@ -1690,6 +1829,73 @@ export function DataTable<TRow extends DataTableRowModel>({
       }
 
       const commandKey = event.metaKey || event.ctrlKey;
+      const redoCommand =
+        commandKey && (event.key.toLowerCase() === "y" || (event.shiftKey && event.key.toLowerCase() === "z"));
+
+      if (mergedFeatures.undo && commandKey && event.key.toLowerCase() === "z" && !event.shiftKey) {
+        const entry = undoStack.popUndo();
+        if (!entry) {
+          return;
+        }
+
+        event.preventDefault();
+        const { optimisticUpdate, patches } = buildUndoSnapshotUpdate(entry, "previous");
+
+        setOptimisticRows((current) => ({
+          ...current,
+          ...optimisticUpdate
+        }));
+
+        if (!dataSource.updateRows) {
+          return;
+        }
+
+        try {
+          await dataSource.updateRows(patches);
+        } catch (error) {
+          undoStack.popRedo();
+          const rollbackUpdate = buildUndoSnapshotUpdate(entry, "next").optimisticUpdate;
+          setOptimisticRows((current) => ({
+            ...current,
+            ...rollbackUpdate
+          }));
+          toast.error(`Undo failed: ${String(error)}`);
+        }
+        return;
+      }
+
+      if (mergedFeatures.undo && redoCommand) {
+        const entry = undoStack.popRedo();
+        if (!entry) {
+          return;
+        }
+
+        event.preventDefault();
+        const { optimisticUpdate, patches } = buildUndoSnapshotUpdate(entry, "next");
+
+        setOptimisticRows((current) => ({
+          ...current,
+          ...optimisticUpdate
+        }));
+
+        if (!dataSource.updateRows) {
+          return;
+        }
+
+        try {
+          await dataSource.updateRows(patches);
+        } catch (error) {
+          undoStack.popUndo();
+          const rollbackUpdate = buildUndoSnapshotUpdate(entry, "previous").optimisticUpdate;
+          setOptimisticRows((current) => ({
+            ...current,
+            ...rollbackUpdate
+          }));
+          toast.error(`Redo failed: ${String(error)}`);
+        }
+        return;
+      }
+
       if (commandKey && event.key.toLowerCase() === "c") {
         event.preventDefault();
         void copySelection();
@@ -1703,13 +1909,16 @@ export function DataTable<TRow extends DataTableRowModel>({
     [
       activeCell,
       copySelection,
+      dataSource,
       editingCell,
       getRowId,
       mergedFeatures.cellSelect,
       mergedFeatures.clipboardPaste,
       mergedFeatures.editing,
+      mergedFeatures.undo,
       mergedRows,
       moveActiveCell,
+      undoStack,
       visibleDataColumns
     ]
   );
@@ -2157,9 +2366,13 @@ export function DataTable<TRow extends DataTableRowModel>({
             <Button
               size="sm"
               onClick={() => {
+                const hasPendingDraftValues = Object.values(draftRowRef.current).some((value) =>
+                  hasDraftCellValue(value)
+                );
+
                 rowVirtualizer.scrollToIndex(mergedRows.length, { align: "end" });
 
-                if (draftHasValues) {
+                if (hasPendingDraftValues) {
                   void commitDraftRow();
                   return;
                 }
@@ -2353,6 +2566,7 @@ export function DataTable<TRow extends DataTableRowModel>({
                   {headerGroup.headers.map((header) => {
                     const columnConfig = columnById.get(header.column.id);
                     const isDataColumn = Boolean(columnConfig);
+                    const centerHeaderContent = shouldCenterHeaderContent(header.column.id);
                     const canSort = Boolean(columnConfig) && mergedFeatures.columnSort && header.column.getCanSort();
                     const canFilter = Boolean(columnConfig) && mergedFeatures.columnFilter && (columnConfig?.isFilterable ?? true);
                     const canHide = Boolean(columnConfig) && mergedFeatures.columnVisibility && header.column.getCanHide();
@@ -2426,8 +2640,18 @@ export function DataTable<TRow extends DataTableRowModel>({
                           right: pinnedState === "right" ? `${rightOffset ?? 0}px` : undefined
                         }}
                       >
-                        <div className="flex w-full items-center justify-between gap-1">
-                          <div className="inline-flex min-w-0 items-center gap-1">
+                        <div
+                          className={cn(
+                            "flex w-full items-center gap-1",
+                            centerHeaderContent ? "justify-center" : "justify-between"
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "inline-flex min-w-0 items-center gap-1",
+                              centerHeaderContent ? "w-full justify-center" : undefined
+                            )}
+                          >
                             {canReorder && columnConfig ? (
                               <button
                                 type="button"
@@ -2826,11 +3050,11 @@ export function DataTable<TRow extends DataTableRowModel>({
                               {content}
                               {!isEditingDraftCell ? (
                                 <span className="pointer-events-none absolute right-1 top-1 hidden rounded bg-white/80 p-0.5 text-slate-500 group-hover:block">
-                                  <Plus className="h-3 w-3" />
+                                  <Pencil className="h-3 w-3" />
                                 </span>
                               ) : (
                                 <span className="pointer-events-none absolute right-1 top-1 rounded bg-emerald-100 p-0.5 text-emerald-700">
-                                  <Plus className="h-3 w-3" />
+                                  <Check className="h-3 w-3" />
                                 </span>
                               )}
                             </div>
