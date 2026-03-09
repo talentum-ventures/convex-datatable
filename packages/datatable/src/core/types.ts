@@ -402,6 +402,11 @@ export type CellCoord = {
   columnIndex: number;
 };
 
+export type EditingCellState = {
+  rowId: RowId;
+  columnId: string;
+} | null;
+
 export type CellRange = {
   start: CellCoord;
   end: CellCoord;

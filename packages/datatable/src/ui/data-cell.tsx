@@ -1,0 +1,158 @@
+import { memo, type CSSProperties } from "react";
+import { cn } from "../core/cn";
+import {
+  useCellIsEditing,
+  useCellIsInRange,
+  useCellIsSelected,
+  useCellStore
+} from "../core/cell-store";
+import type {
+  CellCoord,
+  CollaboratorPresence,
+  DataTableCellValue,
+  DataTableColumn,
+  DataTableRowModel,
+  RowId
+} from "../core/types";
+import {
+  renderColumnContent,
+  renderColumnEditor,
+  renderEditableIndicator,
+  renderEditIndicator
+} from "../engine/column-def-builder";
+
+export type DataCellProps<TRow extends DataTableRowModel> = {
+  column: DataTableColumn<TRow>;
+  row: TRow;
+  rowId: RowId;
+  value: DataTableCellValue;
+  rowIndex: number;
+  columnIndex: number;
+  collaborators: ReadonlyArray<CollaboratorPresence>;
+  enableEditing: boolean;
+  onCommit: (args: {
+    row: TRow;
+    rowId: RowId;
+    column: DataTableColumn<TRow>;
+    value: DataTableCellValue;
+  }) => void;
+  onCancelEdit: () => void;
+  onStartEdit: (rowId: RowId, columnId: string) => void;
+  onCellSelect: (coord: CellCoord) => void;
+  onRangeSelect: (coord: CellCoord) => void;
+};
+
+const DataCellInner = <TRow extends DataTableRowModel>({
+  column,
+  row,
+  rowId,
+  value,
+  rowIndex,
+  columnIndex,
+  collaborators,
+  enableEditing,
+  onCommit,
+  onCancelEdit,
+  onStartEdit,
+  onCellSelect,
+  onRangeSelect
+}: DataCellProps<TRow>): JSX.Element => {
+  const cellStore = useCellStore();
+  const isSelected = useCellIsSelected(cellStore, rowIndex, columnIndex);
+  const isRangeSelected = useCellIsInRange(cellStore, rowIndex, columnIndex);
+  const isEditing = useCellIsEditing(cellStore, rowId, column.id);
+  const currentCoord: CellCoord = {
+    rowIndex,
+    columnIndex
+  };
+  const canEdit = enableEditing && (column.isEditable ?? false);
+  const collaboratorsInCell = collaborators.filter(
+    (collaborator) =>
+      collaborator.activeCell?.rowId === rowId && collaborator.activeCell?.columnId === column.id
+  );
+
+  const content = isEditing
+    ? renderColumnEditor({
+        column,
+        row,
+        rowId,
+        value,
+        onCommit: (nextValue) => {
+          onCommit({ row, rowId, column, value: nextValue });
+        },
+        onCancel: onCancelEdit
+      })
+    : renderColumnContent({
+        column,
+        row,
+        rowId,
+        value,
+        isEditing
+      });
+
+  return (
+    <div
+      role="gridcell"
+      data-row-id={String(rowId)}
+      data-row-index={rowIndex}
+      data-column-id={column.id}
+      data-column-index={columnIndex}
+      data-has-collaborators={collaboratorsInCell.length > 0 ? "true" : "false"}
+      className={cn(
+        "group relative box-border h-full min-h-10 w-full min-w-0 px-2 py-1 text-sm text-slate-800",
+        isEditing && (column.kind === "select" || column.kind === "multiselect" || column.kind === "date")
+          ? "z-20 overflow-visible"
+          : "overflow-hidden",
+        isEditing ? "bg-white" : isRangeSelected ? "bg-[var(--dt-selection-bg)]" : "",
+        isSelected ? "outline outline-2 outline-[var(--dt-active-cell-ring)] outline-offset-[-2px]" : ""
+      )}
+      onClick={(event) => {
+        if (event.shiftKey) {
+          onRangeSelect(currentCoord);
+          return;
+        }
+        onCellSelect(currentCoord);
+      }}
+      onDoubleClick={() => {
+        if (canEdit) {
+          onStartEdit(rowId, column.id);
+        }
+      }}
+    >
+      {collaboratorsInCell.map((collaborator, index) => (
+        <span
+          key={`${collaborator.userId}-outline`}
+          aria-hidden="true"
+          data-dt-collaborator-outline={collaborator.userId}
+          className="pointer-events-none absolute rounded-[3px]"
+          style={
+            {
+              "--dt-collaborator-outline": collaborator.color,
+              inset: `${index * 3}px`,
+              boxShadow: "inset 0 0 0 2px var(--dt-collaborator-outline)"
+            } as CSSProperties & { "--dt-collaborator-outline": string }
+          }
+        />
+      ))}
+      {collaboratorsInCell.length > 0 ? (
+        <span className="pointer-events-none absolute right-1 top-0 z-10 flex -translate-y-1/2 flex-col items-end gap-1">
+          {collaboratorsInCell.map((collaborator) => (
+            <span
+              key={`${collaborator.userId}-label`}
+              data-dt-collaborator-label={collaborator.userId}
+              className="max-w-[10rem] truncate rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white shadow-sm"
+              style={{ backgroundColor: collaborator.color }}
+            >
+              {collaborator.name}
+            </span>
+          ))}
+        </span>
+      ) : null}
+      {content}
+      {renderEditableIndicator(canEdit, isEditing)}
+      {renderEditIndicator(isEditing)}
+    </div>
+  );
+};
+
+export const DataCell = memo(DataCellInner) as typeof DataCellInner;

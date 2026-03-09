@@ -1,9 +1,10 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
 import { toast } from "sonner";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import type { DataTableRowModel, RowId, RowPatch } from "../core/types";
+import type { DataTableRowModel, EditingCellState, RowId, RowPatch } from "../core/types";
+import type { CellStore } from "../core/cell-store";
 import type { UseUndoStackResult, UndoEntry } from "./use-undo-stack";
-import { isEditableKeyboardTarget, type EditingCellState } from "./use-table-clipboard";
+import { isEditableKeyboardTarget } from "./use-table-clipboard";
 
 function buildUndoSnapshotUpdate<TRow extends DataTableRowModel>(
   entry: UndoEntry<TRow>,
@@ -31,8 +32,7 @@ function buildUndoSnapshotUpdate<TRow extends DataTableRowModel>(
 }
 
 export type UseTableKeyboardArgs<TRow extends DataTableRowModel> = {
-  activeCell: { rowIndex: number; columnIndex: number } | null;
-  editingCell: EditingCellState;
+  cellStore: CellStore;
   editingEnabled: boolean;
   cellSelectEnabled: boolean;
   clipboardPasteEnabled: boolean;
@@ -53,8 +53,7 @@ export type UseTableKeyboardResult = {
 };
 
 export function useTableKeyboard<TRow extends DataTableRowModel>({
-  activeCell,
-  editingCell,
+  cellStore,
   editingEnabled,
   cellSelectEnabled,
   clipboardPasteEnabled,
@@ -71,6 +70,7 @@ export function useTableKeyboard<TRow extends DataTableRowModel>({
 }: UseTableKeyboardArgs<TRow>): UseTableKeyboardResult {
   const onGridKeyDown = useCallback(async (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const targetOwnsKeyboard = isEditableKeyboardTarget(event.target);
+    const { activeCell, editingCell } = cellStore.getSnapshot();
 
     if (cellSelectEnabled && !targetOwnsKeyboard && !editingCell) {
       if (event.key === "ArrowDown") {
@@ -199,12 +199,11 @@ export function useTableKeyboard<TRow extends DataTableRowModel>({
       return;
     }
   }, [
-    activeCell,
+    cellStore,
     cellSelectEnabled,
     clipboardPasteEnabled,
     copySelection,
     displayedRows,
-    editingCell,
     editingEnabled,
     getRowId,
     moveActiveCell,

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { flexRender, type Table } from "@tanstack/react-table";
 import { ChevronDown, ChevronUp, Filter, GripVertical, MoreVertical } from "lucide-react";
 import { cn } from "../core/cn";
@@ -64,7 +65,7 @@ export type TableHeaderProps<TRow extends DataTableRowModel> = {
   }) => void;
 };
 
-export function TableHeader<TRow extends DataTableRowModel>({
+function TableHeaderInner<TRow extends DataTableRowModel>({
   table,
   columnById,
   columnRenderLayout,
@@ -334,3 +335,5 @@ export function TableHeader<TRow extends DataTableRowModel>({
     </thead>
   );
 }
+
+export const TableHeader = memo(TableHeaderInner) as typeof TableHeaderInner;

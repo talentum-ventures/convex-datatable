@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { ChevronDown, Copy, LoaderCircle, Plus, Rows3, Trash2 } from "lucide-react";
 import type { Table } from "@tanstack/react-table";
 import { cn } from "../core/cn";
@@ -21,7 +22,7 @@ export type TableToolbarProps<TRow extends DataTableRowModel> = {
   onCopy: () => void;
 };
 
-export function TableToolbar<TRow extends DataTableRowModel>({
+function TableToolbarInner<TRow extends DataTableRowModel>({
   canAddRow,
   canDeleteRows,
   canCopySelection,
@@ -142,3 +143,5 @@ export function TableToolbar<TRow extends DataTableRowModel>({
     </div>
   );
 }
+
+export const TableToolbar = memo(TableToolbarInner) as typeof TableToolbarInner;

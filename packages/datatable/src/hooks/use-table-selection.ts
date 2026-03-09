@@ -1,4 +1,5 @@
-import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, type Dispatch, type SetStateAction } from "react";
+import type { CellStore } from "../core/cell-store";
 import type { CellCoord } from "../core/types";
 import { pushDebugEventThrottled } from "../debug";
 
@@ -25,6 +26,7 @@ export function cellRange(
 }
 
 export type UseTableSelectionArgs = {
+  cellStore: CellStore;
   isDebugMode: boolean;
   debugScope: string;
 };
@@ -39,11 +41,14 @@ export type UseTableSelectionResult = {
 };
 
 export function useTableSelection({
+  cellStore,
   isDebugMode,
   debugScope
 }: UseTableSelectionArgs): UseTableSelectionResult {
-  const [activeCell, setActiveCell] = useState<CellCoord | null>(null);
-  const [rangeStart, setRangeStart] = useState<CellCoord | null>(null);
+  const activeCell = cellStore.getActiveCell();
+  const rangeStart = cellStore.getRangeStart();
+  const setActiveCell = cellStore.setActiveCell;
+  const setRangeStart = cellStore.setRangeStart;
 
   const onCellSelect = useCallback((coord: CellCoord) => {
     if (isDebugMode) {
@@ -54,7 +59,7 @@ export function useTableSelection({
     }
     setActiveCell(coord);
     setRangeStart(coord);
-  }, [debugScope, isDebugMode]);
+  }, [debugScope, isDebugMode, setActiveCell, setRangeStart]);
 
   const onRangeSelect = useCallback((coord: CellCoord) => {
     if (isDebugMode) {
@@ -65,7 +70,7 @@ export function useTableSelection({
     }
     setActiveCell(coord);
     setRangeStart((current) => current ?? coord);
-  }, [debugScope, isDebugMode]);
+  }, [debugScope, isDebugMode, setActiveCell, setRangeStart]);
 
   return {
     activeCell,

@@ -16,11 +16,11 @@ import type {
   DataTableColumn,
   DataTableDataSource,
   DataTableRowModel,
+  EditingCellState,
   RowId,
   RowSchema
 } from "../core/types";
 import { type UseUndoStackResult } from "./use-undo-stack";
-import type { EditingCellState } from "./use-table-clipboard";
 
 export function hasDraftCellValue(value: DataTableCellValue): boolean {
   if (Array.isArray(value)) {

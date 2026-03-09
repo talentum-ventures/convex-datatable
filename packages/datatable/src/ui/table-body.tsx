@@ -1,6 +1,12 @@
-import { flexRender, type Column, type Row } from "@tanstack/react-table";
-import type { VirtualItem } from "@tanstack/react-virtual";
-import { cn } from "../core/cn";
+import {
+  forwardRef,
+  memo,
+  useImperativeHandle,
+  useMemo,
+  type RefAttributes
+} from "react";
+import type { Column, Row } from "@tanstack/react-table";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import type {
   DataTableCellValue,
   DataTableColumn,
@@ -8,15 +14,28 @@ import type {
   RowId
 } from "../core/types";
 import { ACTIONS_COLUMN_ID } from "../engine/managed-columns";
+import {
+  buildStaticVirtualItems,
+  getStaticVirtualTotalHeight
+} from "../virtual/static-virtual-items";
 import type { UseRowHeightsResult } from "../virtual/row-heights";
 import type { ColumnLayoutResult } from "./column-layout";
 import { DraftRow } from "./draft-row";
+import { MemoRow } from "./memo-row";
+
+export type TableBodyHandle = {
+  scrollToIndex: (index: number, align?: "auto" | "start" | "center" | "end") => void;
+  measureRow: (node: HTMLTableRowElement | null) => void;
+};
 
 export type TableBodyProps<TRow extends DataTableRowModel> = {
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>;
+  virtualizationEnabled: boolean;
+  totalRows: number;
+  minHeight: number;
+  overscan: number;
   tableRows: ReadonlyArray<Row<TRow>>;
   displayedRows: ReadonlyArray<TRow>;
-  virtualItems: ReadonlyArray<VirtualItem>;
-  totalHeight: number;
   rowAddEnabled: boolean;
   rowResizeEnabled: boolean;
   canCreateRow: boolean;
@@ -39,11 +58,14 @@ export type TableBodyProps<TRow extends DataTableRowModel> = {
   onStartRowResize: (rowId: RowId, clientY: number) => void;
 };
 
-export function TableBody<TRow extends DataTableRowModel>({
+function TableBodyInner<TRow extends DataTableRowModel>({
+  scrollContainerRef,
+  virtualizationEnabled,
+  totalRows,
+  minHeight,
+  overscan,
   tableRows,
   displayedRows,
-  virtualItems,
-  totalHeight,
   rowAddEnabled,
   rowResizeEnabled,
   canCreateRow,
@@ -64,7 +86,53 @@ export function TableBody<TRow extends DataTableRowModel>({
   getRowRefHandler,
   rowHeights,
   onStartRowResize
-}: TableBodyProps<TRow>): JSX.Element {
+}: TableBodyProps<TRow>, ref: React.ForwardedRef<TableBodyHandle>): JSX.Element {
+  const rowVirtualizer = useVirtualizer({
+    count: totalRows,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: (index) => {
+      if (index >= displayedRows.length) {
+        return minHeight;
+      }
+      const row = displayedRows[index];
+      if (!row) {
+        return minHeight;
+      }
+      return rowHeights.getFinalHeight(getRowId(row));
+    },
+    overscan
+  });
+  const staticVirtualItems = useMemo(() => {
+    if (virtualizationEnabled) {
+      return [];
+    }
+
+    return buildStaticVirtualItems({
+      count: totalRows,
+      getSize: (index) => {
+        const row = displayedRows[index];
+        return row ? rowHeights.getFinalHeight(getRowId(row)) : minHeight;
+      }
+    });
+  }, [displayedRows, getRowId, minHeight, rowHeights, totalRows, virtualizationEnabled]);
+  const virtualItems = virtualizationEnabled
+    ? rowVirtualizer.getVirtualItems()
+    : staticVirtualItems;
+  const totalHeight = virtualizationEnabled
+    ? rowVirtualizer.getTotalSize()
+    : getStaticVirtualTotalHeight(staticVirtualItems);
+
+  useImperativeHandle(ref, () => ({
+    scrollToIndex: (index, align = "auto") => {
+      rowVirtualizer.scrollToIndex(index, { align });
+    },
+    measureRow: (node) => {
+      if (virtualizationEnabled && node) {
+        rowVirtualizer.measureElement(node);
+      }
+    }
+  }), [rowVirtualizer, virtualizationEnabled]);
+
   return (
     <tbody
       style={{
@@ -118,69 +186,28 @@ export function TableBody<TRow extends DataTableRowModel>({
         const isRowActionMenuOpen = rowActionMenuRowId === rowId;
 
         return (
-          <tr
+          <MemoRow
             key={rowModel.id}
-            ref={getRowRefHandler(rowId)}
-            className={cn(
-              "group absolute left-0 overflow-visible bg-[var(--dt-row-bg)] transition-colors hover:bg-[var(--dt-row-hover-bg)]",
-              isRowActionMenuOpen ? "z-50" : "z-0"
-            )}
-            style={{
-              display: "flex",
-              transform: `translateY(${top}px)`,
-              minHeight: `${rowHeights.getFinalHeight(rowId)}px`,
-              width: `${columnRenderLayout.tableRenderWidth}px`
-            }}
-            data-row-id={rowId}
-            data-index={rowIndex}
-          >
-            {rowModel.getVisibleCells().map((cell) => {
-              const pinned = cell.column.getIsPinned();
-              const renderWidth = columnRenderLayout.renderWidthsById[cell.column.id] ?? cell.column.getSize();
-              const leftOffset = columnRenderLayout.leftPinnedOffsetById[cell.column.id];
-              const rightOffset = columnRenderLayout.rightPinnedOffsetById[cell.column.id];
-              const isActionCell = cell.column.id === ACTIONS_COLUMN_ID;
-              const isOpenActionMenuCell = isActionCell && rowActionMenuRowId === rowId;
-
-              return (
-                <td
-                  key={cell.id}
-                  data-pinned-state={pinned || "center"}
-                  className={cn(
-                    "border-r border-b border-[var(--dt-border-color)] p-0 align-top",
-                    isActionCell ? "relative overflow-visible border-l border-l-[var(--dt-border-color)]" : "",
-                    isOpenActionMenuCell ? "z-40" : "",
-                    pinned
-                      ? isOpenActionMenuCell
-                        ? "sticky z-40 shadow-[var(--dt-pinned-shadow)] [background:var(--dt-pinned-row-bg)] group-hover:[background:var(--dt-pinned-row-hover-bg)]"
-                        : "sticky z-10 shadow-[var(--dt-pinned-shadow)] [background:var(--dt-pinned-row-bg)] group-hover:[background:var(--dt-pinned-row-hover-bg)]"
-                      : ""
-                  )}
-                  style={{
-                    ...fixedTrackStyle(renderWidth),
-                    left: pinned === "left" ? `${leftOffset ?? 0}px` : undefined,
-                    right: pinned === "right" ? `${rightOffset ?? 0}px` : undefined
-                  }}
-                >
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              );
-            })}
-
-            {rowResizeEnabled ? (
-              <button
-                type="button"
-                className="absolute bottom-0 left-0 z-10 h-1 w-full cursor-row-resize bg-transparent hover:bg-sky-200"
-                aria-label={`Resize row ${rowId}`}
-                onPointerDown={(event) => {
-                  event.preventDefault();
-                  onStartRowResize(rowId, event.clientY);
-                }}
-              />
-            ) : null}
-          </tr>
+            rowModel={rowModel}
+            rowId={rowId}
+            rowIndex={rowIndex}
+            top={top}
+            isRowActionMenuOpen={isRowActionMenuOpen}
+            columnRenderLayout={columnRenderLayout}
+            fixedTrackStyle={fixedTrackStyle}
+            getRowRefHandler={getRowRefHandler}
+            rowHeights={rowHeights}
+            rowResizeEnabled={rowResizeEnabled}
+            onStartRowResize={onStartRowResize}
+          />
         );
       })}
     </tbody>
   );
 }
+
+const ForwardedTableBody = forwardRef(TableBodyInner) as <TRow extends DataTableRowModel>(
+  props: TableBodyProps<TRow> & RefAttributes<TableBodyHandle>
+) => JSX.Element;
+
+export const TableBody = memo(ForwardedTableBody) as typeof ForwardedTableBody;

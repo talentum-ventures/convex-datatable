@@ -14,8 +14,11 @@ import {
   type ColumnDef,
   type RowSelectionState
 } from "@tanstack/react-table";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { LoaderCircle } from "lucide-react";
+import {
+  CellStore,
+  CellStoreContext,
+} from "../core/cell-store";
 import {
   DEFAULT_FEATURE_FLAGS,
   DEFAULT_MIN_ROW_HEIGHT,
@@ -40,6 +43,7 @@ import type {
   DataTableProps,
   DataTableRowModel,
   DataTableThemeTokens,
+  EditingCellState,
   RowId
 } from "../core/types";
 import {
@@ -52,11 +56,7 @@ import {
   pushDebugEventThrottled
 } from "../debug";
 import { useColumnDefs } from "../hooks/use-column-defs";
-import {
-  canHandleGridPaste,
-  useTableClipboard,
-  type EditingCellState
-} from "../hooks/use-table-clipboard";
+import { canHandleGridPaste, useTableClipboard } from "../hooks/use-table-clipboard";
 import { useTableKeyboard } from "../hooks/use-table-keyboard";
 import { useTableFilters } from "../hooks/use-table-filters";
 import { useTableState } from "../hooks/use-table-state";
@@ -65,10 +65,9 @@ import { hasDraftCellValue, useTableRows } from "../hooks/use-table-rows";
 import { useRowObservers } from "../hooks/use-row-observers";
 import { useRowHeights } from "../virtual/row-heights";
 import { scrollCellIntoView } from "../virtual/scroll";
-import { buildStaticVirtualItems, getStaticVirtualTotalHeight } from "../virtual/static-virtual-items";
 import { computeColumnLayout } from "./column-layout";
 import { RowActions } from "./row-actions";
-import { TableBody } from "./table-body";
+import { TableBody, type TableBodyHandle } from "./table-body";
 import { TableHeader } from "./table-header";
 import { TableToolbar } from "./table-toolbar";
 import {
@@ -190,7 +189,12 @@ export function DataTable<TRow extends DataTableRowModel>({
   const dataColumnIds = useMemo(() => columns.map((column) => column.id), [columns]);
   const minHeight = minRowHeight ?? DEFAULT_MIN_ROW_HEIGHT;
   const effectivePageSize = pageSize ?? DEFAULT_PAGE_SIZE;
-  const [editingCell, setEditingCell] = useState<EditingCellState>(null);
+  const cellStoreRef = useRef<CellStore | null>(null);
+  if (!cellStoreRef.current) {
+    cellStoreRef.current = new CellStore();
+  }
+  const cellStore = cellStoreRef.current;
+  const setEditingCell = cellStore.setEditingCell;
   const undoStack = useUndoStack<TRow>();
   const commitCounter = useRef(0);
   const commitWindow = useRef<number[]>([]);
@@ -243,13 +247,12 @@ export function DataTable<TRow extends DataTableRowModel>({
     setColumnFilters
   });
   const {
-    activeCell,
-    rangeStart,
     setActiveCell,
     setRangeStart,
     onCellSelect,
     onRangeSelect
   } = useTableSelection({
+    cellStore,
     isDebugMode,
     debugScope
   });
@@ -301,9 +304,11 @@ export function DataTable<TRow extends DataTableRowModel>({
   });
   const rowSelectionRef = useRef(rowSelection);
   const mergedRowsRef = useRef(mergedRows);
+  const rowActionMenuRowIdRef = useRef(rowActionMenuRowId);
 
   rowSelectionRef.current = rowSelection;
   mergedRowsRef.current = mergedRows;
+  rowActionMenuRowIdRef.current = rowActionMenuRowId;
 
   const rowHeights = useRowHeights({ minRowHeight });
   const setContentHeight = rowHeights.setContentHeight;
@@ -312,9 +317,6 @@ export function DataTable<TRow extends DataTableRowModel>({
   const dataColumnDefs = useColumnDefs({
     columns: orderedColumns,
     getRowId,
-    editingCell,
-    activeCell,
-    rangeStart,
     collaborators: collaborators ?? EMPTY_COLLABORATORS,
     onStartEdit,
     onCommit: commitCellEdit,
@@ -345,7 +347,7 @@ export function DataTable<TRow extends DataTableRowModel>({
         const visibleRowActions = customRowActionsEnabled
           ? (rowActions ?? []).filter((action) => action.isVisible?.(row) ?? true)
           : [];
-        const isMenuOpen = rowActionMenuRowId === rowId;
+        const isMenuOpen = rowActionMenuRowIdRef.current === rowId;
         return (
           <RowActions
             row={row}
@@ -376,7 +378,6 @@ export function DataTable<TRow extends DataTableRowModel>({
     deleteEnabled,
     getRowId,
     hasActionColumn,
-    rowActionMenuRowId,
     rowActions,
     setRowActionMenuRowId
   ]);
@@ -511,15 +512,47 @@ export function DataTable<TRow extends DataTableRowModel>({
     () => orderedColumns.filter((column) => columnVisibility[column.id] === false),
     [columnVisibility, orderedColumns]
   );
+  const visibleColumnsVersion = useMemo(
+    () => [
+      normalizedColumnOrder.join("|"),
+      Object.entries(columnVisibility)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([columnId, visible]) => `${columnId}:${visible ? "1" : "0"}`)
+        .join("|"),
+      (columnPinning.left ?? []).join("|"),
+      (columnPinning.right ?? []).join("|")
+    ].join("::"),
+    [columnPinning.left, columnPinning.right, columnVisibility, normalizedColumnOrder]
+  );
 
-  const visibleLeafColumnIdsInUiOrder = getVisibleLeafColumnIdsInUiOrder(table);
-  const visibleLeafColumnsInUiOrder = visibleLeafColumnIdsInUiOrder
-    .map((columnId) => table.getColumn(columnId))
-    .filter((column): column is Column<TRow, DataTableCellValue> => Boolean(column));
-  const visibleDataColumnIdsInUiOrder = getVisibleDataColumnIdsInUiOrder(table);
-  const visibleDataColumns = visibleDataColumnIdsInUiOrder
-    .map((columnId) => columnById.get(columnId))
-    .filter((column): column is DataTableColumn<TRow> => Boolean(column));
+  const visibleLeafColumnIdsInUiOrder = useMemo(
+    () => {
+      void visibleColumnsVersion;
+      return getVisibleLeafColumnIdsInUiOrder(table);
+    },
+    [table, visibleColumnsVersion]
+  );
+  const visibleLeafColumnsInUiOrder = useMemo(
+    () =>
+      visibleLeafColumnIdsInUiOrder
+        .map((columnId) => table.getColumn(columnId))
+        .filter((column): column is Column<TRow, DataTableCellValue> => Boolean(column)),
+    [table, visibleLeafColumnIdsInUiOrder]
+  );
+  const visibleDataColumnIdsInUiOrder = useMemo(
+    () => {
+      void visibleColumnsVersion;
+      return getVisibleDataColumnIdsInUiOrder(table);
+    },
+    [table, visibleColumnsVersion]
+  );
+  const visibleDataColumns = useMemo(
+    () =>
+      visibleDataColumnIdsInUiOrder
+        .map((columnId) => columnById.get(columnId))
+        .filter((column): column is DataTableColumn<TRow> => Boolean(column)),
+    [columnById, visibleDataColumnIdsInUiOrder]
+  );
   const visibleDataColumnIndexById = useMemo(() => {
     const indexById: Record<string, number> = {};
 
@@ -534,7 +567,7 @@ export function DataTable<TRow extends DataTableRowModel>({
 
     return indexById;
   }, [visibleDataColumns]);
-  const resolvedActiveCell = useMemo<CollaboratorCellCoord | null>(() => {
+  const resolveActiveCell = useCallback((activeCell: CellCoord | null): CollaboratorCellCoord | null => {
     if (!activeCell) {
       return null;
     }
@@ -550,7 +583,7 @@ export function DataTable<TRow extends DataTableRowModel>({
       rowId: getRowId(row),
       columnId: column.id
     };
-  }, [activeCell, displayedRows, getRowId, visibleDataColumns]);
+  }, [displayedRows, getRowId, visibleDataColumns]);
   const firstVisibleDraftColumnId = useMemo(() => {
     for (const column of visibleLeafColumnsInUiOrder) {
       const columnConfig = columnById.get(column.id);
@@ -563,7 +596,8 @@ export function DataTable<TRow extends DataTableRowModel>({
   }, [columnById, orderedColumns, visibleLeafColumnsInUiOrder]);
   const tableRows = table.getRowModel().rows;
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
-  const previousEditingCellRef = useRef<EditingCellState>(editingCell);
+  const tableBodyRef = useRef<TableBodyHandle | null>(null);
+  const previousEditingCellRef = useRef<EditingCellState>(cellStore.getEditingCell());
   const rowElementsRef = useRef<Record<RowId, HTMLTableRowElement | null>>({});
   const [containerWidth, setContainerWidth] = useState(0);
 
@@ -601,32 +635,42 @@ export function DataTable<TRow extends DataTableRowModel>({
       return;
     }
 
-    onActiveCellChange(resolvedActiveCell);
-  }, [onActiveCellChange, resolvedActiveCell]);
+    const notify = (): void => {
+      onActiveCellChange(resolveActiveCell(cellStore.getActiveCell()));
+    };
+
+    notify();
+    return cellStore.subscribe(notify);
+  }, [cellStore, onActiveCellChange, resolveActiveCell]);
 
   useEffect(() => {
-    const previousEditingCell = previousEditingCellRef.current;
-    previousEditingCellRef.current = editingCell;
+    const syncFocus = (): void => {
+      const editingCell = cellStore.getEditingCell();
+      const previousEditingCell = previousEditingCellRef.current;
+      previousEditingCellRef.current = editingCell;
 
-    if (!previousEditingCell || editingCell) {
-      return;
-    }
+      if (!previousEditingCell || editingCell) {
+        return;
+      }
 
-    const containerNode = tableContainerRef.current;
-    if (!containerNode) {
-      return;
-    }
+      const containerNode = tableContainerRef.current;
+      if (!containerNode) {
+        return;
+      }
 
-    const activeElement = document.activeElement;
-    if (activeElement === document.body) {
-      containerNode.focus({ preventScroll: true });
-      return;
-    }
+      const activeElement = document.activeElement;
+      if (activeElement === document.body) {
+        containerNode.focus({ preventScroll: true });
+        return;
+      }
 
-    if (activeElement instanceof Node && containerNode.contains(activeElement)) {
-      containerNode.focus({ preventScroll: true });
-    }
-  }, [editingCell]);
+      if (activeElement instanceof Node && containerNode.contains(activeElement)) {
+        containerNode.focus({ preventScroll: true });
+      }
+    };
+
+    return cellStore.subscribe(syncFocus);
+  }, [cellStore]);
   const {
     columnMenuId,
     setColumnMenuId,
@@ -674,23 +718,6 @@ export function DataTable<TRow extends DataTableRowModel>({
     () => displayedRows.map((row) => String(getRowId(row))).join("\u001f"),
     [displayedRows, getRowId]
   );
-
-  const rowVirtualizer = useVirtualizer({
-    count: totalRows,
-    getScrollElement: () => tableContainerRef.current,
-    estimateSize: (index) => {
-      if (index >= displayedRows.length) {
-        return minHeight;
-      }
-      const row = displayedRows[index];
-      if (!row) {
-        return minHeight;
-      }
-      return rowHeights.getFinalHeight(getRowId(row));
-    },
-    overscan: DEFAULT_OVERSCAN
-  });
-
   const leftPinnedWidth = table
     .getLeftVisibleLeafColumns()
     .reduce((sum, column) => sum + renderedWidthForColumn(column, columnRenderLayout.renderWidthsById), 0);
@@ -699,53 +726,61 @@ export function DataTable<TRow extends DataTableRowModel>({
     .reduce((sum, column) => sum + renderedWidthForColumn(column, columnRenderLayout.renderWidthsById), 0);
 
   useSafeLayoutEffect(() => {
-    if (!activeCell) {
-      return;
-    }
-
-    const containerNode = tableContainerRef.current;
-    if (!containerNode) {
-      return;
-    }
-
-    if (mergedFeatures.virtualization) {
-      rowVirtualizer.scrollToIndex(activeCell.rowIndex, { align: "auto" });
-    }
-
     let frameId = 0;
-    let attemptCount = 0;
 
-    const syncActiveCellIntoView = (): void => {
-      const cellSelector = `[role="gridcell"][data-row-index='${activeCell.rowIndex}'][data-column-index='${activeCell.columnIndex}']`;
-      const cellNode = containerNode.querySelector(cellSelector);
-      if (!(cellNode instanceof HTMLElement)) {
-        if (attemptCount < 3) {
-          attemptCount += 1;
-          frameId = requestAnimationFrame(syncActiveCellIntoView);
-        }
+    const syncForActiveCell = (): void => {
+      const activeCell = cellStore.getActiveCell();
+      if (!activeCell) {
         return;
       }
 
-      const headerNode = containerNode.querySelector("thead");
-      const stickyHeaderHeight = headerNode instanceof HTMLElement ? headerNode.getBoundingClientRect().height : 0;
+      const containerNode = tableContainerRef.current;
+      if (!containerNode) {
+        return;
+      }
 
-      scrollCellIntoView({
-        containerNode,
-        cellNode,
-        stickyHeaderHeight,
-        leftPinnedWidth,
-        rightPinnedWidth
-      });
+      if (mergedFeatures.virtualization) {
+        tableBodyRef.current?.scrollToIndex(activeCell.rowIndex, "auto");
+      }
+
+      let attemptCount = 0;
+
+      const syncActiveCellIntoView = (): void => {
+        const cellSelector = `[role="gridcell"][data-row-index='${activeCell.rowIndex}'][data-column-index='${activeCell.columnIndex}']`;
+        const cellNode = containerNode.querySelector(cellSelector);
+        if (!(cellNode instanceof HTMLElement)) {
+          if (attemptCount < 3) {
+            attemptCount += 1;
+            frameId = requestAnimationFrame(syncActiveCellIntoView);
+          }
+          return;
+        }
+
+        const headerNode = containerNode.querySelector("thead");
+        const stickyHeaderHeight = headerNode instanceof HTMLElement ? headerNode.getBoundingClientRect().height : 0;
+
+        scrollCellIntoView({
+          containerNode,
+          cellNode,
+          stickyHeaderHeight,
+          leftPinnedWidth,
+          rightPinnedWidth
+        });
+      };
+
+      syncActiveCellIntoView();
     };
 
-    syncActiveCellIntoView();
+    syncForActiveCell();
+    const unsubscribe = cellStore.subscribe(syncForActiveCell);
 
     return () => {
+      unsubscribe();
       if (frameId !== 0) {
         cancelAnimationFrame(frameId);
       }
     };
-  }, [activeCell, leftPinnedWidth, mergedFeatures.virtualization, rightPinnedWidth, rowVirtualizer]);
+  }, [cellStore, leftPinnedWidth, mergedFeatures.virtualization, rightPinnedWidth]);
 
   useSafeLayoutEffect(() => {
     if (!mergedFeatures.virtualization) {
@@ -753,11 +788,9 @@ export function DataTable<TRow extends DataTableRowModel>({
     }
 
     for (const node of Object.values(rowElementsRef.current)) {
-      if (node) {
-        rowVirtualizer.measureElement(node);
-      }
+      tableBodyRef.current?.measureRow(node);
     }
-  }, [mergedFeatures.virtualization, rowOrderSignature, rowVirtualizer]);
+  }, [mergedFeatures.virtualization, rowOrderSignature]);
 
   const setRowElement = useCallback(
     (rowId: RowId, node: HTMLTableRowElement | null) => {
@@ -772,7 +805,7 @@ export function DataTable<TRow extends DataTableRowModel>({
       }
 
       if (mergedFeatures.virtualization) {
-        rowVirtualizer.measureElement(node);
+        tableBodyRef.current?.measureRow(node);
         return;
       }
 
@@ -780,7 +813,7 @@ export function DataTable<TRow extends DataTableRowModel>({
         setContentHeight(rowId, height);
       });
     },
-    [mergedFeatures.virtualization, rowObservers, rowVirtualizer, setContentHeight]
+    [mergedFeatures.virtualization, rowObservers, setContentHeight]
   );
 
   const rowRefHandlers = useRef<Record<RowId, (node: HTMLTableRowElement | null) => void>>({});
@@ -804,28 +837,6 @@ export function DataTable<TRow extends DataTableRowModel>({
     },
     [setRowElement]
   );
-
-  const staticVirtualItems = useMemo(() => {
-    if (mergedFeatures.virtualization) {
-      return [];
-    }
-
-    return buildStaticVirtualItems({
-      count: totalRows,
-      getSize: (index) => {
-        const row = displayedRows[index];
-        return row ? rowHeights.getFinalHeight(getRowId(row)) : minHeight;
-      }
-    });
-  }, [displayedRows, getRowId, mergedFeatures.virtualization, minHeight, rowHeights, totalRows]);
-
-  const virtualItems = mergedFeatures.virtualization
-    ? rowVirtualizer.getVirtualItems()
-    : staticVirtualItems;
-
-  const totalHeight = mergedFeatures.virtualization
-    ? rowVirtualizer.getTotalSize()
-    : getStaticVirtualTotalHeight(staticVirtualItems);
 
   const onGridScroll = useCallback(() => {
     if (!mergedFeatures.infiniteScroll || !rowsResult.hasMore || rowsResult.isLoadingMore) {
@@ -897,10 +908,11 @@ export function DataTable<TRow extends DataTableRowModel>({
     }
 
     if (commitWindow.current.length > 60) {
+      const editingCell = cellStore.getEditingCell();
       pushDebugEventThrottled(debugScope, "render-storm", 1000, "high commit frequency", {
         commits2s: commitWindow.current.length,
         mergedRows: displayedRows.length,
-        virtualItems: virtualItems.length,
+        virtualItems: mergedFeatures.virtualization ? -1 : totalRows,
         selectedRows: Object.keys(rowSelection).length,
         editing: editingCell ? 1 : 0
       });
@@ -910,10 +922,10 @@ export function DataTable<TRow extends DataTableRowModel>({
       pushDebugEventThrottled(debugScope, "render-checkpoint", 1500, "render checkpoint", {
         commits: commitCounter.current,
         mergedRows: displayedRows.length,
-        virtualItems: virtualItems.length
+        virtualItems: mergedFeatures.virtualization ? -1 : totalRows
       });
     }
-  });
+  }, [cellStore, debugScope, displayedRows.length, isDebugMode, mergedFeatures.virtualization, rowSelection, totalRows]);
 
   const moveActiveCell = useCallback(
     (rowDelta: number, columnDelta: number, expandSelection: boolean) => {
@@ -921,6 +933,7 @@ export function DataTable<TRow extends DataTableRowModel>({
         return;
       }
 
+      const activeCell = cellStore.getActiveCell();
       const startingCell: CellCoord = activeCell ?? { rowIndex: 0, columnIndex: 0 };
 
       const nextCoord: CellCoord = {
@@ -939,11 +952,10 @@ export function DataTable<TRow extends DataTableRowModel>({
         setRangeStart(nextCoord);
       }
     },
-    [activeCell, displayedRows.length, setActiveCell, setRangeStart, visibleDataColumns.length]
+    [cellStore, displayedRows.length, setActiveCell, setRangeStart, visibleDataColumns.length]
   );
   const { copySelection, pasteFromText } = useTableClipboard({
-    activeCell,
-    rangeStart,
+    cellStore,
     visibleDataColumns,
     displayedRows,
     getRowId,
@@ -953,15 +965,13 @@ export function DataTable<TRow extends DataTableRowModel>({
     clipboardPasteEnabled: mergedFeatures.clipboardPaste,
     editingEnabled: mergedFeatures.editing,
     cellSelectEnabled: mergedFeatures.cellSelect,
-    editingCell,
     undoEnabled: mergedFeatures.undo,
     undoStack,
     setOptimisticRows
   });
 
   const { onGridKeyDown } = useTableKeyboard({
-    activeCell,
-    editingCell,
+    cellStore,
     editingEnabled: mergedFeatures.editing,
     cellSelectEnabled: mergedFeatures.cellSelect,
     clipboardPasteEnabled: mergedFeatures.clipboardPaste,
@@ -1069,9 +1079,70 @@ export function DataTable<TRow extends DataTableRowModel>({
     [debugScope, isDebugMode]
   );
 
+  const headerFeatures = useMemo(
+    () => ({
+      columnSort: mergedFeatures.columnSort,
+      columnFilter: mergedFeatures.columnFilter,
+      columnVisibility: mergedFeatures.columnVisibility,
+      columnPinning: mergedFeatures.columnPinning,
+      columnReorder: mergedFeatures.columnReorder,
+      columnResize: mergedFeatures.columnResize
+    }),
+    [
+      mergedFeatures.columnFilter,
+      mergedFeatures.columnPinning,
+      mergedFeatures.columnReorder,
+      mergedFeatures.columnResize,
+      mergedFeatures.columnSort,
+      mergedFeatures.columnVisibility
+    ]
+  );
+  const handleAddRow = useCallback(() => {
+    const hasPendingDraftValues = Object.values(draftRowRef.current).some((value) =>
+      hasDraftCellValue(value)
+    );
+
+    tableBodyRef.current?.scrollToIndex(displayedRows.length, "end");
+
+    if (hasPendingDraftValues) {
+      void commitDraftRow();
+      return;
+    }
+
+    if (firstVisibleDraftColumnId) {
+      setEditingCell(null);
+      setDraftEditingColumnId(firstVisibleDraftColumnId);
+    }
+  }, [
+    commitDraftRow,
+    displayedRows.length,
+    draftRowRef,
+    firstVisibleDraftColumnId,
+    setDraftEditingColumnId,
+    setEditingCell
+  ]);
+  const handleDeleteSelected = useCallback(() => {
+    const selectedRows = mergedRows.filter((row) => rowSelection[getRowId(row)]);
+    void deleteRowsNow(selectedRows);
+  }, [deleteRowsNow, getRowId, mergedRows, rowSelection]);
+  const handleCopySelection = useCallback(() => {
+    void copySelection();
+  }, [copySelection]);
+  const handleBeginDraftEdit = useCallback((columnId: string) => {
+    setEditingCell(null);
+    setDraftEditingColumnId(columnId);
+  }, [setDraftEditingColumnId, setEditingCell]);
+  const handleStartRowResize = useCallback((rowId: RowId, clientY: number) => {
+    setResizingRow({
+      rowId,
+      startHeight: rowHeights.getFinalHeight(rowId),
+      startY: clientY
+    });
+  }, [rowHeights]);
   const rootStyle = tableStyle(mergedTheme);
 
   return (
+    <CellStoreContext.Provider value={cellStore}>
     <div
       className={cn(
         "relative rounded-[var(--dt-radius)] border border-[var(--dt-border-color)] bg-white/90 p-3 shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]",
@@ -1091,30 +1162,9 @@ export function DataTable<TRow extends DataTableRowModel>({
         rowSelection={rowSelection}
         mergedRows={mergedRows}
         getRowId={getRowId}
-        onAddRow={() => {
-          const hasPendingDraftValues = Object.values(draftRowRef.current).some((value) =>
-            hasDraftCellValue(value)
-          );
-
-          rowVirtualizer.scrollToIndex(displayedRows.length, { align: "end" });
-
-          if (hasPendingDraftValues) {
-            void commitDraftRow();
-            return;
-          }
-
-          if (firstVisibleDraftColumnId) {
-            setEditingCell(null);
-            setDraftEditingColumnId(firstVisibleDraftColumnId);
-          }
-        }}
-        onDeleteSelected={() => {
-          const selectedRows = mergedRows.filter((row) => rowSelection[getRowId(row)]);
-          void deleteRowsNow(selectedRows);
-        }}
-        onCopy={() => {
-          void copySelection();
-        }}
+        onAddRow={handleAddRow}
+        onDeleteSelected={handleDeleteSelected}
+        onCopy={handleCopySelection}
       />
 
       <div
@@ -1138,6 +1188,7 @@ export function DataTable<TRow extends DataTableRowModel>({
           });
         }}
         onPaste={(event) => {
+          const editingCell = cellStore.getEditingCell();
           if (
             !canHandleGridPaste({
               clipboardPaste: mergedFeatures.clipboardPaste,
@@ -1188,14 +1239,7 @@ export function DataTable<TRow extends DataTableRowModel>({
               columnMenuId={columnMenuId}
               columnMenuAnchorById={columnMenuAnchorById}
               dragOverTarget={dragOverTarget}
-              mergedFeatures={{
-                columnSort: mergedFeatures.columnSort,
-                columnFilter: mergedFeatures.columnFilter,
-                columnVisibility: mergedFeatures.columnVisibility,
-                columnPinning: mergedFeatures.columnPinning,
-                columnReorder: mergedFeatures.columnReorder,
-                columnResize: mergedFeatures.columnResize
-              }}
+              mergedFeatures={headerFeatures}
               filterByColumnId={filterByColumnId}
               selectedFilterOperator={selectedFilterOperator}
               selectColumnFilterTextValue={selectColumnFilterTextValue}
@@ -1216,10 +1260,14 @@ export function DataTable<TRow extends DataTableRowModel>({
             />
 
             <TableBody
+              ref={tableBodyRef}
+              scrollContainerRef={tableContainerRef}
+              virtualizationEnabled={mergedFeatures.virtualization}
+              totalRows={totalRows}
+              minHeight={minHeight}
+              overscan={DEFAULT_OVERSCAN}
               tableRows={tableRows}
               displayedRows={displayedRows}
-              virtualItems={virtualItems}
-              totalHeight={totalHeight}
               rowAddEnabled={mergedFeatures.rowAdd}
               rowResizeEnabled={mergedFeatures.rowResize}
               canCreateRow={Boolean(dataSource.createRow)}
@@ -1232,23 +1280,14 @@ export function DataTable<TRow extends DataTableRowModel>({
               visibleDataColumnIndexById={visibleDataColumnIndexById}
               fixedTrackStyle={fixedTrackStyle}
               isDraftValuePresent={hasDraftCellValue}
-              onBeginDraftEdit={(columnId) => {
-                setEditingCell(null);
-                setDraftEditingColumnId(columnId);
-              }}
+              onBeginDraftEdit={handleBeginDraftEdit}
               onCommitDraftCell={commitDraftCell}
               onCancelDraftEdit={cancelDraftCellEdit}
               getRowId={getRowId}
               rowActionMenuRowId={rowActionMenuRowId}
               getRowRefHandler={getRowRefHandler}
               rowHeights={rowHeights}
-              onStartRowResize={(rowId, clientY) => {
-                setResizingRow({
-                  rowId,
-                  startHeight: rowHeights.getFinalHeight(rowId),
-                  startY: clientY
-                });
-              }}
+              onStartRowResize={handleStartRowResize}
             />
           </table>
         </div>
@@ -1269,5 +1308,6 @@ export function DataTable<TRow extends DataTableRowModel>({
         }
       `}</style>
     </div>
+    </CellStoreContext.Provider>
   );
 }

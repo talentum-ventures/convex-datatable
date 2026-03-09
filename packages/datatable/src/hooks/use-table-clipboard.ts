@@ -1,4 +1,5 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
+import type { CellStore } from "../core/cell-store";
 import { toast } from "sonner";
 import {
   getColumnValue,
@@ -9,10 +10,10 @@ import {
 } from "../core/cell-value";
 import { validateCell, validateRow } from "../core/validation";
 import type {
-  CellCoord,
   DataTableColumn,
   DataTableDataSource,
   DataTableRowModel,
+  EditingCellState,
   RowId,
   RowPatch,
   RowSchema
@@ -21,11 +22,6 @@ import { expandPasteMatrix, parseTsv, serializeTsv } from "../selection/clipboar
 import { normalizeRange } from "../selection/range";
 import { cellRange } from "./use-table-selection";
 import type { UndoEntry, UseUndoStackResult } from "./use-undo-stack";
-
-export type EditingCellState = {
-  rowId: RowId;
-  columnId: string;
-} | null;
 
 export type GridPasteEligibilityArgs = {
   clipboardPaste: boolean;
@@ -93,8 +89,7 @@ function invalidOptionPasteMessage(appliedCells: number, skippedInvalidOptionCel
 }
 
 export type UseTableClipboardArgs<TRow extends DataTableRowModel> = {
-  activeCell: CellCoord | null;
-  rangeStart: CellCoord | null;
+  cellStore: CellStore;
   visibleDataColumns: ReadonlyArray<DataTableColumn<TRow>>;
   displayedRows: ReadonlyArray<TRow>;
   getRowId: (row: TRow) => RowId;
@@ -104,7 +99,6 @@ export type UseTableClipboardArgs<TRow extends DataTableRowModel> = {
   clipboardPasteEnabled: boolean;
   editingEnabled: boolean;
   cellSelectEnabled: boolean;
-  editingCell: EditingCellState;
   undoEnabled: boolean;
   undoStack: UseUndoStackResult<TRow>;
   setOptimisticRows: Dispatch<SetStateAction<Record<RowId, TRow>>>;
@@ -116,8 +110,7 @@ export type UseTableClipboardResult = {
 };
 
 export function useTableClipboard<TRow extends DataTableRowModel>({
-  activeCell,
-  rangeStart,
+  cellStore,
   visibleDataColumns,
   displayedRows,
   getRowId,
@@ -127,7 +120,6 @@ export function useTableClipboard<TRow extends DataTableRowModel>({
   clipboardPasteEnabled,
   editingEnabled,
   cellSelectEnabled,
-  editingCell,
   undoEnabled,
   undoStack,
   setOptimisticRows
@@ -141,6 +133,7 @@ export function useTableClipboard<TRow extends DataTableRowModel>({
       return;
     }
 
+    const { activeCell, rangeStart } = cellStore.getSnapshot();
     const range = cellRange(rangeStart, activeCell);
     if (!range) {
       return;
@@ -180,9 +173,10 @@ export function useTableClipboard<TRow extends DataTableRowModel>({
 
     await navigator.clipboard.writeText(serializeTsv(matrix));
     toast.success("Copied selection");
-  }, [activeCell, clipboardCopyEnabled, displayedRows, rangeStart, visibleDataColumns]);
+  }, [cellStore, clipboardCopyEnabled, displayedRows, visibleDataColumns]);
 
   const pasteFromText = useCallback(async (text: string) => {
+    const { activeCell, rangeStart, editingCell } = cellStore.getSnapshot();
     if (
       !canHandleGridPaste({
         clipboardPaste: clipboardPasteEnabled,
@@ -389,14 +383,12 @@ export function useTableClipboard<TRow extends DataTableRowModel>({
       toast.error(`Paste failed: ${String(error)}`);
     }
   }, [
-    activeCell,
+    cellStore,
     cellSelectEnabled,
     clipboardPasteEnabled,
     displayedRows,
-    editingCell,
     editingEnabled,
     getRowId,
-    rangeStart,
     rowSchema,
     setOptimisticRows,
     undoEnabled,
