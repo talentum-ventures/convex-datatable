@@ -1271,6 +1271,7 @@ export function DataTable<TRow extends DataTableRowModel>({
   const tableRows = table.getRowModel().rows;
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
   const previousEditingCellRef = useRef<EditingCell>(editingCell);
+  const rowElementsRef = useRef<Record<RowId, HTMLTableRowElement | null>>({});
   const [containerWidth, setContainerWidth] = useState(0);
 
   useSafeLayoutEffect(() => {
@@ -1361,6 +1362,10 @@ export function DataTable<TRow extends DataTableRowModel>({
   });
 
   const totalRows = mergedRows.length + (mergedFeatures.rowAdd ? 1 : 0);
+  const rowOrderSignature = useMemo(
+    () => mergedRows.map((row) => String(getRowId(row))).join("\u001f"),
+    [getRowId, mergedRows]
+  );
 
   const rowVirtualizer = useVirtualizer({
     count: totalRows,
@@ -1434,9 +1439,24 @@ export function DataTable<TRow extends DataTableRowModel>({
     };
   }, [activeCell, leftPinnedWidth, mergedFeatures.virtualization, rightPinnedWidth, rowVirtualizer]);
 
+  useSafeLayoutEffect(() => {
+    if (!mergedFeatures.virtualization) {
+      return;
+    }
+
+    for (const node of Object.values(rowElementsRef.current)) {
+      if (node) {
+        rowVirtualizer.measureElement(node);
+      }
+    }
+  }, [mergedFeatures.virtualization, rowOrderSignature, rowVirtualizer]);
+
   const setRowElement = useCallback(
     (rowId: RowId, node: HTMLTableRowElement | null) => {
+      rowElementsRef.current[rowId] = node;
+
       if (!node) {
+        delete rowElementsRef.current[rowId];
         if (!mergedFeatures.virtualization) {
           rowObservers.connect(rowId, null, () => undefined);
         }
@@ -1525,6 +1545,7 @@ export function DataTable<TRow extends DataTableRowModel>({
     return () => {
       rowObservers.disconnectAll();
       rowRefHandlers.current = {};
+      rowElementsRef.current = {};
     };
   }, [rowObservers]);
 

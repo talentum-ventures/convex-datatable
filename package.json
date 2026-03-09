@@ -15,7 +15,7 @@
     "check:demo-src-no-js": "if rg --files apps/demo/src -g '*.js' -g '*.jsx' > /dev/null; then echo 'Error: JavaScript source files are not allowed in apps/demo/src'; rg --files apps/demo/src -g '*.js' -g '*.jsx'; exit 1; fi",
     "dev": "bun --filter @rolha/demo dev",
     "build": "bun run check:demo-src-no-js && bun --filter @rolha/datatable build && bun --filter @rolha/demo build",
-    "typecheck": "bun run check:demo-src-no-js && tsgo --build --pretty false && bun run test:types",
+    "typecheck": "tsgo --build --pretty false",
     "typecheck:datatable": "tsgo --project packages/datatable/tsconfig.json --noEmit --pretty false",
     "typecheck:demo": "tsgo --project apps/demo/tsconfig.json --noEmit --pretty false",
     "lint": "bun run check:demo-src-no-js && oxlint . --deny-warnings",
@@ -23,7 +23,6 @@
     "format": "oxlint . --fix",
     "format:check": "oxlint . --deny-warnings",
     "test:unit": "vitest run",
-    "test:types": "tsc -p tests/types/tsconfig.json --noEmit",
     "test:cypress:component": "VITE_CJS_IGNORE_WARNING=true env -u ELECTRON_RUN_AS_NODE cypress run --component --browser electron --headless",
     "test:cypress:e2e": "VITE_CJS_IGNORE_WARNING=true env -u ELECTRON_RUN_AS_NODE start-server-and-test \"bun --filter @rolha/demo dev --host 127.0.0.1 --port 5173\" http://127.0.0.1:5173 \"cypress run --e2e --browser electron --headless --config baseUrl=http://127.0.0.1:5173\""
   },

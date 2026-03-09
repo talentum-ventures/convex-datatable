@@ -718,6 +718,63 @@ function MeasuredRowsHarness({ tableId }: { tableId: string }): JSX.Element {
   );
 }
 
+function VirtualizedDeleteMeasuredRowsHarness({ tableId }: { tableId: string }): JSX.Element {
+  const [rows, setRows] = useState<ReadonlyArray<TaskRow>>([
+    {
+      id: "1",
+      title: "Build UI",
+      status: "todo",
+      amount: 10,
+      notes:
+        "This row uses long text content that wraps across multiple lines so deleting it should force the remaining rows to recompute their virtual positions immediately."
+    },
+    {
+      id: "2",
+      title: "Ship",
+      status: "done",
+      amount: 20,
+      notes: "Short note"
+    },
+    {
+      id: "3",
+      title: "QA",
+      status: "todo",
+      amount: 30,
+      notes: "Another short note"
+    }
+  ]);
+
+  const dataSource = useMemo<DataTableDataSource<TaskRow>>(
+    () => ({
+      useRows: () => ({
+        rows,
+        hasMore: false,
+        isLoading: false,
+        isLoadingMore: false,
+        error: null,
+        loadMore: () => undefined,
+        refresh: () => undefined
+      }),
+      deleteRows: async (rowIds) => {
+        setRows((current) => current.filter((row) => !rowIds.includes(row.id)));
+      }
+    }),
+    [rows]
+  );
+
+  return (
+    <div className="w-[360px] p-4">
+      <DataTable
+        tableId={tableId}
+        columns={measuredRowColumns}
+        dataSource={dataSource}
+        getRowId={(row) => row.id}
+        features={{ rowDelete: true, rowSelect: false, rowActions: false, infiniteScroll: false }}
+      />
+    </div>
+  );
+}
+
 function DateHarness({ tableId }: { tableId: string }): JSX.Element {
   const [rows, setRows] = useState<ReadonlyArray<DateRow>>([{ id: "1", due: "2026-03-05" }]);
 
@@ -1485,6 +1542,64 @@ describe("DataTable component", () => {
       expect(
         Math.abs(tbodyRect.height - (secondRect.bottom - tbodyRect.top)),
         "tbody height should reach the last rendered row"
+      ).to.be.lte(1);
+    });
+  });
+
+  it("recomputes virtual row positions after deleting a tall measured row", () => {
+    cy.mount(<VirtualizedDeleteMeasuredRowsHarness tableId="cypress-table-virtualized-delete-measured-rows" />);
+
+    cy.get("tbody").should(($tbody) => {
+      const tbody = $tbody[0];
+      const firstRow = tbody.querySelector("tr[data-row-id='1']");
+      const secondRow = tbody.querySelector("tr[data-row-id='2']");
+
+      expect(firstRow, "first row should render").to.not.equal(null);
+      expect(secondRow, "second row should render").to.not.equal(null);
+
+      if (!(firstRow instanceof HTMLTableRowElement) || !(secondRow instanceof HTMLTableRowElement)) {
+        throw new Error("Expected virtualized measured rows to render as table rows");
+      }
+
+      const firstRect = firstRow.getBoundingClientRect();
+      const secondRect = secondRow.getBoundingClientRect();
+
+      expect(firstRect.height, "first row should grow beyond the base min height").to.be.greaterThan(40);
+      expect(
+        Math.abs(secondRect.top - firstRect.bottom),
+        "second row should start where the first row ends before deletion"
+      ).to.be.lte(1);
+    });
+
+    cy.findByLabelText("Delete row 1").click();
+    cy.get("tr[data-row-id='1']").should("not.exist");
+
+    cy.get("tbody").should(($tbody) => {
+      const tbody = $tbody[0];
+      const firstRemainingRow = tbody.querySelector("tr[data-row-id='2']");
+      const secondRemainingRow = tbody.querySelector("tr[data-row-id='3']");
+      const tbodyRect = tbody.getBoundingClientRect();
+
+      expect(firstRemainingRow, "row 2 should remain").to.not.equal(null);
+      expect(secondRemainingRow, "row 3 should remain").to.not.equal(null);
+
+      if (
+        !(firstRemainingRow instanceof HTMLTableRowElement) ||
+        !(secondRemainingRow instanceof HTMLTableRowElement)
+      ) {
+        throw new Error("Expected remaining virtualized rows to render as table rows");
+      }
+
+      const firstRect = firstRemainingRow.getBoundingClientRect();
+      const secondRect = secondRemainingRow.getBoundingClientRect();
+
+      expect(
+        Math.abs(firstRect.top - tbodyRect.top),
+        "first remaining row should move to the top immediately after deletion"
+      ).to.be.lte(1);
+      expect(
+        Math.abs(secondRect.top - firstRect.bottom),
+        "next remaining row should follow the first remaining row without a stale gap"
       ).to.be.lte(1);
     });
   });
