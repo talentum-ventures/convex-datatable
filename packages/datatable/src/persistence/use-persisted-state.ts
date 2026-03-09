@@ -7,7 +7,7 @@ import {
   debugEnabled,
   pushDebugEvent,
   pushDebugEventThrottled
-} from "../core/debug";
+} from "../debug";
 import type { DataTableOnError, PersistedTableState } from "../core/types";
 import {
   decodePersistedStateFromUrl,

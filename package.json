@@ -23,6 +23,7 @@
     "format": "oxlint . --fix",
     "format:check": "oxlint . --deny-warnings",
     "test:unit": "vitest run",
+    "test:types": "tsgo --project tests/types/tsconfig.json --noEmit --pretty false",
     "test:cypress:component": "VITE_CJS_IGNORE_WARNING=true env -u ELECTRON_RUN_AS_NODE cypress run --component --browser electron --headless",
     "test:cypress:e2e": "VITE_CJS_IGNORE_WARNING=true env -u ELECTRON_RUN_AS_NODE start-server-and-test \"bun --filter @rolha/demo dev --host 127.0.0.1 --port 5173\" http://127.0.0.1:5173 \"cypress run --e2e --browser electron --headless --config baseUrl=http://127.0.0.1:5173\""
   },

@@ -5,46 +5,17 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
-  type DragEvent,
-  type KeyboardEvent,
-  type ReactNode
+  type CSSProperties
 } from "react";
-import { flushSync } from "react-dom";
 import {
-  flexRender,
   getCoreRowModel,
   useReactTable,
   type Column,
   type ColumnDef,
-  type ColumnFiltersState,
-  type ColumnPinningState,
-  type ColumnSizingState,
-  type ColumnSizingInfoState,
-  type RowSelectionState,
-  type SortingState,
-  type Updater,
-  type VisibilityState
+  type RowSelectionState
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import {
-  Check,
-  ChevronDown,
-  ChevronUp,
-  Copy,
-  EyeOff,
-  Filter,
-  GripVertical,
-  LoaderCircle,
-  MoreVertical,
-  Pencil,
-  Pin,
-  PinOff,
-  Plus,
-  Rows3,
-  Trash2
-} from "lucide-react";
-import { toast } from "sonner";
+import { LoaderCircle } from "lucide-react";
 import {
   DEFAULT_FEATURE_FLAGS,
   DEFAULT_MIN_ROW_HEIGHT,
@@ -53,90 +24,65 @@ import {
   DEFAULT_THEME_TOKENS
 } from "../core/defaults";
 import { cn } from "../core/cn";
-import { parseDateValue } from "../core/formatters";
+import { applyClientQuery } from "../core/filtering";
 import {
-  getColumnValue,
   orderColumns,
-  setColumnValue
 } from "../core/column-utils";
-import {
-  parseClipboardToCellValue,
-  serializeCellForClipboard
-} from "../core/cell-value";
-import { useUndoStack, type UndoEntry } from "../core/use-undo-stack";
+import { useTableSelection } from "../hooks/use-table-selection";
+import { useUndoStack } from "../hooks/use-undo-stack";
 import type {
   CellCoord,
   CollaboratorCellCoord,
   CollaboratorPresence,
   DataTableCellValue,
   DataTableColumn,
-  DataTableFilter,
   DataTableFeatureFlags,
   DataTableProps,
   DataTableRowModel,
   DataTableThemeTokens,
-  FilterOperator,
-  PersistedTableState,
-  RowPatch,
   RowId
 } from "../core/types";
-import { validateCell, validateRow } from "../core/validation";
 import {
   fromTanStackFilters,
-  fromTanStackSorting,
-  internalToPersistedState,
-  persistedStateToInternal,
-  toTanStackFilters
+  fromTanStackSorting
 } from "../engine/state-converters";
 import {
   debugEnabled,
   pushDebugEvent,
   pushDebugEventThrottled
-} from "../core/debug";
+} from "../debug";
+import { useColumnDefs } from "../hooks/use-column-defs";
 import {
-  renderColumnContent,
-  renderColumnEditor,
-  useColumnDefs,
-  type CellCommit
-} from "../engine/build-columns";
-import { expandPasteMatrix, parseTsv, serializeTsv } from "../selection/clipboard";
-import { normalizeRange } from "../selection/range";
-import { usePersistedState } from "../persistence/use-persisted-state";
+  canHandleGridPaste,
+  useTableClipboard,
+  type EditingCellState
+} from "../hooks/use-table-clipboard";
+import { useTableKeyboard } from "../hooks/use-table-keyboard";
+import { useTableFilters } from "../hooks/use-table-filters";
+import { useTableState } from "../hooks/use-table-state";
+import { useTableColumns } from "../hooks/use-table-columns";
+import { hasDraftCellValue, useTableRows } from "../hooks/use-table-rows";
+import { useRowObservers } from "../hooks/use-row-observers";
 import { useRowHeights } from "../virtual/row-heights";
+import { scrollCellIntoView } from "../virtual/scroll";
 import { buildStaticVirtualItems, getStaticVirtualTotalHeight } from "../virtual/static-virtual-items";
 import { computeColumnLayout } from "./column-layout";
+import { RowActions } from "./row-actions";
+import { TableBody } from "./table-body";
+import { TableHeader } from "./table-header";
+import { TableToolbar } from "./table-toolbar";
 import {
   ACTIONS_COLUMN_ID,
   SELECT_COLUMN_ID,
-  buildManagedColumnOrder,
-  buildManagedColumnPinning,
-  reorderDataColumnsByPinZone,
-  sanitizeDataColumnOrder,
-  sanitizeDataColumnPinning
-} from "./managed-columns";
-import { getVisibleDataColumnIdsInUiOrder, getVisibleLeafColumnIdsInUiOrder } from "./visible-column-order";
-import { Button, Checkbox, Input } from "./primitives";
+} from "../engine/managed-columns";
+import { getVisibleDataColumnIdsInUiOrder, getVisibleLeafColumnIdsInUiOrder } from "../engine/visible-column-order";
+import { Checkbox } from "./primitives";
 
-type EditingCell = {
-  rowId: RowId;
-  columnId: string;
-} | null;
+export { applyClientQuery } from "../core/filtering";
+export { canHandleGridPaste } from "../hooks/use-table-clipboard";
 
-type GridPasteEligibilityArgs = {
-  clipboardPaste: boolean;
-  editing: boolean;
-  cellSelect: boolean;
-  editingCell: EditingCell;
-  hasUpdateRows: boolean;
-  target?: EventTarget | null;
-};
-
-function applyUpdater<TValue>(updater: Updater<TValue>, current: TValue): TValue {
-  if (typeof updater === "function") {
-    const fn = updater as (old: TValue) => TValue;
-    return fn(current);
-  }
-  return updater;
+export function shouldCenterHeaderContent(columnId: string): boolean {
+  return columnId === SELECT_COLUMN_ID;
 }
 
 function asRequiredFeatureFlags(
@@ -146,118 +92,6 @@ function asRequiredFeatureFlags(
     ...DEFAULT_FEATURE_FLAGS,
     ...features
   };
-}
-
-function cellRange(start: CellCoord | null, end: CellCoord | null): { start: CellCoord; end: CellCoord } | null {
-  if (!start && !end) {
-    return null;
-  }
-  if (start && !end) {
-    return { start, end: start };
-  }
-  if (!start && end) {
-    return { start: end, end };
-  }
-  if (start && end) {
-    return {
-      start,
-      end
-    };
-  }
-  return null;
-}
-
-function isEditableKeyboardTarget(target: EventTarget | null): boolean {
-  const element =
-    target instanceof HTMLElement ? target : target instanceof Node ? target.parentElement : null;
-
-  if (!element) {
-    return false;
-  }
-
-  if (
-    element instanceof HTMLInputElement ||
-    element instanceof HTMLTextAreaElement ||
-    element instanceof HTMLSelectElement
-  ) {
-    return true;
-  }
-
-  if (element.isContentEditable || element.getAttribute("contenteditable") === "true") {
-    return true;
-  }
-
-  return element.closest("[data-dt-editor-root='true'], [data-dt-editor-dialog='true']") !== null;
-}
-
-export function canHandleGridPaste({
-  clipboardPaste,
-  editing,
-  cellSelect,
-  editingCell,
-  hasUpdateRows,
-  target = null
-}: GridPasteEligibilityArgs): boolean {
-  if (!clipboardPaste || !editing || !cellSelect || editingCell !== null || !hasUpdateRows) {
-    return false;
-  }
-
-  return !isEditableKeyboardTarget(target);
-}
-
-export function shouldCenterHeaderContent(columnId: string): boolean {
-  return columnId === SELECT_COLUMN_ID;
-}
-
-function appendSkipSuffix(message: string, skippedNonEditable: number): string {
-  if (skippedNonEditable === 0) {
-    return message;
-  }
-
-  const cellLabel = skippedNonEditable === 1 ? "cell" : "cells";
-  return `${message} Skipped ${skippedNonEditable} non-editable ${cellLabel}.`;
-}
-
-function invalidOptionPasteMessage(appliedCells: number, skippedInvalidOptionCells: number): string {
-  const cellLabel = skippedInvalidOptionCells === 1 ? "cell" : "cells";
-  if (appliedCells > 0) {
-    return `Paste applied with ${skippedInvalidOptionCells} invalid select/multiselect ${cellLabel} skipped.`;
-  }
-
-  return `Paste skipped ${skippedInvalidOptionCells} invalid select/multiselect ${cellLabel}.`;
-}
-
-function buildUndoSnapshotUpdate<TRow extends DataTableRowModel>(
-  entry: UndoEntry<TRow>,
-  direction: "previous" | "next"
-): {
-  optimisticUpdate: Record<RowId, TRow>;
-  patches: ReadonlyArray<RowPatch<TRow>>;
-} {
-  const optimisticUpdate: Record<RowId, TRow> = {};
-  const patches: RowPatch<TRow>[] = [];
-
-  for (const change of entry.changes) {
-    const row = direction === "previous" ? change.previousRow : change.nextRow;
-    optimisticUpdate[change.rowId] = row;
-    patches.push({
-      rowId: change.rowId,
-      patch: row
-    });
-  }
-
-  return {
-    optimisticUpdate,
-    patches
-  };
-}
-
-function hasDraftCellValue(value: DataTableCellValue): boolean {
-  if (Array.isArray(value)) {
-    return value.length > 0;
-  }
-
-  return value !== "" && value !== null && value !== undefined;
 }
 
 type CssVarsStyle = CSSProperties & {
@@ -275,148 +109,10 @@ type CssVarsStyle = CSSProperties & {
   "--dt-selection-bg": string;
 };
 
-type PinZone = "left" | "center" | "right";
-type DropPlacement = "before" | "after";
-type ColumnMenuAnchor = "left" | "right";
 const EMPTY_COLLABORATORS: ReadonlyArray<CollaboratorPresence> = [];
 
-const COLUMN_MENU_WIDTH_PX = 288;
-const COLUMN_MENU_GUTTER_PX = 8;
 const DRAFT_ROW_ID = "__draft__";
 const useSafeLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
-
-const TEXT_FILTER_OPERATORS: ReadonlyArray<FilterOperator> = [
-  "contains",
-  "startsWith",
-  "endsWith",
-  "eq",
-  "neq"
-];
-const NUMBER_FILTER_OPERATORS: ReadonlyArray<FilterOperator> = ["eq", "neq", "gt", "gte", "lt", "lte"];
-const DATE_FILTER_OPERATORS: ReadonlyArray<FilterOperator> = ["eq", "neq", "gt", "gte", "lt", "lte"];
-const SELECT_FILTER_OPERATORS: ReadonlyArray<FilterOperator> = ["in"];
-const MULTISELECT_FILTER_OPERATORS: ReadonlyArray<FilterOperator> = ["in"];
-
-function filterOperatorsForColumn<TRow extends DataTableRowModel>(
-  column: DataTableColumn<TRow>
-): ReadonlyArray<FilterOperator> {
-  if (column.kind === "number" || column.kind === "currency") {
-    return NUMBER_FILTER_OPERATORS;
-  }
-  if (column.kind === "date") {
-    return DATE_FILTER_OPERATORS;
-  }
-  if (column.kind === "select") {
-    return SELECT_FILTER_OPERATORS;
-  }
-  if (column.kind === "multiselect") {
-    return MULTISELECT_FILTER_OPERATORS;
-  }
-  return TEXT_FILTER_OPERATORS;
-}
-
-function defaultFilterOperatorForColumn<TRow extends DataTableRowModel>(
-  column: DataTableColumn<TRow>
-): FilterOperator {
-  const operators = filterOperatorsForColumn(column);
-  const first = operators[0];
-  return first ?? "contains";
-}
-
-function isActiveFilterValue(value: DataTableFilter["value"]): boolean {
-  if (value === null) {
-    return false;
-  }
-  if (Array.isArray(value)) {
-    return value.length > 0;
-  }
-  if (typeof value === "string") {
-    return value.trim().length > 0;
-  }
-  return true;
-}
-
-function pinZoneForColumnId(columnId: string, pinning: ColumnPinningState): PinZone {
-  if (columnId === SELECT_COLUMN_ID) {
-    return "left";
-  }
-  if (columnId === ACTIONS_COLUMN_ID) {
-    return "right";
-  }
-  if ((pinning.left ?? []).includes(columnId)) {
-    return "left";
-  }
-  if ((pinning.right ?? []).includes(columnId)) {
-    return "right";
-  }
-  return "center";
-}
-
-function useRowObservers(): {
-  connect: (rowId: RowId, node: HTMLTableRowElement | null, onResize: (height: number) => void) => void;
-  disconnectAll: () => void;
-} {
-  const observers = useRef<Record<RowId, ResizeObserver>>({});
-  const nodes = useRef<Record<RowId, HTMLTableRowElement | null>>({});
-
-  const connect = useCallback(
-    (rowId: RowId, node: HTMLTableRowElement | null, onResize: (height: number) => void) => {
-      const currentNode = nodes.current[rowId] ?? null;
-      if (node === currentNode) {
-        return;
-      }
-
-      const existing = observers.current[rowId];
-
-      if (!node) {
-        if (currentNode && currentNode.isConnected) {
-          return;
-        }
-
-        if (existing) {
-          existing.disconnect();
-          delete observers.current[rowId];
-        }
-        delete nodes.current[rowId];
-        return;
-      }
-
-      if (existing) {
-        existing.disconnect();
-        delete observers.current[rowId];
-      }
-
-      const observer = new ResizeObserver((entries) => {
-        const entry = entries[0];
-        if (!entry) {
-          return;
-        }
-        onResize(entry.contentRect.height);
-      });
-
-      observer.observe(node);
-      observers.current[rowId] = observer;
-      nodes.current[rowId] = node;
-    },
-    []
-  );
-
-  const disconnectAll = useCallback(() => {
-    for (const observer of Object.values(observers.current)) {
-      observer.disconnect();
-    }
-    observers.current = {};
-    nodes.current = {};
-  }, []);
-
-  return useMemo(
-    () => ({
-      connect,
-      disconnectAll
-    }),
-    [connect, disconnectAll]
-  );
-}
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -451,291 +147,11 @@ function fixedTrackStyle(width: number): CSSProperties {
   };
 }
 
-function defaultColumnSizingInfoState(): ColumnSizingInfoState {
-  return {
-    startOffset: null,
-    startSize: null,
-    deltaOffset: null,
-    deltaPercentage: null,
-    isResizingColumn: false,
-    columnSizingStart: []
-  };
-}
-
-function stringifyFilterCellValue(raw: DataTableCellValue): string {
-  if (Array.isArray(raw)) {
-    return raw.map((entry) => String(entry)).join(",");
-  }
-
-  if (raw instanceof Date) {
-    return raw.toISOString();
-  }
-
-  if (typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean") {
-    return String(raw);
-  }
-
-  if (raw === null || raw === undefined) {
-    return "";
-  }
-
-  return String(raw);
-}
-
-function comparableSortValue(raw: DataTableCellValue): string | number | boolean | null {
-  if (raw instanceof Date) {
-    return raw.getTime();
-  }
-
-  if (typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean") {
-    return raw;
-  }
-
-  if (raw === null || raw === undefined) {
-    return null;
-  }
-
-  if (Array.isArray(raw)) {
-    return raw.map((entry) => String(entry)).join(",");
-  }
-
-  return String(raw);
-}
-
-function compareValues(left: string | number | boolean | null, right: string | number | boolean | null): number {
-  if (left === right) {
-    return 0;
-  }
-
-  if (left === null) {
-    return -1;
-  }
-
-  if (right === null) {
-    return 1;
-  }
-
-  if (typeof left === "number" && typeof right === "number") {
-    return left - right;
-  }
-
-  return String(left).localeCompare(String(right));
-}
-
-function numericFilterValue(raw: DataTableCellValue | DataTableFilter["value"]): number | null {
-  if (typeof raw === "number") {
-    return Number.isFinite(raw) ? raw : null;
-  }
-
-  if (typeof raw === "string" && raw.trim().length > 0) {
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-
-  if (raw instanceof Date) {
-    return raw.getTime();
-  }
-
-  return null;
-}
-
-function dateFilterValue(raw: DataTableCellValue | DataTableFilter["value"], locale: string | undefined): string | null {
-  if (raw instanceof Date) {
-    return raw.toISOString().slice(0, 10);
-  }
-
-  if (typeof raw !== "string") {
-    return null;
-  }
-
-  const parsed = parseDateValue(raw, locale);
-  return parsed.length > 0 ? parsed : null;
-}
-
-function rowMatchesFilter<TRow extends DataTableRowModel>(
-  row: TRow,
-  filter: DataTableFilter,
-  column: DataTableColumn<TRow> | undefined
-): boolean {
-  const raw = row[filter.columnId as keyof TRow];
-  const text = stringifyFilterCellValue(raw);
-
-  if (filter.op === "contains") {
-    return text.toLowerCase().includes(String(filter.value ?? "").toLowerCase());
-  }
-
-  if (filter.op === "startsWith") {
-    return text.toLowerCase().startsWith(String(filter.value ?? "").toLowerCase());
-  }
-
-  if (filter.op === "endsWith") {
-    return text.toLowerCase().endsWith(String(filter.value ?? "").toLowerCase());
-  }
-
-  if (filter.op === "eq") {
-    if (column?.kind === "date") {
-      const left = dateFilterValue(raw, column.locale);
-      const right = dateFilterValue(filter.value, column.locale);
-      return left !== null && right !== null && left === right;
-    }
-
-    return text === String(filter.value ?? "");
-  }
-
-  if (filter.op === "neq") {
-    if (column?.kind === "date") {
-      const left = dateFilterValue(raw, column.locale);
-      const right = dateFilterValue(filter.value, column.locale);
-      return left !== null && right !== null && left !== right;
-    }
-
-    return text !== String(filter.value ?? "");
-  }
-
-  if (filter.op === "in") {
-    const filterValues = filter.value;
-    if (!Array.isArray(filterValues)) {
-      return false;
-    }
-
-    if (Array.isArray(raw)) {
-      const rowValues = raw.map((entry) => String(entry));
-      return rowValues.some((value) => filterValues.includes(value));
-    }
-
-    return filterValues.includes(text);
-  }
-
-  if (filter.op === "gt" || filter.op === "gte" || filter.op === "lt" || filter.op === "lte") {
-    if (column?.kind === "date") {
-      const left = dateFilterValue(raw, column.locale);
-      const right = dateFilterValue(filter.value, column.locale);
-      if (left === null || right === null) {
-        return false;
-      }
-
-      if (filter.op === "gt") {
-        return left > right;
-      }
-      if (filter.op === "gte") {
-        return left >= right;
-      }
-      if (filter.op === "lt") {
-        return left < right;
-      }
-      return left <= right;
-    }
-
-    const left = numericFilterValue(raw);
-    const right = numericFilterValue(filter.value);
-    if (left === null || right === null) {
-      return false;
-    }
-
-    if (filter.op === "gt") {
-      return left > right;
-    }
-    if (filter.op === "gte") {
-      return left >= right;
-    }
-    if (filter.op === "lt") {
-      return left < right;
-    }
-    return left <= right;
-  }
-
-  return true;
-}
-
-export function applyClientQuery<TRow extends DataTableRowModel>(
-  rows: ReadonlyArray<TRow>,
-  state: {
-    sorting: ReadonlyArray<{ columnId: string; direction: "asc" | "desc" }>;
-    filters: ReadonlyArray<DataTableFilter>;
-  },
-  columnById: ReadonlyMap<string, DataTableColumn<TRow>>
-): ReadonlyArray<TRow> {
-  let output = [...rows];
-
-  for (const filter of state.filters) {
-    output = output.filter((row) => rowMatchesFilter(row, filter, columnById.get(filter.columnId)));
-  }
-
-  const sortEntry = state.sorting[0];
-  if (!sortEntry) {
-    return output;
-  }
-
-  output.sort((left, right) => {
-    const leftValue = left[sortEntry.columnId as keyof TRow];
-    const rightValue = right[sortEntry.columnId as keyof TRow];
-    const result = compareValues(comparableSortValue(leftValue), comparableSortValue(rightValue));
-    return sortEntry.direction === "asc" ? result : -result;
-  });
-
-  return output;
-}
-
 function renderedWidthForColumn<TRow extends DataTableRowModel, TValue>(
   column: Column<TRow, TValue>,
   renderWidthsById: Readonly<Record<string, number>>
 ): number {
   return renderWidthsById[column.id] ?? column.getSize();
-}
-
-function scrollCellIntoView(args: {
-  containerNode: HTMLDivElement;
-  cellNode: HTMLElement;
-  stickyHeaderHeight: number;
-  leftPinnedWidth: number;
-  rightPinnedWidth: number;
-}): void {
-  const {
-    containerNode,
-    cellNode,
-    stickyHeaderHeight,
-    leftPinnedWidth,
-    rightPinnedWidth
-  } = args;
-
-  const parentCell = cellNode.closest("td");
-  const targetNode = parentCell instanceof HTMLElement ? parentCell : cellNode;
-  const containerRect = containerNode.getBoundingClientRect();
-  const cellRect = targetNode.getBoundingClientRect();
-  const pinnedState = targetNode.getAttribute("data-pinned-state") ?? "center";
-  const minVisibleTop = containerRect.top + stickyHeaderHeight;
-  const maxVisibleBottom = containerRect.bottom;
-  let nextScrollTop = containerNode.scrollTop;
-
-  if (cellRect.top < minVisibleTop) {
-    nextScrollTop -= minVisibleTop - cellRect.top;
-  } else if (cellRect.bottom > maxVisibleBottom) {
-    nextScrollTop += cellRect.bottom - maxVisibleBottom;
-  }
-
-  let nextScrollLeft = containerNode.scrollLeft;
-  if (pinnedState === "center") {
-    const minVisibleLeft = containerRect.left + leftPinnedWidth;
-    const maxVisibleRight = containerRect.right - rightPinnedWidth;
-
-    if (cellRect.left < minVisibleLeft) {
-      nextScrollLeft -= minVisibleLeft - cellRect.left;
-    } else if (cellRect.right > maxVisibleRight) {
-      nextScrollLeft += cellRect.right - maxVisibleRight;
-    }
-  }
-
-  const maxScrollTop = Math.max(0, containerNode.scrollHeight - containerNode.clientHeight);
-  const maxScrollLeft = Math.max(0, containerNode.scrollWidth - containerNode.clientWidth);
-  const finalScrollTop = clamp(Math.round(nextScrollTop), 0, maxScrollTop);
-  const finalScrollLeft = clamp(Math.round(nextScrollLeft), 0, maxScrollLeft);
-
-  if (finalScrollTop !== containerNode.scrollTop) {
-    containerNode.scrollTop = finalScrollTop;
-  }
-  if (finalScrollLeft !== containerNode.scrollLeft) {
-    containerNode.scrollLeft = finalScrollLeft;
-  }
 }
 
 function resolveThemeTokens(
@@ -747,13 +163,6 @@ function resolveThemeTokens(
   };
 }
 
-function asRecord<TValue>(entries: ReadonlyArray<readonly [string, TValue]>): Record<string, TValue> {
-  const output: Record<string, TValue> = {};
-  for (const [key, value] of entries) {
-    output[key] = value;
-  }
-  return output;
-}
 
 export function DataTable<TRow extends DataTableRowModel>({
   tableId,
@@ -778,54 +187,72 @@ export function DataTable<TRow extends DataTableRowModel>({
   );
   const isDebugMode = useMemo(() => debugEnabled(), []);
   const debugScope = useMemo(() => `table:${tableId}`, [tableId]);
-
+  const dataColumnIds = useMemo(() => columns.map((column) => column.id), [columns]);
   const minHeight = minRowHeight ?? DEFAULT_MIN_ROW_HEIGHT;
   const effectivePageSize = pageSize ?? DEFAULT_PAGE_SIZE;
-
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [columnOrder, setColumnOrder] = useState<string[]>([]);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-  const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({ left: [], right: [] });
-  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
-  const [columnSizingInfo, setColumnSizingInfo] = useState<ColumnSizingInfoState>(() =>
-    defaultColumnSizingInfoState()
-  );
-  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-  const [editingCell, setEditingCell] = useState<EditingCell>(null);
-  const [activeCell, setActiveCell] = useState<CellCoord | null>(null);
-  const [rangeStart, setRangeStart] = useState<CellCoord | null>(null);
-  const [columnMenuId, setColumnMenuId] = useState<string | null>(null);
-  const [columnMenuAnchorById, setColumnMenuAnchorById] = useState<Readonly<Record<string, ColumnMenuAnchor>>>({});
-  const [rowActionMenuRowId, setRowActionMenuRowId] = useState<RowId | null>(null);
-  const [filterOperatorDrafts, setFilterOperatorDrafts] = useState<Readonly<Record<string, FilterOperator>>>({});
-  const [draggingColumnId, setDraggingColumnId] = useState<string | null>(null);
-  const [dragOverTarget, setDragOverTarget] = useState<{ columnId: string; placement: DropPlacement } | null>(null);
-  const [optimisticRows, setOptimisticRows] = useState<Record<RowId, TRow>>({});
-  const [deletedRows, setDeletedRows] = useState<Record<RowId, TRow>>({});
-  const [draftRow, setDraftRow] = useState<Partial<TRow>>({});
-  const [draftEditingColumnId, setDraftEditingColumnId] = useState<string | null>(null);
+  const [editingCell, setEditingCell] = useState<EditingCellState>(null);
   const undoStack = useUndoStack<TRow>();
   const commitCounter = useRef(0);
   const commitWindow = useRef<number[]>([]);
   const interactionSequence = useRef(0);
-  const dataColumnIds = useMemo(() => columns.map((column) => column.id), [columns]);
-  const normalizedColumnOrder = useMemo(
-    () =>
-      sanitizeDataColumnOrder({
-        dataColumnIds,
-        userColumnOrder: columnOrder
-      }),
-    [columnOrder, dataColumnIds]
-  );
-  const normalizedColumnPinning = useMemo(
-    () =>
-      sanitizeDataColumnPinning({
-        dataColumnIds,
-        userColumnPinning: columnPinning
-      }),
-    [columnPinning, dataColumnIds]
-  );
+  const deleteEnabled = mergedFeatures.rowDelete && Boolean(dataSource.deleteRows);
+  const customRowActionsEnabled = mergedFeatures.rowActions && (rowActions?.length ?? 0) > 0;
+  const hasActionColumn = deleteEnabled || customRowActionsEnabled;
+  const {
+    sorting,
+    columnFilters,
+    columnVisibility,
+    columnPinning,
+    columnSizing,
+    rowSelection,
+    normalizedColumnOrder,
+    normalizedColumnPinning,
+    reactTableState,
+    setSorting,
+    setColumnFilters,
+    setColumnOrder,
+    setColumnPinning,
+    setColumnSizing,
+    setRowSelection,
+    onSortingChange,
+    onColumnFiltersChange,
+    onColumnOrderChange,
+    onColumnVisibilityChange,
+    onColumnPinningChange,
+    onColumnSizingChange,
+    onColumnSizingInfoChange,
+    onRowSelectionChange
+  } = useTableState({
+    tableId,
+    dataColumnIds,
+    includeSelectColumn: mergedFeatures.rowSelect,
+    includeActionsColumn: hasActionColumn,
+    onError
+  });
+  const {
+    filterByColumnId,
+    selectedFilterOperator,
+    setColumnFilterOperator,
+    selectColumnFilterTextValue,
+    setColumnFilterTextValue,
+    selectColumnFilterValues,
+    toggleColumnFilterInValue,
+    clearColumnFilter
+  } = useTableFilters<TRow>({
+    columnFilters,
+    setColumnFilters
+  });
+  const {
+    activeCell,
+    rangeStart,
+    setActiveCell,
+    setRangeStart,
+    onCellSelect,
+    onRangeSelect
+  } = useTableSelection({
+    isDebugMode,
+    debugScope
+  });
 
   const orderedColumns = useMemo(
     () => orderColumns(columns, normalizedColumnOrder),
@@ -843,233 +270,44 @@ export function DataTable<TRow extends DataTableRowModel>({
   );
 
   const rowsResult = dataSource.useRows(queryState);
-
-  const deletedRowIds = useMemo(() => new Set(Object.keys(deletedRows)), [deletedRows]);
-
-  const mergedRows = useMemo(() => {
-    const rows: TRow[] = [];
-
-    for (const sourceRow of rowsResult.rows) {
-      const rowId = getRowId(sourceRow);
-      if (deletedRowIds.has(rowId)) {
-        continue;
-      }
-      rows.push(optimisticRows[rowId] ?? sourceRow);
-    }
-
-    return rows;
-  }, [deletedRowIds, getRowId, optimisticRows, rowsResult.rows]);
+  const {
+    setOptimisticRows,
+    mergedRows,
+    rowActionMenuRowId,
+    setRowActionMenuRowId,
+    draftRow,
+    draftEditingColumnId,
+    setDraftEditingColumnId,
+    draftRowRef,
+    onStartEdit,
+    onCancelEdit,
+    commitCellEdit,
+    deleteRowsNow,
+    commitDraftRow,
+    commitDraftCell,
+    cancelDraftCellEdit
+  } = useTableRows({
+    sourceRows: rowsResult.rows,
+    getRowId,
+    orderedColumns,
+    rowSchema,
+    dataSource,
+    rowsRefresh: rowsResult.refresh,
+    rowDeleteEnabled: mergedFeatures.rowDelete,
+    rowAddEnabled: mergedFeatures.rowAdd,
+    undoEnabled: mergedFeatures.undo,
+    setEditingCell,
+    undoStack
+  });
   const rowSelectionRef = useRef(rowSelection);
   const mergedRowsRef = useRef(mergedRows);
-  const draftRowRef = useRef(draftRow);
 
   rowSelectionRef.current = rowSelection;
   mergedRowsRef.current = mergedRows;
-  draftRowRef.current = draftRow;
 
   const rowHeights = useRowHeights({ minRowHeight });
   const setContentHeight = rowHeights.setContentHeight;
   const rowObservers = useRowObservers();
-
-  const persistedState = useMemo(
-    () =>
-      internalToPersistedState({
-        sorting,
-        filters: columnFilters,
-        columnOrder: normalizedColumnOrder,
-        columnVisibility,
-        columnPinning: normalizedColumnPinning,
-        columnSizing
-      }),
-    [columnFilters, columnSizing, columnVisibility, normalizedColumnOrder, normalizedColumnPinning, sorting]
-  );
-
-  const hydrateFromPersistence = useCallback((state: PersistedTableState) => {
-    const internal = persistedStateToInternal(state);
-    setSorting(internal.sorting);
-    setColumnFilters(internal.filters);
-    setColumnOrder(
-      sanitizeDataColumnOrder({
-        dataColumnIds,
-        userColumnOrder: internal.columnOrder
-      })
-    );
-    setColumnVisibility(internal.columnVisibility);
-    setColumnPinning(
-      sanitizeDataColumnPinning({
-        dataColumnIds,
-        userColumnPinning: internal.columnPinning
-      })
-    );
-    setColumnSizing(internal.columnSizing);
-    setColumnSizingInfo(defaultColumnSizingInfoState());
-  }, [dataColumnIds]);
-
-  usePersistedState({
-    tableId,
-    state: persistedState,
-    onHydrate: hydrateFromPersistence,
-    onError
-  });
-
-  useEffect(() => {
-    if (columnOrder.length > 0) {
-      return;
-    }
-    setColumnOrder(dataColumnIds);
-  }, [columnOrder.length, dataColumnIds]);
-
-  useEffect(() => {
-    if (!columnMenuId) {
-      return;
-    }
-
-    const onPointerDown = (event: MouseEvent): void => {
-      if (!(event.target instanceof Element)) {
-        setColumnMenuId(null);
-        return;
-      }
-
-      if (event.target.closest("[data-dt-column-menu-root='true']")) {
-        return;
-      }
-      setColumnMenuId(null);
-    };
-
-    const onKeyDown = (event: globalThis.KeyboardEvent): void => {
-      if (event.key === "Escape") {
-        setColumnMenuId(null);
-      }
-    };
-
-    window.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [columnMenuId]);
-
-  useEffect(() => {
-    if (!rowActionMenuRowId) {
-      return;
-    }
-
-    const onPointerDown = (event: MouseEvent): void => {
-      if (!(event.target instanceof Element)) {
-        setRowActionMenuRowId(null);
-        return;
-      }
-
-      if (event.target.closest("[data-dt-row-action-menu-root='true']")) {
-        return;
-      }
-
-      setRowActionMenuRowId(null);
-    };
-
-    const onKeyDown = (event: globalThis.KeyboardEvent): void => {
-      if (event.key === "Escape") {
-        setRowActionMenuRowId(null);
-      }
-    };
-
-    window.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [rowActionMenuRowId]);
-
-  const onCellSelect = useCallback((coord: CellCoord) => {
-    if (isDebugMode) {
-      pushDebugEventThrottled(debugScope, "cell-select", 120, "cell selected", {
-        row: coord.rowIndex,
-        column: coord.columnIndex
-      });
-    }
-    setActiveCell(coord);
-    setRangeStart(coord);
-  }, [debugScope, isDebugMode]);
-
-  const onRangeSelect = useCallback((coord: CellCoord) => {
-    if (isDebugMode) {
-      pushDebugEventThrottled(debugScope, "range-select", 120, "range anchor updated", {
-        row: coord.rowIndex,
-        column: coord.columnIndex
-      });
-    }
-    setActiveCell(coord);
-    setRangeStart((current) => current ?? coord);
-  }, [debugScope, isDebugMode]);
-
-  const onStartEdit = useCallback((rowId: RowId, columnId: string) => {
-    setDraftEditingColumnId(null);
-    setEditingCell({ rowId, columnId });
-  }, []);
-
-  const onCancelEdit = useCallback(() => {
-    setEditingCell(null);
-  }, []);
-
-  const commitCellEdit = useCallback<CellCommit<TRow>>(
-    async ({ row, rowId, column, value }) => {
-      const cellValidation = validateCell(column, row, value);
-      if (!cellValidation.ok) {
-        toast.error(cellValidation.message ?? "Invalid cell value");
-        return;
-      }
-
-      const updateResult = setColumnValue(row, rowId, column, value);
-      const rowValidation = validateRow(rowSchema, updateResult.nextRow);
-      if (!rowValidation.ok) {
-        toast.error(rowValidation.message ?? "Invalid row state");
-        return;
-      }
-
-      const undoEntry = mergedFeatures.undo
-        ? {
-            changes: [
-              {
-                rowId,
-                previousRow: row,
-                nextRow: updateResult.nextRow
-              }
-            ]
-          }
-        : null;
-
-      if (undoEntry) {
-        undoStack.pushUndo(undoEntry);
-      }
-
-      setOptimisticRows((current) => ({
-        ...current,
-        [rowId]: updateResult.nextRow
-      }));
-      setEditingCell(null);
-
-      if (!dataSource.updateRows) {
-        return;
-      }
-
-      try {
-        await dataSource.updateRows([updateResult.patch]);
-      } catch (error) {
-        if (undoEntry) {
-          undoStack.discard(undoEntry);
-        }
-        setOptimisticRows((current) => {
-          const next = { ...current };
-          delete next[rowId];
-          return next;
-        });
-        toast.error(`Failed to update row: ${String(error)}`);
-      }
-    },
-    [dataSource, mergedFeatures.undo, rowSchema, undoStack]
-  );
 
   const dataColumnDefs = useColumnDefs({
     columns: orderedColumns,
@@ -1085,69 +323,6 @@ export function DataTable<TRow extends DataTableRowModel>({
     onRangeSelect,
     enableEditing: mergedFeatures.editing
   });
-
-  const deleteRowsNow = useCallback(
-    async (rowsToDelete: ReadonlyArray<TRow>) => {
-      if (!mergedFeatures.rowDelete || !dataSource.deleteRows || rowsToDelete.length === 0) {
-        return;
-      }
-
-      const rowIds = rowsToDelete.map((row) => getRowId(row));
-      const snapshotEntries = rowsToDelete.map((row) => [getRowId(row), row] as const);
-      const snapshot = asRecord(snapshotEntries);
-
-      setDeletedRows((current) => ({ ...current, ...snapshot }));
-
-      try {
-        await dataSource.deleteRows(rowIds);
-      } catch (error) {
-        setDeletedRows((current) => {
-          const next = { ...current };
-          for (const rowId of rowIds) {
-            delete next[rowId];
-          }
-          return next;
-        });
-        toast.error(`Failed to delete rows: ${String(error)}`);
-        return;
-      }
-
-      toast.message(`${rowIds.length} row${rowIds.length > 1 ? "s" : ""} deleted`, {
-        action:
-          dataSource.restoreRows
-            ? {
-                label: "Undo",
-                onClick: () => {
-                  const toRestore = rowIds
-                    .map((rowId) => snapshot[rowId])
-                    .filter((row): row is TRow => Boolean(row));
-
-                  setDeletedRows((current) => {
-                    const next = { ...current };
-                    for (const rowId of rowIds) {
-                      delete next[rowId];
-                    }
-                    return next;
-                  });
-
-                  const restorePromise = dataSource.restoreRows
-                    ? dataSource.restoreRows(toRestore)
-                    : null;
-                  if (restorePromise) {
-                    void restorePromise.catch((error) => {
-                      toast.error(`Failed to restore rows: ${String(error)}`);
-                    });
-                  }
-                }
-              }
-            : undefined
-      });
-    },
-    [dataSource, getRowId, mergedFeatures.rowDelete]
-  );
-  const deleteEnabled = mergedFeatures.rowDelete && Boolean(dataSource.deleteRows);
-  const customRowActionsEnabled = mergedFeatures.rowActions && (rowActions?.length ?? 0) > 0;
-  const hasActionColumn = deleteEnabled || customRowActionsEnabled;
 
   const actionColumn = useMemo(() => {
     if (!hasActionColumn) {
@@ -1171,71 +346,25 @@ export function DataTable<TRow extends DataTableRowModel>({
           ? (rowActions ?? []).filter((action) => action.isVisible?.(row) ?? true)
           : [];
         const isMenuOpen = rowActionMenuRowId === rowId;
-        const hasCustomActions = visibleRowActions.length > 0;
-        const shouldShowDelete = deleteEnabled;
-
         return (
-          <div className="flex items-center justify-center gap-0.5 py-1">
-            {shouldShowDelete ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 w-7 px-0 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
-                aria-label={`Delete row ${rowId}`}
-                onClick={() => {
-                  setRowActionMenuRowId(null);
-                  void deleteRowsNow([row]);
-                }}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            ) : null}
-
-            {hasCustomActions ? (
-              <div className="relative" data-dt-row-action-menu-root="true">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 px-0"
-                  aria-label={`Open actions for row ${rowId}`}
-                  aria-haspopup="menu"
-                  data-row-action-menu-trigger={rowId}
-                  aria-expanded={isMenuOpen}
-                  onClick={() => {
-                    setRowActionMenuRowId((current) => (current === rowId ? null : rowId));
-                  }}
-                >
-                  <MoreVertical className="h-3.5 w-3.5" />
-                </Button>
-
-                {isMenuOpen ? (
-                  <div
-                    role="menu"
-                    aria-label={`Actions for row ${rowId}`}
-                    className="absolute right-0 top-full z-50 mt-1 min-w-40 rounded-md border border-slate-200 bg-white p-1 shadow-xl"
-                  >
-                    {visibleRowActions.map((action) => (
-                      <Button
-                        key={`${rowId}-${action.id}`}
-                        variant={action.variant === "destructive" ? "destructive" : "ghost"}
-                        size="sm"
-                        role="menuitem"
-                        className="w-full justify-start"
-                        disabled={action.isDisabled?.(row) ?? false}
-                        onClick={() => {
-                          setRowActionMenuRowId(null);
-                          void action.onSelect({ row, rowId });
-                        }}
-                      >
-                        {action.icon ? <action.icon className="h-3.5 w-3.5" /> : null}
-                        {action.label}
-                      </Button>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
+          <RowActions
+            row={row}
+            rowId={rowId}
+            rowActions={visibleRowActions}
+            isMenuOpen={isMenuOpen}
+            canDelete={deleteEnabled}
+            onDelete={() => {
+              setRowActionMenuRowId(null);
+              void deleteRowsNow([row]);
+            }}
+            onToggleMenu={() => {
+              setRowActionMenuRowId((current) => (current === rowId ? null : rowId));
+            }}
+            onActionSelect={async (action) => {
+              setRowActionMenuRowId(null);
+              await action.onSelect({ row, rowId });
+            }}
+          />
         );
       }
     };
@@ -1248,7 +377,8 @@ export function DataTable<TRow extends DataTableRowModel>({
     getRowId,
     hasActionColumn,
     rowActionMenuRowId,
-    rowActions
+    rowActions,
+    setRowActionMenuRowId
   ]);
 
   const rowSelectColumn = useMemo(() => {
@@ -1318,7 +448,7 @@ export function DataTable<TRow extends DataTableRowModel>({
     };
 
     return column;
-  }, [getRowId, mergedFeatures.rowSelect]);
+  }, [getRowId, mergedFeatures.rowSelect, setRowSelection]);
 
   const coreRowModel = useMemo(() => getCoreRowModel(), []);
 
@@ -1333,26 +463,6 @@ export function DataTable<TRow extends DataTableRowModel>({
     }
     return output;
   }, [actionColumn, dataColumnDefs, rowSelectColumn]);
-  const fullColumnOrder = useMemo(
-    () =>
-      buildManagedColumnOrder({
-        dataColumnIds,
-        userColumnOrder: normalizedColumnOrder,
-        includeSelect: Boolean(rowSelectColumn),
-        includeActions: Boolean(actionColumn)
-      }),
-    [actionColumn, dataColumnIds, normalizedColumnOrder, rowSelectColumn]
-  );
-  const managedColumnPinning = useMemo(
-    () =>
-      buildManagedColumnPinning({
-        dataColumnIds,
-        userColumnPinning: normalizedColumnPinning,
-        includeSelect: Boolean(rowSelectColumn),
-        includeActions: Boolean(actionColumn)
-      }),
-    [actionColumn, dataColumnIds, normalizedColumnPinning, rowSelectColumn]
-  );
   const columnById = useMemo(() => {
     const map = new Map<string, DataTableColumn<TRow>>();
     for (const column of orderedColumns) {
@@ -1386,81 +496,16 @@ export function DataTable<TRow extends DataTableRowModel>({
     enableSorting: mergedFeatures.columnSort,
     enableFilters: mergedFeatures.columnFilter,
     columnResizeMode: "onChange",
-    state: {
-      sorting,
-      columnFilters,
-      columnOrder: fullColumnOrder,
-      columnVisibility,
-      columnPinning: managedColumnPinning,
-      columnSizing,
-      columnSizingInfo,
-      rowSelection
-    },
-    onSortingChange: (updater) => {
-      setSorting((current) => applyUpdater(updater, current));
-    },
-    onColumnFiltersChange: (updater) => {
-      setColumnFilters((current) => applyUpdater(updater, current));
-    },
-    onColumnOrderChange: (updater) => {
-      setColumnOrder((current) => {
-        const next = applyUpdater(
-          updater,
-          buildManagedColumnOrder({
-            dataColumnIds,
-            userColumnOrder: current,
-            includeSelect: Boolean(rowSelectColumn),
-            includeActions: Boolean(actionColumn)
-          })
-        );
-
-        return sanitizeDataColumnOrder({
-          dataColumnIds,
-          userColumnOrder: next
-        });
-      });
-    },
-    onColumnVisibilityChange: (updater) => {
-      setColumnVisibility((current) => applyUpdater(updater, current));
-    },
-    onColumnPinningChange: (updater) => {
-      setColumnPinning((current) => {
-        const next = applyUpdater(
-          updater,
-          buildManagedColumnPinning({
-            dataColumnIds,
-            userColumnPinning: current,
-            includeSelect: Boolean(rowSelectColumn),
-            includeActions: Boolean(actionColumn)
-          })
-        );
-
-        return sanitizeDataColumnPinning({
-          dataColumnIds,
-          userColumnPinning: next
-        });
-      });
-    },
-    onColumnSizingChange: (updater) => {
-      setColumnSizing((current) => applyUpdater(updater, current));
-    },
-    onColumnSizingInfoChange: (updater) => {
-      setColumnSizingInfo((current) => applyUpdater(updater, current));
-    },
-    onRowSelectionChange: (updater) => {
-      setRowSelection((current) => applyUpdater(updater, current));
-    }
+    state: reactTableState,
+    onSortingChange,
+    onColumnFiltersChange,
+    onColumnOrderChange,
+    onColumnVisibilityChange,
+    onColumnPinningChange,
+    onColumnSizingChange,
+    onColumnSizingInfoChange,
+    onRowSelectionChange
   });
-
-  const decodedFilters = useMemo(() => fromTanStackFilters(columnFilters), [columnFilters]);
-
-  const filterByColumnId = useMemo(() => {
-    const map = new Map<string, DataTableFilter>();
-    for (const filter of decodedFilters) {
-      map.set(filter.columnId, filter);
-    }
-    return map;
-  }, [decodedFilters]);
 
   const hiddenColumns = useMemo(
     () => orderedColumns.filter((column) => columnVisibility[column.id] === false),
@@ -1518,7 +563,7 @@ export function DataTable<TRow extends DataTableRowModel>({
   }, [columnById, orderedColumns, visibleLeafColumnsInUiOrder]);
   const tableRows = table.getRowModel().rows;
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
-  const previousEditingCellRef = useRef<EditingCell>(editingCell);
+  const previousEditingCellRef = useRef<EditingCellState>(editingCell);
   const rowElementsRef = useRef<Record<RowId, HTMLTableRowElement | null>>({});
   const [containerWidth, setContainerWidth] = useState(0);
 
@@ -1582,14 +627,29 @@ export function DataTable<TRow extends DataTableRowModel>({
       containerNode.focus({ preventScroll: true });
     }
   }, [editingCell]);
-
-  const resolveColumnMenuAnchor = useCallback((trigger: HTMLElement): ColumnMenuAnchor => {
-    const triggerRect = trigger.getBoundingClientRect();
-    const containerRect = tableContainerRef.current?.getBoundingClientRect();
-    const minLeft = (containerRect?.left ?? 0) + COLUMN_MENU_GUTTER_PX;
-    const projectedLeft = triggerRect.right - COLUMN_MENU_WIDTH_PX;
-    return projectedLeft < minLeft ? "left" : "right";
-  }, []);
+  const {
+    columnMenuId,
+    setColumnMenuId,
+    columnMenuAnchorById,
+    dragOverTarget,
+    toggleColumnMenu,
+    updatePinnedColumn,
+    setColumnSortDirection,
+    onHeaderDragStart,
+    onHeaderDragOver,
+    onHeaderDrop,
+    onHeaderDragEnd,
+    beginColumnResize
+  } = useTableColumns({
+    tableContainerRef,
+    columnPinning,
+    normalizedColumnOrder,
+    normalizedColumnPinning,
+    setColumnOrder,
+    setColumnPinning,
+    setColumnSizing,
+    setSorting
+  });
 
   const columnRenderLayout = computeColumnLayout({
     columns: visibleLeafColumnsInUiOrder.map((column) => {
@@ -1879,834 +939,47 @@ export function DataTable<TRow extends DataTableRowModel>({
         setRangeStart(nextCoord);
       }
     },
-    [activeCell, displayedRows.length, visibleDataColumns.length]
+    [activeCell, displayedRows.length, setActiveCell, setRangeStart, visibleDataColumns.length]
   );
-
-  const copySelection = useCallback(async () => {
-    if (!mergedFeatures.clipboardCopy || !navigator.clipboard) {
-      return;
-    }
-
-    if (visibleDataColumns.length === 0 || displayedRows.length === 0) {
-      return;
-    }
-
-    const range = cellRange(rangeStart, activeCell);
-    if (!range) {
-      return;
-    }
-
-    const normalized = normalizeRange(range);
-    const matrix: string[][] = [];
-
-    for (let rowIndex = normalized.start.rowIndex; rowIndex <= normalized.end.rowIndex; rowIndex += 1) {
-      const row = displayedRows[rowIndex];
-      if (!row) {
-        continue;
-      }
-      const rowCells: string[] = [];
-
-      for (
-        let columnIndex = normalized.start.columnIndex;
-        columnIndex <= normalized.end.columnIndex;
-        columnIndex += 1
-      ) {
-        const column = visibleDataColumns[columnIndex];
-        if (!column) {
-          rowCells.push("");
-          continue;
-        }
-        const value = getColumnValue(row, column);
-        rowCells.push(serializeCellForClipboard(column, row, value));
-      }
-
-      matrix.push(rowCells);
-    }
-
-    if (matrix.length === 0) {
-      return;
-    }
-
-    await navigator.clipboard.writeText(serializeTsv(matrix));
-    toast.success("Copied selection");
-  }, [activeCell, displayedRows, mergedFeatures.clipboardCopy, rangeStart, visibleDataColumns]);
-
-  const pasteFromText = useCallback(
-    async (text: string) => {
-      const updateRows = dataSource.updateRows;
-      if (
-        !canHandleGridPaste({
-          clipboardPaste: mergedFeatures.clipboardPaste,
-          editing: mergedFeatures.editing,
-          cellSelect: mergedFeatures.cellSelect,
-          editingCell,
-          hasUpdateRows: updateRows !== undefined
-        })
-      ) {
-        return;
-      }
-      if (updateRows === undefined) {
-        return;
-      }
-
-      if (!activeCell || visibleDataColumns.length === 0 || displayedRows.length === 0) {
-        return;
-      }
-
-      const parsed = parseTsv(text);
-      if (parsed.length === 0) {
-        return;
-      }
-
-      const selectedRange = cellRange(rangeStart, activeCell);
-      const normalizedSelectedRange = selectedRange ? normalizeRange(selectedRange) : null;
-      const selectedHeight = normalizedSelectedRange
-        ? normalizedSelectedRange.end.rowIndex - normalizedSelectedRange.start.rowIndex + 1
-        : 0;
-      const selectedWidth = normalizedSelectedRange
-        ? normalizedSelectedRange.end.columnIndex - normalizedSelectedRange.start.columnIndex + 1
-        : 0;
-      const shouldExpandFromActiveCell =
-        normalizedSelectedRange === null || (selectedHeight === 1 && selectedWidth === 1);
-      const baseRange = shouldExpandFromActiveCell
-        ? {
-            start: activeCell,
-            end: {
-              rowIndex: activeCell.rowIndex + parsed.length - 1,
-              columnIndex: activeCell.columnIndex + (parsed[0]?.length ?? 1) - 1
-            }
-          }
-        : normalizedSelectedRange;
-
-      const expanded = expandPasteMatrix(parsed, baseRange);
-      const previousRows = new Map<RowId, TRow>();
-      const patches = new Map<RowId, Partial<TRow>>();
-      let skippedNonEditable = 0;
-      let skippedInvalidOptionCells = 0;
-
-      for (let rowOffset = 0; rowOffset < expanded.length; rowOffset += 1) {
-        const matrixRow = expanded[rowOffset];
-        if (!matrixRow) {
-          continue;
-        }
-        const rowIndex = baseRange.start.rowIndex + rowOffset;
-        const row = displayedRows[rowIndex];
-        if (!row) {
-          continue;
-        }
-        const rowId = getRowId(row);
-        previousRows.set(rowId, row);
-
-        for (let columnOffset = 0; columnOffset < matrixRow.length; columnOffset += 1) {
-          const columnIndex = baseRange.start.columnIndex + columnOffset;
-          const column = visibleDataColumns[columnIndex];
-          if (!column) {
-            continue;
-          }
-          if (!(column.isEditable ?? false)) {
-            skippedNonEditable += 1;
-            continue;
-          }
-
-          const rawValue = matrixRow[columnOffset] ?? "";
-          const parsedValue = parseClipboardToCellValue(column, row, rawValue);
-          if (!parsedValue.ok) {
-            skippedInvalidOptionCells += 1;
-            continue;
-          }
-
-          const cellValidation = validateCell(column, row, parsedValue.value);
-          if (!cellValidation.ok) {
-            continue;
-          }
-
-          const currentPatch = patches.get(rowId) ?? {};
-          patches.set(
-            rowId,
-            {
-              ...currentPatch,
-              [column.field]: parsedValue.value
-            } as Partial<TRow>
-          );
-        }
-      }
-
-      if (patches.size === 0) {
-        if (skippedInvalidOptionCells > 0) {
-          toast.error(appendSkipSuffix(invalidOptionPasteMessage(0, skippedInvalidOptionCells), skippedNonEditable));
-          return;
-        }
-
-        if (skippedNonEditable > 0) {
-          toast.message(`Skipped ${skippedNonEditable} non-editable cells`);
-        }
-        return;
-      }
-
-      const optimisticUpdate: Record<RowId, TRow> = {};
-      const groupedPatches: Array<{ rowId: RowId; patch: Partial<TRow> }> = [];
-      let appliedCells = 0;
-      for (const [rowId, patch] of patches.entries()) {
-        const source = previousRows.get(rowId);
-        if (!source) {
-          continue;
-        }
-        const next = {
-          ...source,
-          ...patch
-        } as TRow;
-
-        const rowValidation = validateRow(rowSchema, next);
-        if (!rowValidation.ok) {
-          continue;
-        }
-
-        optimisticUpdate[rowId] = next;
-        groupedPatches.push({ rowId, patch });
-        appliedCells += Object.keys(patch).length;
-      }
-
-      if (Object.keys(optimisticUpdate).length === 0) {
-        if (skippedInvalidOptionCells > 0) {
-          toast.error(appendSkipSuffix(invalidOptionPasteMessage(0, skippedInvalidOptionCells), skippedNonEditable));
-        }
-        return;
-      }
-
-      const undoEntry = mergedFeatures.undo
-        ? {
-            changes: Object.entries(optimisticUpdate).map(([rowId, nextRow]) => {
-              const previousRow = previousRows.get(rowId);
-              if (!previousRow) {
-                throw new Error(`Missing previous row snapshot for ${rowId}`);
-              }
-
-              return {
-                rowId,
-                previousRow,
-                nextRow
-              };
-            })
-          }
-        : null;
-
-      if (undoEntry) {
-        undoStack.pushUndo(undoEntry);
-      }
-
-      setOptimisticRows((current) => ({
-        ...current,
-        ...optimisticUpdate
-      }));
-
-      try {
-        await updateRows(groupedPatches);
-        if (skippedInvalidOptionCells > 0) {
-          toast.error(appendSkipSuffix(invalidOptionPasteMessage(appliedCells, skippedInvalidOptionCells), skippedNonEditable));
-        } else if (skippedNonEditable > 0) {
-          toast.message(`Paste applied. Skipped ${skippedNonEditable} non-editable cells`);
-        } else {
-          toast.success("Paste applied");
-        }
-      } catch (error) {
-        if (undoEntry) {
-          undoStack.discard(undoEntry);
-        }
-        setOptimisticRows((current) => {
-          const next = { ...current };
-          for (const rowId of Object.keys(optimisticUpdate)) {
-            const previous = previousRows.get(rowId);
-            if (previous) {
-              next[rowId] = previous;
-            }
-          }
-          return next;
-        });
-        toast.error(`Paste failed: ${String(error)}`);
-      }
-    },
-    [
-      activeCell,
-      dataSource,
-      getRowId,
-      mergedFeatures.clipboardPaste,
-      mergedFeatures.cellSelect,
-      mergedFeatures.editing,
-      mergedFeatures.undo,
-      displayedRows,
-      rangeStart,
-      rowSchema,
-      visibleDataColumns,
-      editingCell,
-      undoStack
-    ]
-  );
-
-  const onGridKeyDown = useCallback(
-    async (event: KeyboardEvent<HTMLDivElement>) => {
-      const targetOwnsKeyboard = isEditableKeyboardTarget(event.target);
-
-      if (mergedFeatures.cellSelect && !targetOwnsKeyboard && !editingCell) {
-        if (event.key === "ArrowDown") {
-          event.preventDefault();
-          moveActiveCell(1, 0, event.shiftKey);
-          return;
-        }
-        if (event.key === "ArrowUp") {
-          event.preventDefault();
-          moveActiveCell(-1, 0, event.shiftKey);
-          return;
-        }
-        if (event.key === "ArrowLeft") {
-          event.preventDefault();
-          moveActiveCell(0, -1, event.shiftKey);
-          return;
-        }
-        if (event.key === "ArrowRight") {
-          event.preventDefault();
-          moveActiveCell(0, 1, event.shiftKey);
-          return;
-        }
-      }
-
-      if (targetOwnsKeyboard) {
-        return;
-      }
-
-      if ((event.key === "Enter" || event.key === "F2") && mergedFeatures.editing) {
-        const target = activeCell;
-        if (!target) {
-          return;
-        }
-
-        const row = displayedRows[target.rowIndex];
-        const column = visibleDataColumns[target.columnIndex];
-        if (!row || !column || !(column.isEditable ?? false)) {
-          return;
-        }
-
-        setEditingCell({ rowId: getRowId(row), columnId: column.id });
-        return;
-      }
-
-      if (event.key === "Escape") {
-        setEditingCell(null);
-        return;
-      }
-
-      const commandKey = event.metaKey || event.ctrlKey;
-      const redoCommand =
-        commandKey && (event.key.toLowerCase() === "y" || (event.shiftKey && event.key.toLowerCase() === "z"));
-
-      if (mergedFeatures.undo && commandKey && event.key.toLowerCase() === "z" && !event.shiftKey) {
-        const entry = undoStack.popUndo();
-        if (!entry) {
-          return;
-        }
-
-        event.preventDefault();
-        const { optimisticUpdate, patches } = buildUndoSnapshotUpdate(entry, "previous");
-
-        setOptimisticRows((current) => ({
-          ...current,
-          ...optimisticUpdate
-        }));
-
-        if (!dataSource.updateRows) {
-          return;
-        }
-
-        try {
-          await dataSource.updateRows(patches);
-        } catch (error) {
-          undoStack.popRedo();
-          const rollbackUpdate = buildUndoSnapshotUpdate(entry, "next").optimisticUpdate;
-          setOptimisticRows((current) => ({
-            ...current,
-            ...rollbackUpdate
-          }));
-          toast.error(`Undo failed: ${String(error)}`);
-        }
-        return;
-      }
-
-      if (mergedFeatures.undo && redoCommand) {
-        const entry = undoStack.popRedo();
-        if (!entry) {
-          return;
-        }
-
-        event.preventDefault();
-        const { optimisticUpdate, patches } = buildUndoSnapshotUpdate(entry, "next");
-
-        setOptimisticRows((current) => ({
-          ...current,
-          ...optimisticUpdate
-        }));
-
-        if (!dataSource.updateRows) {
-          return;
-        }
-
-        try {
-          await dataSource.updateRows(patches);
-        } catch (error) {
-          undoStack.popUndo();
-          const rollbackUpdate = buildUndoSnapshotUpdate(entry, "previous").optimisticUpdate;
-          setOptimisticRows((current) => ({
-            ...current,
-            ...rollbackUpdate
-          }));
-          toast.error(`Redo failed: ${String(error)}`);
-        }
-        return;
-      }
-
-      if (commandKey && event.key.toLowerCase() === "c") {
-        event.preventDefault();
-        void copySelection();
-        return;
-      }
-
-      if (commandKey && event.key.toLowerCase() === "v" && mergedFeatures.clipboardPaste) {
-        // Keep default browser paste event and conditionally handle it via onPaste in selection mode.
-      }
-    },
-    [
-      activeCell,
-      copySelection,
-      dataSource,
-      editingCell,
-      getRowId,
-      mergedFeatures.cellSelect,
-      mergedFeatures.clipboardPaste,
-      mergedFeatures.editing,
-      mergedFeatures.undo,
-      displayedRows,
-      moveActiveCell,
-      undoStack,
-      visibleDataColumns
-    ]
-  );
-
-  const commitDraftRow = useCallback(async (nextDraftRow?: Partial<TRow>) => {
-    if (!mergedFeatures.rowAdd || !dataSource.createRow) {
-      return;
-    }
-
-    const currentDraftRow = nextDraftRow ?? draftRowRef.current;
-    const hasValues = Object.values(currentDraftRow).some((value) => hasDraftCellValue(value));
-    if (!hasValues) {
-      return;
-    }
-
-    const candidate = currentDraftRow as TRow;
-
-    for (const column of orderedColumns) {
-      const value = candidate[column.field];
-      if (value === undefined) {
-        continue;
-      }
-      const validation = validateCell(column, candidate, value);
-      if (!validation.ok) {
-        return;
-      }
-    }
-
-    const rowValidation = validateRow(rowSchema, candidate);
-    if (!rowValidation.ok) {
-      return;
-    }
-
-    try {
-      await dataSource.createRow(currentDraftRow);
-      draftRowRef.current = {};
-      setDraftRow({});
-      setDraftEditingColumnId(null);
-      rowsResult.refresh();
-      toast.success("Row added");
-    } catch (error) {
-      toast.error(`Failed to create row: ${String(error)}`);
-    }
-  }, [
-    dataSource,
-    mergedFeatures.rowAdd,
-    orderedColumns,
+  const { copySelection, pasteFromText } = useTableClipboard({
+    activeCell,
+    rangeStart,
+    visibleDataColumns,
+    displayedRows,
+    getRowId,
     rowSchema,
-    rowsResult
-  ]);
+    updateRows: dataSource.updateRows,
+    clipboardCopyEnabled: mergedFeatures.clipboardCopy,
+    clipboardPasteEnabled: mergedFeatures.clipboardPaste,
+    editingEnabled: mergedFeatures.editing,
+    cellSelectEnabled: mergedFeatures.cellSelect,
+    editingCell,
+    undoEnabled: mergedFeatures.undo,
+    undoStack,
+    setOptimisticRows
+  });
 
-  const commitDraftCell = useCallback(
-    (column: DataTableColumn<TRow>, value: DataTableCellValue) => {
-      const nextDraftRow = {
-        ...draftRowRef.current,
-        [column.field]: value
-      };
-
-      draftRowRef.current = nextDraftRow;
-      setDraftRow(nextDraftRow);
-      setDraftEditingColumnId(null);
-    },
-    []
-  );
-
-  const cancelDraftCellEdit = useCallback(() => {
-    setDraftEditingColumnId(null);
-  }, []);
-
-  const setColumnFilter = useCallback((columnId: string, nextFilter: DataTableFilter | null) => {
-    setColumnFilters((current) => {
-      const next = fromTanStackFilters(current).filter((entry) => entry.columnId !== columnId);
-      if (nextFilter && isActiveFilterValue(nextFilter.value)) {
-        next.push(nextFilter);
-      }
-      return toTanStackFilters(next);
-    });
-  }, []);
-
-  const selectedFilterOperator = useCallback(
-    (column: DataTableColumn<TRow>): FilterOperator => {
-      const allowed = filterOperatorsForColumn(column);
-      const activeOperator = filterByColumnId.get(column.id)?.op;
-      if (activeOperator && allowed.includes(activeOperator)) {
-        return activeOperator;
-      }
-
-      const draftOperator = filterOperatorDrafts[column.id];
-      if (draftOperator && allowed.includes(draftOperator)) {
-        return draftOperator;
-      }
-
-      return defaultFilterOperatorForColumn(column);
-    },
-    [filterByColumnId, filterOperatorDrafts]
-  );
-
-  const setColumnFilterOperator = useCallback(
-    (column: DataTableColumn<TRow>, operator: FilterOperator): void => {
-      setFilterOperatorDrafts((current) => ({
-        ...current,
-        [column.id]: operator
-      }));
-
-      const activeFilter = filterByColumnId.get(column.id);
-      if (!activeFilter) {
-        return;
-      }
-
-      let nextValue = activeFilter.value;
-      if (operator === "in" && !Array.isArray(nextValue)) {
-        const seed = String(nextValue ?? "").trim();
-        nextValue = seed.length > 0 ? [seed] : [];
-      }
-      if (operator !== "in" && Array.isArray(nextValue)) {
-        nextValue = nextValue[0] ?? "";
-      }
-
-      setColumnFilter(column.id, {
-        columnId: column.id,
-        op: operator,
-        value: nextValue
-      });
-    },
-    [filterByColumnId, setColumnFilter]
-  );
-
-  const selectColumnFilterTextValue = useCallback(
-    (column: DataTableColumn<TRow>): string => {
-      const filter = filterByColumnId.get(column.id);
-      if (!filter || Array.isArray(filter.value)) {
-        return "";
-      }
-      if (filter.value === null) {
-        return "";
-      }
-      return String(filter.value);
-    },
-    [filterByColumnId]
-  );
-
-  const setColumnFilterTextValue = useCallback(
-    (column: DataTableColumn<TRow>, rawValue: string): void => {
-      const operator = selectedFilterOperator(column);
-      if (rawValue.trim().length === 0) {
-        setColumnFilter(column.id, null);
-        return;
-      }
-
-      if (column.kind === "number" || column.kind === "currency") {
-        const parsed = Number(rawValue);
-        if (Number.isNaN(parsed)) {
-          setColumnFilter(column.id, null);
-          return;
-        }
-        setColumnFilter(column.id, {
-          columnId: column.id,
-          op: operator,
-          value: parsed
-        });
-        return;
-      }
-
-      setColumnFilter(column.id, {
-        columnId: column.id,
-        op: operator,
-        value: rawValue
-      });
-    },
-    [selectedFilterOperator, setColumnFilter]
-  );
-
-  const selectColumnFilterValues = useCallback(
-    (column: DataTableColumn<TRow>): ReadonlyArray<string> => {
-      const filter = filterByColumnId.get(column.id);
-      if (!filter) {
-        return [];
-      }
-      if (Array.isArray(filter.value)) {
-        return filter.value;
-      }
-      if (typeof filter.value === "string" && filter.value.trim().length > 0) {
-        return [filter.value];
-      }
-      return [];
-    },
-    [filterByColumnId]
-  );
-
-  const toggleColumnFilterInValue = useCallback(
-    (column: DataTableColumn<TRow>, value: string, enabled: boolean): void => {
-      const currentValues = [...selectColumnFilterValues(column)];
-      const withoutCurrent = currentValues.filter((entry) => entry !== value);
-      const nextValues = enabled ? [...withoutCurrent, value] : withoutCurrent;
-
-      setFilterOperatorDrafts((current) => ({
-        ...current,
-        [column.id]: "in"
-      }));
-
-      if (nextValues.length === 0) {
-        setColumnFilter(column.id, null);
-        return;
-      }
-
-      setColumnFilter(column.id, {
-        columnId: column.id,
-        op: "in",
-        value: nextValues
-      });
-    },
-    [selectColumnFilterValues, setColumnFilter]
-  );
-
-  const clearColumnFilter = useCallback(
-    (columnId: string): void => {
-      setColumnFilter(columnId, null);
-    },
-    [setColumnFilter]
-  );
-
-  const updatePinnedColumn = useCallback((columnId: string, side: "left" | "right" | "none") => {
-    setColumnPinning((current) => {
-      const left = (current.left ?? []).filter((id) => id !== columnId);
-      const right = (current.right ?? []).filter((id) => id !== columnId);
-
-      if (side === "left") {
-        left.push(columnId);
-      }
-      if (side === "right") {
-        right.push(columnId);
-      }
-
-      return {
-        left,
-        right
-      };
-    });
-  }, []);
-
-  const setColumnSortDirection = useCallback((columnId: string, direction: "asc" | "desc") => {
-    setSorting((current) => {
-      const activeSort = current[0];
-      if (activeSort?.id === columnId && activeSort.desc === (direction === "desc")) {
-        return [];
-      }
-
-      return [{ id: columnId, desc: direction === "desc" }];
-    });
-    setColumnMenuId(null);
-  }, []);
-
-  const moveColumnByDrop = useCallback((sourceColumnId: string, targetColumnId: string, placement: DropPlacement) => {
-    const next = reorderDataColumnsByPinZone({
-      columnOrder: normalizedColumnOrder,
-      columnPinning: normalizedColumnPinning,
-      sourceColumnId,
-      targetColumnId,
-      placement
-    });
-
-    if (!next.changed) {
-      return;
-    }
-
-    setColumnOrder(next.columnOrder);
-    setColumnPinning(next.columnPinning);
-  }, [normalizedColumnOrder, normalizedColumnPinning]);
-
-  const onHeaderDragStart = useCallback(
-    (event: DragEvent<HTMLElement>, columnId: string): void => {
-      event.dataTransfer.effectAllowed = "move";
-      event.dataTransfer.setData("text/plain", columnId);
-      const dragPreview = event.currentTarget.closest("th");
-      if (dragPreview) {
-        const previewRect = dragPreview.getBoundingClientRect();
-        const offsetX = Math.max(0, event.clientX - previewRect.left);
-        const offsetY = Math.max(0, event.clientY - previewRect.top);
-        event.dataTransfer.setDragImage(dragPreview, offsetX, offsetY);
-      }
-      setColumnMenuId(null);
-      setDraggingColumnId(columnId);
-      setDragOverTarget(null);
-    },
-    []
-  );
-
-  const onHeaderDragOver = useCallback(
-    (event: DragEvent<HTMLTableCellElement>, targetColumnId: string): void => {
-      if (!draggingColumnId || draggingColumnId === targetColumnId) {
-        return;
-      }
-
-      const sourceZone = pinZoneForColumnId(draggingColumnId, columnPinning);
-      const targetZone = pinZoneForColumnId(targetColumnId, columnPinning);
-      if (sourceZone !== targetZone) {
-        return;
-      }
-
-      event.preventDefault();
-      const rect = event.currentTarget.getBoundingClientRect();
-      const placement: DropPlacement = event.clientX < rect.left + rect.width / 2 ? "before" : "after";
-      setDragOverTarget({
-        columnId: targetColumnId,
-        placement
-      });
-    },
-    [columnPinning, draggingColumnId]
-  );
-
-  const onHeaderDrop = useCallback(
-    (event: DragEvent<HTMLTableCellElement>, targetColumnId: string): void => {
-      if (!draggingColumnId) {
-        return;
-      }
-
-      event.preventDefault();
-      const rect = event.currentTarget.getBoundingClientRect();
-      const placement: DropPlacement = event.clientX < rect.left + rect.width / 2 ? "before" : "after";
-      moveColumnByDrop(draggingColumnId, targetColumnId, placement);
-      setDraggingColumnId(null);
-      setDragOverTarget(null);
-    },
-    [draggingColumnId, moveColumnByDrop]
-  );
-
-  const onHeaderDragEnd = useCallback((): void => {
-    setDraggingColumnId(null);
-    setDragOverTarget(null);
-  }, []);
+  const { onGridKeyDown } = useTableKeyboard({
+    activeCell,
+    editingCell,
+    editingEnabled: mergedFeatures.editing,
+    cellSelectEnabled: mergedFeatures.cellSelect,
+    clipboardPasteEnabled: mergedFeatures.clipboardPaste,
+    undoEnabled: mergedFeatures.undo,
+    displayedRows,
+    visibleDataColumns,
+    getRowId,
+    moveActiveCell,
+    setEditingCell,
+    copySelection,
+    undoStack,
+    updateRows: dataSource.updateRows,
+    setOptimisticRows
+  });
 
   const [resizingRow, setResizingRow] = useState<{ rowId: RowId; startHeight: number; startY: number } | null>(
     null
   );
-
-  const beginColumnResize = useCallback((args: {
-    ownerDocument: Document;
-    columnId: string;
-    startWidth: number;
-    startX: number;
-    minWidth: number;
-    maxWidth: number | null;
-  }): void => {
-    const maxWidth = args.maxWidth ?? Number.MAX_SAFE_INTEGER;
-
-    const applyNextWidth = (clientX: number): void => {
-      const delta = clientX - args.startX;
-      const nextWidth = clamp(args.startWidth + delta, args.minWidth, maxWidth);
-      const normalizedWidth = `${Math.round(nextWidth)}px`;
-
-      for (const headerCell of args.ownerDocument.querySelectorAll<HTMLElement>(`th[data-column-id='${args.columnId}']`)) {
-        headerCell.style.boxSizing = "border-box";
-        headerCell.style.width = normalizedWidth;
-        headerCell.style.minWidth = normalizedWidth;
-        headerCell.style.maxWidth = normalizedWidth;
-        headerCell.style.flex = `0 0 ${normalizedWidth}`;
-      }
-
-      for (const gridCell of args.ownerDocument.querySelectorAll<HTMLElement>(
-        `[role='gridcell'][data-column-id='${args.columnId}']`
-      )) {
-        const bodyCell = gridCell.closest("td");
-        if (!(bodyCell instanceof HTMLElement)) {
-          continue;
-        }
-
-        bodyCell.style.boxSizing = "border-box";
-        bodyCell.style.width = normalizedWidth;
-        bodyCell.style.minWidth = normalizedWidth;
-        bodyCell.style.maxWidth = normalizedWidth;
-        bodyCell.style.flex = `0 0 ${normalizedWidth}`;
-      }
-
-      flushSync(() => {
-        setColumnSizing((current) => {
-          const roundedWidth = Math.round(nextWidth);
-          if (current[args.columnId] === roundedWidth) {
-            return current;
-          }
-
-          return {
-            ...current,
-            [args.columnId]: roundedWidth
-          };
-        });
-      });
-    };
-
-    const cleanup = (): void => {
-      args.ownerDocument.removeEventListener("mousemove", onMouseMove);
-      args.ownerDocument.removeEventListener("mouseup", onMouseUp);
-      args.ownerDocument.removeEventListener("touchmove", onTouchMove);
-      args.ownerDocument.removeEventListener("touchend", onTouchEnd);
-    };
-
-    const onMouseMove = (event: MouseEvent): void => {
-      applyNextWidth(event.clientX);
-    };
-
-    const onMouseUp = (): void => {
-      cleanup();
-    };
-
-    const onTouchMove = (event: TouchEvent): void => {
-      const touch = event.touches[0];
-      if (!touch) {
-        return;
-      }
-
-      applyNextWidth(touch.clientX);
-    };
-
-    const onTouchEnd = (): void => {
-      cleanup();
-    };
-
-    args.ownerDocument.addEventListener("mousemove", onMouseMove);
-    args.ownerDocument.addEventListener("mouseup", onMouseUp);
-    args.ownerDocument.addEventListener("touchmove", onTouchMove, { passive: true });
-    args.ownerDocument.addEventListener("touchend", onTouchEnd);
-    applyNextWidth(args.startX + 1);
-  }, []);
 
   useEffect(() => {
     if (!resizingRow) {
@@ -2806,131 +1079,43 @@ export function DataTable<TRow extends DataTableRowModel>({
       )}
       style={rootStyle}
     >
-      <div className="mb-3 grid gap-3 md:grid-cols-[1fr_auto]">
-        <div className="flex flex-wrap items-center gap-2">
-          {mergedFeatures.rowAdd && dataSource.createRow ? (
-            <Button
-              size="sm"
-              onClick={() => {
-                const hasPendingDraftValues = Object.values(draftRowRef.current).some((value) =>
-                  hasDraftCellValue(value)
-                );
+      <TableToolbar
+        canAddRow={mergedFeatures.rowAdd && Boolean(dataSource.createRow)}
+        canDeleteRows={mergedFeatures.rowDelete && Boolean(dataSource.deleteRows)}
+        canCopySelection={mergedFeatures.clipboardCopy}
+        canManageVisibility={mergedFeatures.columnVisibility}
+        isLoadingRows={rowsResult.isLoading}
+        hiddenColumns={hiddenColumns}
+        orderedColumns={orderedColumns}
+        table={table}
+        rowSelection={rowSelection}
+        mergedRows={mergedRows}
+        getRowId={getRowId}
+        onAddRow={() => {
+          const hasPendingDraftValues = Object.values(draftRowRef.current).some((value) =>
+            hasDraftCellValue(value)
+          );
 
-                rowVirtualizer.scrollToIndex(displayedRows.length, { align: "end" });
+          rowVirtualizer.scrollToIndex(displayedRows.length, { align: "end" });
 
-                if (hasPendingDraftValues) {
-                  void commitDraftRow();
-                  return;
-                }
+          if (hasPendingDraftValues) {
+            void commitDraftRow();
+            return;
+          }
 
-                if (firstVisibleDraftColumnId) {
-                  setEditingCell(null);
-                  setDraftEditingColumnId(firstVisibleDraftColumnId);
-                }
-              }}
-            >
-              <Plus className="h-4 w-4" />
-              Add row
-            </Button>
-          ) : null}
-          {mergedFeatures.rowDelete && dataSource.deleteRows ? (
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={Object.keys(rowSelection).length === 0}
-              onClick={() => {
-                const selectedRows = mergedRows.filter((row) => rowSelection[getRowId(row)]);
-                void deleteRowsNow(selectedRows);
-              }}
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete selected
-            </Button>
-          ) : null}
-          {mergedFeatures.clipboardCopy ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                void copySelection();
-              }}
-            >
-              <Copy className="h-4 w-4" />
-              Copy
-            </Button>
-          ) : null}
-          {rowsResult.isLoading ? (
-            <span className="inline-flex items-center gap-1 text-xs text-slate-500">
-              <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-              Loading rows...
-            </span>
-          ) : null}
-        </div>
-
-        {mergedFeatures.columnVisibility && hiddenColumns.length > 0 ? (
-          <details className="group relative min-w-[280px]">
-            <summary className="flex cursor-pointer list-none items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
-              <span className="inline-flex items-center gap-1">
-                <Rows3 className="h-4 w-4" />
-                Hidden columns ({hiddenColumns.length})
-              </span>
-              <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
-            </summary>
-            <div className="absolute right-0 z-30 mt-2 max-h-72 w-[360px] overflow-auto rounded-md border border-slate-200 bg-white p-2 shadow-xl">
-              <div className="mb-2 flex items-center justify-between border-b border-slate-200 px-2 pb-2">
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Column visibility</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    for (const column of hiddenColumns) {
-                      table.getColumn(column.id)?.toggleVisibility(true);
-                    }
-                  }}
-                >
-                  Show all hidden
-                </Button>
-              </div>
-              {orderedColumns.map((column) => {
-                const isVisible = table.getColumn(column.id)?.getIsVisible() ?? true;
-                return (
-                  <div
-                    key={column.id}
-                    data-hidden-column-row={column.id}
-                    className={cn(
-                      "grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-md px-2 py-1.5",
-                      isVisible ? "" : "bg-amber-50/60"
-                    )}
-                  >
-                    <span className="text-sm text-slate-700">{column.header}</span>
-                    <span
-                      className={cn(
-                        "inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide",
-                        isVisible ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"
-                      )}
-                    >
-                      {isVisible ? "Visible" : "Hidden"}
-                    </span>
-                    {!isVisible ? (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => {
-                          table.getColumn(column.id)?.toggleVisibility(true);
-                        }}
-                      >
-                        Show
-                      </Button>
-                    ) : (
-                      <span />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </details>
-        ) : null}
-      </div>
+          if (firstVisibleDraftColumnId) {
+            setEditingCell(null);
+            setDraftEditingColumnId(firstVisibleDraftColumnId);
+          }
+        }}
+        onDeleteSelected={() => {
+          const selectedRows = mergedRows.filter((row) => rowSelection[getRowId(row)]);
+          void deleteRowsNow(selectedRows);
+        }}
+        onCopy={() => {
+          void copySelection();
+        }}
+      />
 
       <div
         className="rounded-md border border-slate-200 bg-[linear-gradient(180deg,hsl(210_50%_98%),hsl(210_35%_97%))]"
@@ -2994,633 +1179,77 @@ export function DataTable<TRow extends DataTableRowModel>({
               fontFamily: "var(--dt-font-family)"
             }}
           >
-            <thead
-              className="sticky top-0 z-30"
-              style={{
-                display: "grid",
-                background: "var(--dt-header-bg)"
+            <TableHeader
+              table={table}
+              columnById={columnById}
+              columnRenderLayout={columnRenderLayout}
+              columnSizing={columnSizing}
+              fixedTrackStyle={fixedTrackStyle}
+              columnMenuId={columnMenuId}
+              columnMenuAnchorById={columnMenuAnchorById}
+              dragOverTarget={dragOverTarget}
+              mergedFeatures={{
+                columnSort: mergedFeatures.columnSort,
+                columnFilter: mergedFeatures.columnFilter,
+                columnVisibility: mergedFeatures.columnVisibility,
+                columnPinning: mergedFeatures.columnPinning,
+                columnReorder: mergedFeatures.columnReorder,
+                columnResize: mergedFeatures.columnResize
               }}
-            >
-              {table.getHeaderGroups().map((headerGroup) => (
-                <tr
-                  key={headerGroup.id}
-                  style={{
-                    display: "flex",
-                    width: `${columnRenderLayout.tableRenderWidth}px`
-                  }}
-                >
-                  {headerGroup.headers.map((header) => {
-                    const columnConfig = columnById.get(header.column.id);
-                    const isDataColumn = Boolean(columnConfig);
-                    const centerHeaderContent = shouldCenterHeaderContent(header.column.id);
-                    const canSort = Boolean(columnConfig) && mergedFeatures.columnSort && header.column.getCanSort();
-                    const canFilter = Boolean(columnConfig) && mergedFeatures.columnFilter && (columnConfig?.isFilterable ?? true);
-                    const canHide = Boolean(columnConfig) && mergedFeatures.columnVisibility && header.column.getCanHide();
-                    const canPin = Boolean(columnConfig) && mergedFeatures.columnPinning && (columnConfig?.isPinnable ?? true);
-                    const canReorder = Boolean(columnConfig) && mergedFeatures.columnReorder && (columnConfig?.isReorderable ?? true);
-                    const currentFilter = columnConfig ? filterByColumnId.get(columnConfig.id) : undefined;
-                    const hasFilter = Boolean(currentFilter && isActiveFilterValue(currentFilter.value));
-                    const isMenuOpen = columnMenuId === columnConfig?.id;
-                    const sortState = header.column.getIsSorted();
-                    const filterOperators = columnConfig ? filterOperatorsForColumn(columnConfig) : [];
-                    const activeFilterOperator = columnConfig ? selectedFilterOperator(columnConfig) : "contains";
-                    const textFilterValue = columnConfig ? selectColumnFilterTextValue(columnConfig) : "";
-                    const selectedFilterValues = columnConfig ? selectColumnFilterValues(columnConfig) : [];
-                    const dropIndicator =
-                      dragOverTarget && columnConfig && dragOverTarget.columnId === columnConfig.id
-                        ? dragOverTarget.placement === "before"
-                          ? "inset 3px 0 0 hsl(199 89% 48%)"
-                          : "inset -3px 0 0 hsl(199 89% 48%)"
-                        : undefined;
-                    const fallbackHeader = columnConfig?.header ?? "column";
-                    const resizeLabel =
-                      typeof header.column.columnDef.header === "string" ||
-                      typeof header.column.columnDef.header === "number"
-                        ? String(header.column.columnDef.header)
-                        : fallbackHeader;
-                    const pinnedState = header.column.getIsPinned();
-                    const isPinned = pinnedState === "left" || pinnedState === "right";
-                    let menuActionGridColumns = "grid-cols-1";
-                    if (isPinned && canPin && canHide) {
-                      menuActionGridColumns = "grid-cols-2";
-                    } else if (canPin && canHide) {
-                      menuActionGridColumns = "grid-cols-3";
-                    } else if (canPin) {
-                      menuActionGridColumns = "grid-cols-2";
-                    }
-                    const renderWidth = columnRenderLayout.renderWidthsById[header.column.id] ?? header.getSize();
-                    const leftOffset = columnRenderLayout.leftPinnedOffsetById[header.column.id];
-                    const rightOffset = columnRenderLayout.rightPinnedOffsetById[header.column.id];
-                    const isActionHeader = header.column.id === ACTIONS_COLUMN_ID;
+              filterByColumnId={filterByColumnId}
+              selectedFilterOperator={selectedFilterOperator}
+              selectColumnFilterTextValue={selectColumnFilterTextValue}
+              selectColumnFilterValues={selectColumnFilterValues}
+              setColumnFilterOperator={setColumnFilterOperator}
+              setColumnFilterTextValue={setColumnFilterTextValue}
+              toggleColumnFilterInValue={toggleColumnFilterInValue}
+              clearColumnFilter={clearColumnFilter}
+              toggleColumnMenu={toggleColumnMenu}
+              setColumnMenuId={setColumnMenuId}
+              updatePinnedColumn={updatePinnedColumn}
+              setColumnSortDirection={setColumnSortDirection}
+              onHeaderDragStart={onHeaderDragStart}
+              onHeaderDragOver={onHeaderDragOver}
+              onHeaderDrop={onHeaderDrop}
+              onHeaderDragEnd={onHeaderDragEnd}
+              beginColumnResize={beginColumnResize}
+            />
 
-                    return (
-                      <th
-                        key={header.id}
-                        onDragOver={
-                          canReorder && columnConfig
-                            ? (event) => {
-                                onHeaderDragOver(event, columnConfig.id);
-                              }
-                            : undefined
-                        }
-                        onDrop={
-                          canReorder && columnConfig
-                            ? (event) => {
-                                onHeaderDrop(event, columnConfig.id);
-                              }
-                            : undefined
-                        }
-                        data-column-id={columnConfig?.id}
-                        data-column-sort-status={sortState || "none"}
-                        data-column-filter-active={hasFilter ? "true" : "false"}
-                        data-pinned-state={pinnedState || "center"}
-                        className={cn(
-                          "group relative border-b border-r border-[var(--dt-border-color)] px-2 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600",
-                          isActionHeader ? "border-l border-l-[var(--dt-border-color)]" : "",
-                          pinnedState
-                            ? "sticky z-30 shadow-[var(--dt-pinned-shadow)] [background:var(--dt-pinned-header-bg)]"
-                            : "[background:var(--dt-header-bg)]"
-                        )}
-                        style={{
-                          ...fixedTrackStyle(renderWidth),
-                          boxShadow: dropIndicator,
-                          left: pinnedState === "left" ? `${leftOffset ?? 0}px` : undefined,
-                          right: pinnedState === "right" ? `${rightOffset ?? 0}px` : undefined
-                        }}
-                      >
-                        <div
-                          className={cn(
-                            "flex w-full items-center gap-1",
-                            centerHeaderContent ? "justify-center" : "justify-between"
-                          )}
-                        >
-                          <div
-                            className={cn(
-                              "inline-flex min-w-0 items-center gap-1",
-                              centerHeaderContent ? "w-full justify-center" : undefined
-                            )}
-                          >
-                            {canReorder && columnConfig ? (
-                              <button
-                                type="button"
-                                draggable
-                                onDragStart={(event) => {
-                                  onHeaderDragStart(event, columnConfig.id);
-                                }}
-                                onDragEnd={onHeaderDragEnd}
-                                data-column-reorder-handle={columnConfig.id}
-                                aria-label={`Reorder ${fallbackHeader}`}
-                                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-400 opacity-0 transition hover:text-slate-600 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 group-hover:opacity-100"
-                              >
-                                <GripVertical className="h-3.5 w-3.5 cursor-grab active:cursor-grabbing" />
-                              </button>
-                            ) : null}
-                            <span className="truncate text-left">
-                              {flexRender(header.column.columnDef.header, header.getContext())}
-                            </span>
-                            <span className="inline-flex items-center gap-1">
-                              {sortState === "asc" ? (
-                                <span className="inline-flex items-center text-sky-700" aria-label="Sorted ascending">
-                                  <ChevronUp className="h-3.5 w-3.5" />
-                                </span>
-                              ) : sortState === "desc" ? (
-                                <span className="inline-flex items-center text-sky-700" aria-label="Sorted descending">
-                                  <ChevronDown className="h-3.5 w-3.5" />
-                                </span>
-                              ) : null}
-                              {hasFilter ? (
-                                <span className="inline-flex items-center text-emerald-700" aria-label="Filter active">
-                                  <Filter className="h-3.5 w-3.5" />
-                                </span>
-                              ) : null}
-                            </span>
-                          </div>
-
-                          {isDataColumn ? (
-                            <div className="relative" data-dt-column-menu-root="true">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 px-2"
-                                data-column-menu-trigger={columnConfig?.id}
-                                onClick={(event) => {
-                                  if (!columnConfig) {
-                                    return;
-                                  }
-                                  const nextOpen = columnMenuId === columnConfig.id ? null : columnConfig.id;
-                                  setColumnMenuId(nextOpen);
-                                  if (nextOpen) {
-                                    const nextAnchor = resolveColumnMenuAnchor(event.currentTarget);
-                                    setColumnMenuAnchorById((current) => ({
-                                      ...current,
-                                      [columnConfig.id]: nextAnchor
-                                    }));
-                                    const existingOperator = filterByColumnId.get(columnConfig.id)?.op;
-                                    if (existingOperator) {
-                                      setFilterOperatorDrafts((current) => ({
-                                        ...current,
-                                        [columnConfig.id]: existingOperator
-                                      }));
-                                    }
-                                  }
-                                }}
-                              >
-                                <MoreVertical className="h-3.5 w-3.5" />
-                                <span className="sr-only">Open column menu</span>
-                              </Button>
-
-                              {isMenuOpen && columnConfig ? (
-                                <div
-                                  role="dialog"
-                                  aria-label={`${columnConfig.header} options`}
-                                  className={cn(
-                                    "absolute z-40 mt-1 w-72 rounded-md border border-slate-200 bg-white p-2 shadow-xl",
-                                    columnMenuAnchorById[columnConfig.id] === "left" ? "left-0" : "right-0"
-                                  )}
-                                >
-                                  <div className="mb-2 border-b border-slate-200 pb-2">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                      {columnConfig.header}
-                                    </p>
-                                  </div>
-
-                                  {canSort ? (
-                                    <div className="mb-2 grid grid-cols-2 gap-1 border-b border-slate-200 pb-2">
-                                      <Button
-                                        variant={sortState === "asc" ? "secondary" : "ghost"}
-                                        size="sm"
-                                        onClick={() => {
-                                          setColumnSortDirection(columnConfig.id, "asc");
-                                        }}
-                                      >
-                                        <ChevronUp className="h-3.5 w-3.5" />
-                                        Sort asc
-                                      </Button>
-                                      <Button
-                                        variant={sortState === "desc" ? "secondary" : "ghost"}
-                                        size="sm"
-                                        onClick={() => {
-                                          setColumnSortDirection(columnConfig.id, "desc");
-                                        }}
-                                      >
-                                        <ChevronDown className="h-3.5 w-3.5" />
-                                        Sort desc
-                                      </Button>
-                                    </div>
-                                  ) : null}
-
-                                  {(canHide || canPin) && (
-                                    <div className="mb-2 space-y-2 border-b border-slate-200 pb-2">
-                                      <div
-                                        className={cn(
-                                          "grid gap-1",
-                                          menuActionGridColumns
-                                        )}
-                                      >
-                                        {canPin && !isPinned ? (
-                                          <>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={() => {
-                                                updatePinnedColumn(columnConfig.id, "left");
-                                              }}
-                                            >
-                                              <Pin className="h-3.5 w-3.5" />
-                                              Left
-                                            </Button>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={() => {
-                                                updatePinnedColumn(columnConfig.id, "right");
-                                              }}
-                                            >
-                                              <Pin className="h-3.5 w-3.5" />
-                                              Right
-                                            </Button>
-                                          </>
-                                        ) : null}
-                                        {canPin && isPinned ? (
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => {
-                                              updatePinnedColumn(columnConfig.id, "none");
-                                            }}
-                                          >
-                                            <PinOff className="h-3.5 w-3.5" />
-                                            Unpin
-                                          </Button>
-                                        ) : null}
-                                        {canHide ? (
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => {
-                                              table.getColumn(columnConfig.id)?.toggleVisibility(false);
-                                              setColumnMenuId(null);
-                                            }}
-                                          >
-                                            <EyeOff className="h-3.5 w-3.5" />
-                                            Hide
-                                          </Button>
-                                        ) : null}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {canFilter ? (
-                                    <div className="space-y-2">
-                                      <div className="flex items-center justify-between">
-                                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                          Filter
-                                        </span>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => {
-                                            clearColumnFilter(columnConfig.id);
-                                          }}
-                                        >
-                                          Clear
-                                        </Button>
-                                      </div>
-
-                                      {filterOperators.length > 1 ? (
-                                        <select
-                                          value={activeFilterOperator}
-                                          onChange={(event) => {
-                                            setColumnFilterOperator(columnConfig, event.target.value as FilterOperator);
-                                          }}
-                                          className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm outline-none ring-offset-2 focus:ring-2 focus:ring-sky-500"
-                                        >
-                                          {filterOperators.map((operator) => (
-                                            <option key={`${columnConfig.id}-${operator}`} value={operator}>
-                                              {operator}
-                                            </option>
-                                          ))}
-                                        </select>
-                                      ) : (
-                                        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs font-medium text-slate-600">
-                                          Operator: {filterOperators[0]}
-                                        </div>
-                                      )}
-
-                                      {columnConfig.kind === "select" || columnConfig.kind === "multiselect" ? (
-                                        <div className="max-h-36 space-y-1 overflow-auto rounded-md border border-slate-200 p-2">
-                                          {columnConfig.options.map((option) => {
-                                            return (
-                                              <label
-                                                key={`${columnConfig.id}-${option.value}`}
-                                                className="flex items-center gap-2 text-xs text-slate-700"
-                                              >
-                                                <Checkbox
-                                                  checked={selectedFilterValues.includes(option.value)}
-                                                  onChange={(event) => {
-                                                    toggleColumnFilterInValue(
-                                                      columnConfig,
-                                                      option.value,
-                                                      event.target.checked
-                                                    );
-                                                  }}
-                                                />
-                                                {option.label}
-                                              </label>
-                                            );
-                                          })}
-                                        </div>
-                                      ) : null}
-
-                                      {columnConfig.kind !== "select" && columnConfig.kind !== "multiselect" ? (
-                                        <Input
-                                          type={
-                                            columnConfig.kind === "number" || columnConfig.kind === "currency"
-                                              ? "number"
-                                              : columnConfig.kind === "date"
-                                                ? "date"
-                                              : "text"
-                                          }
-                                          value={textFilterValue}
-                                          onChange={(event) => {
-                                            setColumnFilterTextValue(columnConfig, event.target.value);
-                                          }}
-                                          placeholder="Filter value"
-                                          className="h-9 text-sm"
-                                        />
-                                      ) : null}
-                                    </div>
-                                  ) : null}
-                                </div>
-                              ) : null}
-                            </div>
-                          ) : null}
-
-                          {mergedFeatures.columnResize && header.column.getCanResize() ? (
-                            <button
-                              type="button"
-                              className="absolute right-0 top-0 h-full w-2 cursor-col-resize bg-transparent hover:bg-sky-200"
-                              data-column-resize-handle={header.column.id}
-                              draggable={false}
-                              onMouseDown={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                const headerRect = event.currentTarget.closest("th")?.getBoundingClientRect();
-                                const startX = Number.isFinite(event.clientX)
-                                  ? event.clientX
-                                  : Math.round((headerRect?.right ?? 0) - 1);
-                                beginColumnResize({
-                                  ownerDocument: event.currentTarget.ownerDocument,
-                                  columnId: header.column.id,
-                                  startWidth: columnSizing[header.column.id] ?? header.getSize(),
-                                  startX,
-                                  minWidth: header.column.columnDef.minSize ?? 20,
-                                  maxWidth: header.column.columnDef.maxSize ?? null
-                                });
-                              }}
-                              onTouchStart={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                const touch = event.touches[0];
-                                const headerRect = event.currentTarget.closest("th")?.getBoundingClientRect();
-                                const startX = touch
-                                  ? touch.clientX
-                                  : Math.round((headerRect?.right ?? 0) - 1);
-
-                                beginColumnResize({
-                                  ownerDocument: event.currentTarget.ownerDocument,
-                                  columnId: header.column.id,
-                                  startWidth: columnSizing[header.column.id] ?? header.getSize(),
-                                  startX,
-                                  minWidth: header.column.columnDef.minSize ?? 20,
-                                  maxWidth: header.column.columnDef.maxSize ?? null
-                                });
-                              }}
-                              aria-label={`Resize ${resizeLabel}`}
-                            />
-                          ) : null}
-                        </div>
-                      </th>
-                    );
-                  })}
-                </tr>
-              ))}
-            </thead>
-
-            <tbody
-              style={{
-                display: "grid",
-                height: `${totalHeight}px`,
-                position: "relative",
-                width: `${columnRenderLayout.tableRenderWidth}px`,
-                minWidth: `${columnRenderLayout.tableRenderWidth}px`
+            <TableBody
+              tableRows={tableRows}
+              displayedRows={displayedRows}
+              virtualItems={virtualItems}
+              totalHeight={totalHeight}
+              rowAddEnabled={mergedFeatures.rowAdd}
+              rowResizeEnabled={mergedFeatures.rowResize}
+              canCreateRow={Boolean(dataSource.createRow)}
+              draftRowId={DRAFT_ROW_ID}
+              draftRow={draftRow}
+              draftEditingColumnId={draftEditingColumnId}
+              visibleLeafColumnsInUiOrder={visibleLeafColumnsInUiOrder}
+              columnById={columnById}
+              columnRenderLayout={columnRenderLayout}
+              visibleDataColumnIndexById={visibleDataColumnIndexById}
+              fixedTrackStyle={fixedTrackStyle}
+              isDraftValuePresent={hasDraftCellValue}
+              onBeginDraftEdit={(columnId) => {
+                setEditingCell(null);
+                setDraftEditingColumnId(columnId);
               }}
-            >
-              {virtualItems.map((virtualRow) => {
-                const rowIndex = virtualRow.index;
-                const isDraft = rowIndex >= displayedRows.length;
-
-                if (isDraft) {
-                  if (!mergedFeatures.rowAdd || !dataSource.createRow) {
-                    return null;
-                  }
-
-                  const draftCandidateRow = draftRow as TRow;
-
-                  return (
-                    <tr
-                      key={DRAFT_ROW_ID}
-                      className="absolute left-0 bg-slate-50"
-                      style={{
-                        display: "flex",
-                        transform: `translateY(${virtualRow.start}px)`,
-                        height: `${virtualRow.size}px`,
-                        width: `${columnRenderLayout.tableRenderWidth}px`
-                      }}
-                      data-row-id={DRAFT_ROW_ID}
-                      data-index={rowIndex}
-                    >
-                      {visibleLeafColumnsInUiOrder.map((column) => {
-                        const columnConfig = columnById.get(column.id);
-                        const renderWidth = columnRenderLayout.renderWidthsById[column.id] ?? column.getSize();
-                        const widthStyle = fixedTrackStyle(renderWidth);
-
-                        if (!columnConfig) {
-                          return (
-                            <td
-                              key={`draft-${column.id}`}
-                              style={widthStyle}
-                              className={cn(
-                                "border-r border-b border-slate-200 bg-slate-50",
-                                column.id === ACTIONS_COLUMN_ID ? "border-l border-l-slate-200" : ""
-                              )}
-                            />
-                          );
-                        }
-
-                        const value = draftRow[columnConfig.field];
-                        const isEditingDraftCell = draftEditingColumnId === columnConfig.id;
-                        const draftColumnIndex = visibleDataColumnIndexById[columnConfig.id] ?? 0;
-                        const showPlaceholder = !hasDraftCellValue(value);
-                        const content = isEditingDraftCell
-                          ? renderColumnEditor({
-                              column: columnConfig,
-                              row: draftCandidateRow,
-                              rowId: DRAFT_ROW_ID,
-                              value,
-                              onCommit: (nextValue) => {
-                                commitDraftCell(columnConfig, nextValue);
-                              },
-                              onCancel: cancelDraftCellEdit
-                            })
-                          : showPlaceholder
-                            ? (
-                                <span className="text-sm text-slate-400">{`Add ${columnConfig.header}`}</span>
-                              )
-                            : (
-                                renderColumnContent({
-                                  column: columnConfig,
-                                  row: draftCandidateRow,
-                                  rowId: DRAFT_ROW_ID,
-                                  value,
-                                  isEditing: false
-                                })
-                              );
-
-                        return (
-                          <td
-                            key={`draft-${column.id}`}
-                            style={widthStyle}
-                            className="border-r border-b border-slate-200 bg-slate-50 p-0 align-top"
-                          >
-                            <div
-                              role="gridcell"
-                              data-row-id={DRAFT_ROW_ID}
-                              data-row-index={rowIndex}
-                              data-column-id={columnConfig.id}
-                              data-column-index={draftColumnIndex}
-                              className={cn(
-                                "group relative box-border h-full min-h-10 w-full min-w-0 px-2 py-1 text-sm text-slate-800",
-                                isEditingDraftCell &&
-                                  (columnConfig.kind === "select" ||
-                                    columnConfig.kind === "multiselect" ||
-                                    columnConfig.kind === "date")
-                                  ? "z-20 overflow-visible bg-white"
-                                  : "overflow-hidden",
-                                isEditingDraftCell ? "outline outline-2 outline-[var(--dt-active-cell-ring)] outline-offset-[-2px]" : ""
-                              )}
-                              onClick={() => {
-                                setEditingCell(null);
-                                setDraftEditingColumnId(columnConfig.id);
-                              }}
-                              onDoubleClick={() => {
-                                setEditingCell(null);
-                                setDraftEditingColumnId(columnConfig.id);
-                              }}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter" || event.key === "F2") {
-                                  event.preventDefault();
-                                  setEditingCell(null);
-                                  setDraftEditingColumnId(columnConfig.id);
-                                }
-                              }}
-                              tabIndex={0}
-                            >
-                              {content}
-                              {!isEditingDraftCell ? (
-                                <span className="pointer-events-none absolute right-1 top-1 hidden rounded bg-white/80 p-0.5 text-slate-500 group-hover:block">
-                                  <Pencil className="h-3 w-3" />
-                                </span>
-                              ) : (
-                                <span className="pointer-events-none absolute right-1 top-1 rounded bg-emerald-100 p-0.5 text-emerald-700">
-                                  <Check className="h-3 w-3" />
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                }
-
-                const rowModel = tableRows[rowIndex];
-                const row = displayedRows[rowIndex];
-                if (!rowModel || !row) {
-                  return null;
-                }
-
-                const rowId = getRowId(row);
-                const top = virtualRow.start;
-                const isRowActionMenuOpen = rowActionMenuRowId === rowId;
-
-                return (
-                  <tr
-                    key={rowModel.id}
-                    ref={getRowRefHandler(rowId)}
-                    className={cn(
-                      "group absolute left-0 overflow-visible bg-[var(--dt-row-bg)] transition-colors hover:bg-[var(--dt-row-hover-bg)]",
-                      isRowActionMenuOpen ? "z-50" : "z-0"
-                    )}
-                    style={{
-                      display: "flex",
-                      transform: `translateY(${top}px)`,
-                      minHeight: `${rowHeights.getFinalHeight(rowId)}px`,
-                      width: `${columnRenderLayout.tableRenderWidth}px`
-                    }}
-                    data-row-id={rowId}
-                    data-index={rowIndex}
-                  >
-                    {rowModel.getVisibleCells().map((cell) => {
-                      const pinned = cell.column.getIsPinned();
-                      const renderWidth = columnRenderLayout.renderWidthsById[cell.column.id] ?? cell.column.getSize();
-                      const leftOffset = columnRenderLayout.leftPinnedOffsetById[cell.column.id];
-                      const rightOffset = columnRenderLayout.rightPinnedOffsetById[cell.column.id];
-                      const isActionCell = cell.column.id === ACTIONS_COLUMN_ID;
-                      const isOpenActionMenuCell = isActionCell && rowActionMenuRowId === rowId;
-                      return (
-                        <td
-                          key={cell.id}
-                          data-pinned-state={pinned || "center"}
-                          className={cn(
-                            "border-r border-b border-[var(--dt-border-color)] p-0 align-top",
-                            isActionCell ? "relative overflow-visible border-l border-l-[var(--dt-border-color)]" : "",
-                            isOpenActionMenuCell ? "z-40" : "",
-                            pinned
-                              ? isOpenActionMenuCell
-                                ? "sticky z-40 shadow-[var(--dt-pinned-shadow)] [background:var(--dt-pinned-row-bg)] group-hover:[background:var(--dt-pinned-row-hover-bg)]"
-                                : "sticky z-10 shadow-[var(--dt-pinned-shadow)] [background:var(--dt-pinned-row-bg)] group-hover:[background:var(--dt-pinned-row-hover-bg)]"
-                              : ""
-                          )}
-                          style={{
-                            ...fixedTrackStyle(renderWidth),
-                            left: pinned === "left" ? `${leftOffset ?? 0}px` : undefined,
-                            right: pinned === "right" ? `${rightOffset ?? 0}px` : undefined
-                          }}
-                        >
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </td>
-                      );
-                    })}
-                    {mergedFeatures.rowResize ? (
-                      <button
-                        type="button"
-                        className="absolute bottom-0 left-0 z-10 h-1 w-full cursor-row-resize bg-transparent hover:bg-sky-200"
-                        aria-label={`Resize row ${rowId}`}
-                        onPointerDown={(event) => {
-                          event.preventDefault();
-                          setResizingRow({
-                            rowId,
-                            startHeight: rowHeights.getFinalHeight(rowId),
-                            startY: event.clientY
-                          });
-                        }}
-                      />
-                    ) : null}
-                  </tr>
-                );
-              })}
-            </tbody>
+              onCommitDraftCell={commitDraftCell}
+              onCancelDraftEdit={cancelDraftCellEdit}
+              getRowId={getRowId}
+              rowActionMenuRowId={rowActionMenuRowId}
+              getRowRefHandler={getRowRefHandler}
+              rowHeights={rowHeights}
+              onStartRowResize={(rowId, clientY) => {
+                setResizingRow({
+                  rowId,
+                  startHeight: rowHeights.getFinalHeight(rowId),
+                  startY: clientY
+                });
+              }}
+            />
           </table>
         </div>
       </div>
@@ -3639,14 +1268,6 @@ export function DataTable<TRow extends DataTableRowModel>({
           outline-offset: 2px;
         }
       `}</style>
-    </div>
-  );
-}
-
-export function DataTableContainer({ children }: { children: ReactNode }): JSX.Element {
-  return (
-    <div className="relative overflow-visible rounded-3xl bg-[radial-gradient(circle_at_20%_20%,rgba(125,211,252,0.35),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(253,224,71,0.28),transparent_38%),linear-gradient(180deg,#ffffff,#f1f5f9)] p-3 sm:p-5">
-      {children}
     </div>
   );
 }

@@ -238,7 +238,7 @@ describe("managed columns", () => {
 
     expect(
       buildManagedColumnOrder({
-        dataColumnIds: ["title", "status", "amount"],
+        dataColumnIds: reordered.columnOrder,
         userColumnOrder: reordered.columnOrder,
         includeSelect: true,
         includeActions: true
@@ -247,7 +247,7 @@ describe("managed columns", () => {
 
     expect(
       buildManagedColumnPinning({
-        dataColumnIds: ["title", "status", "amount"],
+        dataColumnIds: reordered.columnOrder,
         userColumnPinning: reordered.columnPinning,
         includeSelect: true,
         includeActions: true

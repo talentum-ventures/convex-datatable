@@ -1,0 +1,101 @@
+import { useEffect, useRef } from "react";
+import { cn } from "../../core/cn";
+import type { DataTableRowModel } from "../../core/types";
+import {
+  focusEditableAtEnd,
+  parseEditorValue,
+  readEditableText,
+  setEditableText,
+  type DefaultEditorProps
+} from "./shared";
+
+export type InlineContentEditorProps<TRow extends DataTableRowModel> = DefaultEditorProps<TRow> & {
+  initialText: string;
+};
+
+export function InlineContentEditor<TRow extends DataTableRowModel>({
+  column,
+  row,
+  onCommit,
+  onCancel,
+  initialText
+}: InlineContentEditorProps<TRow>): JSX.Element {
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  const draftRef = useRef(initialText);
+  const finalizedRef = useRef(false);
+
+  useEffect(() => {
+    const node = editorRef.current;
+    if (!node) {
+      return;
+    }
+
+    setEditableText(node, initialText);
+    focusEditableAtEnd(node);
+  }, [initialText]);
+
+  const commit = (): void => {
+    if (finalizedRef.current) {
+      return;
+    }
+
+    finalizedRef.current = true;
+    const parsed = parseEditorValue(column, draftRef.current, row);
+    onCommit(parsed);
+  };
+
+  const cancel = (): void => {
+    if (finalizedRef.current) {
+      return;
+    }
+
+    finalizedRef.current = true;
+    onCancel();
+  };
+
+  return (
+    <div data-dt-editor-root="true" className="h-full w-full">
+      <div
+        ref={editorRef}
+        role="textbox"
+        aria-label={`Edit ${column.header}`}
+        aria-multiline={column.kind === "longText"}
+        contentEditable
+        suppressContentEditableWarning
+        spellCheck={column.kind === "text" || column.kind === "longText"}
+        className={cn(
+          "h-full min-h-8 w-full cursor-text whitespace-pre-wrap break-words bg-transparent text-sm text-slate-900 outline-none",
+          column.kind === "text" || column.kind === "number" || column.kind === "currency" || column.kind === "link"
+            ? "whitespace-nowrap"
+            : ""
+        )}
+        onInput={(event) => {
+          draftRef.current = readEditableText(event.currentTarget);
+        }}
+        onBlur={() => {
+          commit();
+        }}
+        onKeyDown={(event) => {
+          event.stopPropagation();
+
+          if (event.key === "Escape") {
+            event.preventDefault();
+            cancel();
+            return;
+          }
+
+          if (event.key === "Tab") {
+            event.preventDefault();
+            commit();
+            return;
+          }
+
+          if (event.key === "Enter" && (column.kind !== "longText" || !event.shiftKey)) {
+            event.preventDefault();
+            commit();
+          }
+        }}
+      />
+    </div>
+  );
+}

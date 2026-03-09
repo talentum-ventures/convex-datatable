@@ -247,23 +247,13 @@ export function buildManagedColumnPinning({
   includeSelect,
   includeActions
 }: ManagedColumnPinningArgs): ColumnPinningState {
-  const sanitizedPinning = sanitizeDataColumnPinning({
+  const sanitized = sanitizeDataColumnPinning({
     dataColumnIds,
     userColumnPinning
   });
-  const left = [...(sanitizedPinning.left ?? [])];
-  const right = [...(sanitizedPinning.right ?? [])];
-
-  if (includeSelect) {
-    left.unshift(SELECT_COLUMN_ID);
-  }
-
-  if (includeActions) {
-    right.push(ACTIONS_COLUMN_ID);
-  }
 
   return {
-    left,
-    right
+    left: [...(includeSelect ? [SELECT_COLUMN_ID] : []), ...(sanitized.left ?? [])],
+    right: [...(sanitized.right ?? []), ...(includeActions ? [ACTIONS_COLUMN_ID] : [])]
   };
 }

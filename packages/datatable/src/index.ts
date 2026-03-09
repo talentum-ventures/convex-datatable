@@ -1,4 +1,5 @@
-export { DataTable, DataTableContainer } from "./ui/data-table";
+export { DataTable } from "./ui/data-table";
+export { DataTableContainer } from "./ui/data-table-container";
 export { useConvexDataSource } from "./convex/use-convex-data-source";
 export { useConvexPresence } from "./convex/use-convex-presence";
 export type {
@@ -62,4 +63,4 @@ export {
   type DebugDetails,
   type DebugEventEntry,
   type DebugScalar
-} from "./core/debug";
+} from "./debug";

@@ -1,0 +1,100 @@
+Rolha Grid LLM Reference
+
+Purpose
+- Production-ready React datatable library in `packages/datatable`
+- Public API must remain stable through `packages/datatable/src/index.ts`
+- No authored `any` or `unknown`
+
+Layer Rules
+- `core/`: pure logic and public types only
+- `engine/`: TanStack bridge and column/state helpers
+- `hooks/`: extracted stateful table logic
+- `ui/`: React presentation and orchestration
+- No upward imports
+
+Key Entry Points
+- `packages/datatable/src/index.ts`: public exports
+- `packages/datatable/src/ui/data-table.tsx`: main orchestrator
+- `packages/datatable/src/ui/data-table-container.tsx`: outer visual wrapper
+- `packages/datatable/src/engine/column-def-builder.tsx`: column rendering/editor bridge
+- `packages/datatable/src/hooks/use-table-state.ts`: persisted TanStack state
+- `packages/datatable/src/hooks/use-table-filters.ts`: filter drafting and mutation
+- `packages/datatable/src/hooks/use-table-selection.ts`: active cell and range state
+
+Public API Types
+- `DataTableProps<TRow>`
+- `DataTableColumn<TRow>`
+- `DataTableDataSource<TRow>`
+- `DataTableRowAction<TRow>`
+- `DataTableFeatureFlags`
+- `DataTableThemeTokens`
+- `CollaboratorPresence`
+- `ConvexDataSourceConfig<TRow>`
+- `ConvexPresenceConfig`
+
+Column Kind Map
+- `text`: string
+- `longText`: string
+- `number`: number
+- `currency`: number
+- `select`: string + `options`
+- `multiselect`: `ReadonlyArray<string>` + `options`
+- `link`: string URL
+- `date`: `string | Date`
+- `reactNode`: custom render/editor/clipboard hooks
+
+Important Internal Files
+- `core/filtering.ts`: filter operators, active-value checks, client query application
+- `core/sorting.ts`: comparable sort values and comparison
+- `engine/managed-columns.ts`: utility columns, pinning/order normalization
+- `engine/visible-column-order.ts`: visible UI order helpers
+- `virtual/scroll.ts`: active-cell scroll syncing
+- `selection/clipboard.ts`: TSV parsing/serializing and paste expansion
+
+Common Modification Recipes
+- Add a new column kind:
+  1. Extend `DataTableColumnKind` and type unions in `core/types.ts`
+  2. Add formatting/parsing support in `core/formatters.ts` or editor shared helpers
+  3. Update default render/editor handling in `engine/build-columns.tsx` or extracted editor/renderer modules
+  4. Update filtering support in `core/filtering.ts` if needed
+  5. Add unit and Cypress coverage
+
+- Add a new persisted table state field:
+  1. Extend `PersistedTableState` in `core/types.ts`
+  2. Update `persistence/query-codec.ts`
+  3. Update `engine/state-converters.ts`
+  4. Update `hooks/use-table-state.ts`
+  5. Add query-codec and public behavior tests
+
+- Change selection behavior:
+  1. Prefer `hooks/use-table-selection.ts`
+  2. Keep coordinate math centralized
+  3. Verify keyboard and paste Cypress specs
+
+- Change column menus or header behavior:
+  1. Start in `ui/data-table.tsx`
+  2. Preserve managed utility column invariants
+  3. Re-run component Cypress
+
+Quality Gates
+- `bun run typecheck`
+- `bun run lint`
+- `bun run format:check`
+- `bun run test:unit`
+- `bun run test:types`
+- `bun run test:cypress:component`
+- `bun run test:cypress:e2e`
+- `bun run build`
+
+Test Files Worth Checking First
+- `packages/datatable/src/ui/data-table.test.ts`
+- `cypress/component/datatable.cy.tsx`
+- `tests/types/public-api.test.ts`
+- `packages/datatable/src/engine/managed-columns.test.ts`
+- `packages/datatable/src/engine/visible-column-order.test.ts`
+
+Conventions
+- Prefer `rg` for search
+- Use `apply_patch` for edits
+- Keep helpers narrow and non-repetitive
+- Avoid leaking TanStack types into the external API

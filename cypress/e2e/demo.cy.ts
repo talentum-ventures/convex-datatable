@@ -7,12 +7,12 @@ describe("demo app", () => {
     cy.contains("Rolha Grid").should("exist");
     cy.contains("Project 1").should("exist");
 
-    cy.get("[data-column-menu-trigger='website']").click();
+    cy.get("[data-column-menu-trigger='status']").click();
     cy.contains("button", "Hide").click();
-    cy.findByRole("columnheader", { name: /Website/i }).should("not.exist");
+    cy.findByRole("columnheader", { name: /Status/i }).should("not.exist");
     cy.contains("Hidden columns (1)").click();
-    cy.get("[data-hidden-column-row='website']").contains("button", "Show").click();
-    cy.findByRole("columnheader", { name: /Website/i }).should("exist");
+    cy.get("[data-hidden-column-row='status']").contains("button", "Show").click();
+    cy.findByRole("columnheader", { name: /Status/i }).should("exist");
     cy.contains("th", "Actions").should("not.exist");
     cy.findByLabelText("Open actions for row 1").click();
     cy.findByRole("menu", { name: "Actions for row 1" }).within(() => {

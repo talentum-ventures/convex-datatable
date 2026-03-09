@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef } from "react";
-import type { DataTableRowModel, RowId } from "./types";
+import type { DataTableRowModel, RowId } from "../core/types";
 
 const MAX_UNDO_ENTRIES = 50;
 
