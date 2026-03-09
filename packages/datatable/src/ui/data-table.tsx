@@ -29,6 +29,7 @@ import {
   ChevronDown,
   ChevronUp,
   Copy,
+  EyeOff,
   Filter,
   GripVertical,
   LoaderCircle,
@@ -150,7 +151,11 @@ function isEditableKeyboardTarget(target: EventTarget | null): boolean {
     return true;
   }
 
-  return element.isContentEditable;
+  if (element.isContentEditable) {
+    return true;
+  }
+
+  return element.closest("[data-dt-editor-root='true']") !== null;
 }
 
 type CssVarsStyle = CSSProperties & {
@@ -1517,7 +1522,9 @@ export function DataTable<TRow extends DataTableRowModel>({
 
   const onGridKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
-      if (mergedFeatures.cellSelect && !isEditableKeyboardTarget(event.target)) {
+      const targetOwnsKeyboard = isEditableKeyboardTarget(event.target);
+
+      if (mergedFeatures.cellSelect && !targetOwnsKeyboard) {
         if (event.key === "ArrowDown") {
           event.preventDefault();
           moveActiveCell(1, 0, event.shiftKey);
@@ -1538,6 +1545,10 @@ export function DataTable<TRow extends DataTableRowModel>({
           moveActiveCell(0, 1, event.shiftKey);
           return;
         }
+      }
+
+      if (targetOwnsKeyboard) {
+        return;
       }
 
       if ((event.key === "Enter" || event.key === "F2") && mergedFeatures.editing) {
@@ -1813,7 +1824,14 @@ export function DataTable<TRow extends DataTableRowModel>({
   }, []);
 
   const setColumnSortDirection = useCallback((columnId: string, direction: "asc" | "desc") => {
-    setSorting([{ id: columnId, desc: direction === "desc" }]);
+    setSorting((current) => {
+      const activeSort = current[0];
+      if (activeSort?.id === columnId && activeSort.desc === (direction === "desc")) {
+        return [];
+      }
+
+      return [{ id: columnId, desc: direction === "desc" }];
+    });
     setColumnMenuId(null);
   }, []);
 
@@ -2217,6 +2235,15 @@ export function DataTable<TRow extends DataTableRowModel>({
                         ? String(header.column.columnDef.header)
                         : fallbackHeader;
                     const pinnedState = header.column.getIsPinned();
+                    const isPinned = pinnedState === "left" || pinnedState === "right";
+                    let menuActionGridColumns = "grid-cols-1";
+                    if (isPinned && canPin && canHide) {
+                      menuActionGridColumns = "grid-cols-2";
+                    } else if (canPin && canHide) {
+                      menuActionGridColumns = "grid-cols-3";
+                    } else if (canPin) {
+                      menuActionGridColumns = "grid-cols-2";
+                    }
                     const renderWidth = columnRenderLayout.renderWidthsById[header.column.id] ?? header.getSize();
                     const leftOffset = columnRenderLayout.leftPinnedOffsetById[header.column.id];
                     const rightOffset = columnRenderLayout.rightPinnedOffsetById[header.column.id];
@@ -2368,44 +2395,39 @@ export function DataTable<TRow extends DataTableRowModel>({
 
                                   {(canHide || canPin) && (
                                     <div className="mb-2 space-y-2 border-b border-slate-200 pb-2">
-                                      {canHide ? (
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="w-full justify-start"
-                                          onClick={() => {
-                                            table.getColumn(columnConfig.id)?.toggleVisibility(false);
-                                            setColumnMenuId(null);
-                                          }}
-                                        >
-                                          Hide
-                                        </Button>
-                                      ) : null}
-
-                                      {canPin ? (
-                                        <div className="grid grid-cols-3 gap-1">
+                                      <div
+                                        className={cn(
+                                          "grid gap-1",
+                                          menuActionGridColumns
+                                        )}
+                                      >
+                                        {canPin && !isPinned ? (
+                                          <>
+                                            <Button
+                                              variant={pinnedState === "left" ? "secondary" : "ghost"}
+                                              size="sm"
+                                              onClick={() => {
+                                                updatePinnedColumn(columnConfig.id, "left");
+                                              }}
+                                            >
+                                              <Pin className="h-3.5 w-3.5" />
+                                              Left
+                                            </Button>
+                                            <Button
+                                              variant={pinnedState === "right" ? "secondary" : "ghost"}
+                                              size="sm"
+                                              onClick={() => {
+                                                updatePinnedColumn(columnConfig.id, "right");
+                                              }}
+                                            >
+                                              <Pin className="h-3.5 w-3.5" />
+                                              Right
+                                            </Button>
+                                          </>
+                                        ) : null}
+                                        {canPin && isPinned ? (
                                           <Button
-                                            variant={header.column.getIsPinned() === "left" ? "secondary" : "ghost"}
-                                            size="sm"
-                                            onClick={() => {
-                                              updatePinnedColumn(columnConfig.id, "left");
-                                            }}
-                                          >
-                                            <Pin className="h-3.5 w-3.5" />
-                                            Left
-                                          </Button>
-                                          <Button
-                                            variant={header.column.getIsPinned() === "right" ? "secondary" : "ghost"}
-                                            size="sm"
-                                            onClick={() => {
-                                              updatePinnedColumn(columnConfig.id, "right");
-                                            }}
-                                          >
-                                            <Pin className="h-3.5 w-3.5" />
-                                            Right
-                                          </Button>
-                                          <Button
-                                            variant={header.column.getIsPinned() ? "secondary" : "ghost"}
+                                            variant="ghost"
                                             size="sm"
                                             onClick={() => {
                                               updatePinnedColumn(columnConfig.id, "none");
@@ -2414,8 +2436,21 @@ export function DataTable<TRow extends DataTableRowModel>({
                                             <PinOff className="h-3.5 w-3.5" />
                                             Unpin
                                           </Button>
-                                        </div>
-                                      ) : null}
+                                        ) : null}
+                                        {canHide ? (
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                              table.getColumn(columnConfig.id)?.toggleVisibility(false);
+                                              setColumnMenuId(null);
+                                            }}
+                                          >
+                                            <EyeOff className="h-3.5 w-3.5" />
+                                            Hide
+                                          </Button>
+                                        ) : null}
+                                      </div>
                                     </div>
                                   )}
 
@@ -2759,7 +2794,7 @@ export function DataTable<TRow extends DataTableRowModel>({
 
 export function DataTableContainer({ children }: { children: ReactNode }): JSX.Element {
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-[radial-gradient(circle_at_20%_20%,rgba(125,211,252,0.35),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(253,224,71,0.28),transparent_38%),linear-gradient(180deg,#ffffff,#f1f5f9)] p-3 sm:p-5">
+    <div className="relative overflow-visible rounded-3xl bg-[radial-gradient(circle_at_20%_20%,rgba(125,211,252,0.35),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(253,224,71,0.28),transparent_38%),linear-gradient(180deg,#ffffff,#f1f5f9)] p-3 sm:p-5">
       {children}
     </div>
   );

@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { ColumnDef, Table } from "@tanstack/react-table";
 import { Check, ExternalLink, Link as LinkIcon, Pencil } from "lucide-react";
 import type {
@@ -12,6 +13,7 @@ import type {
 } from "../core/types";
 import { cn } from "../core/cn";
 import { formatColumnValue, parseDateValue, parseTextNumber } from "../core/formatters";
+import { Input } from "../ui/primitives";
 import { getVisibleDataColumnIdsInUiOrder } from "../ui/visible-column-order";
 
 type ActiveCell = CellCoord | null;
@@ -140,110 +142,581 @@ function toReactValue(value: DataTableCellValue): DataTableReactValue {
 type DefaultEditorProps<TRow extends DataTableRowModel> = {
   column: DataTableColumn<TRow>;
   row: TRow;
-  rowId: RowId;
   value: DataTableCellValue;
   onCommit: (value: DataTableCellValue) => void;
   onCancel: () => void;
 };
 
+function editorTextValue<TRow extends DataTableRowModel>(
+  column: DataTableColumn<TRow>,
+  value: DataTableCellValue
+): string {
+  if (Array.isArray(value)) {
+    return value.join(", ");
+  }
+
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  if (column.kind === "date") {
+    if (typeof value === "string") {
+      return value;
+    }
+    if (value instanceof Date) {
+      return value.toISOString().slice(0, 10);
+    }
+  }
+
+  return String(value);
+}
+
+function setEditableText(node: HTMLDivElement, value: string): void {
+  if (node.textContent === value) {
+    return;
+  }
+  node.textContent = value;
+}
+
+function readEditableText(node: HTMLDivElement): string {
+  return node.textContent?.replace(/\u00a0/g, " ") ?? "";
+}
+
+function focusEditableAtEnd(node: HTMLDivElement): void {
+  node.focus({ preventScroll: true });
+
+  const selection = window.getSelection();
+  if (!selection) {
+    return;
+  }
+
+  const range = document.createRange();
+  range.selectNodeContents(node);
+  range.collapse(false);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function dateInputValue(value: string): string {
+  const raw = value.trim();
+  if (raw.length === 0) {
+    return "";
+  }
+
+  const matchedIsoDate = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (matchedIsoDate?.[1]) {
+    return matchedIsoDate[1];
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+type NodeContainerRef = {
+  current: Node | null;
+};
+
+function containsInRefs(target: EventTarget | null, refs: ReadonlyArray<NodeContainerRef>): boolean {
+  if (!(target instanceof Node)) {
+    return false;
+  }
+
+  for (const ref of refs) {
+    if (ref.current?.contains(target)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function useDropdownPosition(anchorRef: NodeContainerRef): CSSProperties {
+  const [style, setStyle] = useState<CSSProperties>({
+    left: 0,
+    top: 0,
+    visibility: "hidden"
+  });
+
+  useEffect(() => {
+    const anchor = anchorRef.current;
+    if (!(anchor instanceof HTMLElement)) {
+      return;
+    }
+
+    const ownerWindow = anchor.ownerDocument.defaultView;
+    const grid = anchor.closest<HTMLElement>("[role='grid']");
+    let frameId = 0;
+
+    const updatePosition = (): void => {
+      const nextAnchor = anchorRef.current;
+      if (!(nextAnchor instanceof HTMLElement)) {
+        return;
+      }
+
+      const rect = nextAnchor.getBoundingClientRect();
+      setStyle({
+        left: rect.left,
+        top: rect.bottom + 4,
+        visibility: "visible"
+      });
+    };
+
+    const schedulePositionUpdate = (): void => {
+      if (!ownerWindow) {
+        updatePosition();
+        return;
+      }
+
+      ownerWindow.cancelAnimationFrame(frameId);
+      frameId = ownerWindow.requestAnimationFrame(updatePosition);
+    };
+
+    schedulePositionUpdate();
+
+    grid?.addEventListener("scroll", schedulePositionUpdate, { passive: true });
+    ownerWindow?.addEventListener("resize", schedulePositionUpdate);
+    ownerWindow?.addEventListener("scroll", schedulePositionUpdate, true);
+
+    const resizeObserver =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => schedulePositionUpdate());
+    resizeObserver?.observe(anchor);
+
+    return () => {
+      if (ownerWindow) {
+        ownerWindow.cancelAnimationFrame(frameId);
+        ownerWindow.removeEventListener("resize", schedulePositionUpdate);
+        ownerWindow.removeEventListener("scroll", schedulePositionUpdate, true);
+      }
+      grid?.removeEventListener("scroll", schedulePositionUpdate);
+      resizeObserver?.disconnect();
+    };
+  }, [anchorRef]);
+
+  return style;
+}
+
+function OptionBadge({
+  option,
+  isSelected,
+  isActive
+}: {
+  option: SelectOption;
+  isSelected: boolean;
+  isActive: boolean;
+}): JSX.Element {
+  const Icon = option.icon;
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+        option.colorClass,
+        isActive ? "ring-2 ring-slate-900/10 ring-offset-1 ring-offset-white" : "",
+        isSelected ? "shadow-[inset_0_0_0_1px_rgba(15,23,42,0.12)]" : ""
+      )}
+    >
+      {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
+      {option.label}
+    </span>
+  );
+}
+
+type InlineContentEditorProps<TRow extends DataTableRowModel> = DefaultEditorProps<TRow> & {
+  initialText: string;
+};
+
+function InlineContentEditor<TRow extends DataTableRowModel>({
+  column,
+  row,
+  onCommit,
+  onCancel,
+  initialText
+}: InlineContentEditorProps<TRow>): JSX.Element {
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  const draftRef = useRef(initialText);
+  const finalizedRef = useRef(false);
+
+  useEffect(() => {
+    const node = editorRef.current;
+    if (!node) {
+      return;
+    }
+
+    setEditableText(node, initialText);
+    focusEditableAtEnd(node);
+  }, [initialText]);
+
+  const commit = (): void => {
+    if (finalizedRef.current) {
+      return;
+    }
+
+    finalizedRef.current = true;
+    const parsed = parseEditorValue(column, draftRef.current, row);
+    onCommit(parsed);
+  };
+
+  const cancel = (): void => {
+    if (finalizedRef.current) {
+      return;
+    }
+
+    finalizedRef.current = true;
+    onCancel();
+  };
+
+  return (
+    <div data-dt-editor-root="true" className="h-full w-full">
+      <div
+        ref={editorRef}
+        role="textbox"
+        aria-label={`Edit ${column.header}`}
+        aria-multiline={column.kind === "longText"}
+        contentEditable
+        suppressContentEditableWarning
+        spellCheck={column.kind === "text" || column.kind === "longText"}
+        className={cn(
+          "h-full min-h-8 w-full cursor-text whitespace-pre-wrap break-words bg-transparent text-sm text-slate-900 outline-none",
+          column.kind === "text" || column.kind === "number" || column.kind === "currency" || column.kind === "link"
+            ? "whitespace-nowrap"
+            : ""
+        )}
+        onInput={(event) => {
+          draftRef.current = readEditableText(event.currentTarget);
+        }}
+        onBlur={() => {
+          commit();
+        }}
+        onKeyDown={(event) => {
+          event.stopPropagation();
+
+          if (event.key === "Escape") {
+            event.preventDefault();
+            cancel();
+            return;
+          }
+
+          if (event.key === "Tab") {
+            event.preventDefault();
+            commit();
+            return;
+          }
+
+          if (event.key === "Enter" && (column.kind !== "longText" || !event.shiftKey)) {
+            event.preventDefault();
+            commit();
+          }
+        }}
+      />
+    </div>
+  );
+}
+
+type SelectMenuEditorProps<TRow extends DataTableRowModel> = DefaultEditorProps<TRow> & {
+  column: Extract<DataTableColumn<TRow>, { kind: "select" }>;
+};
+
+function SelectMenuEditor<TRow extends DataTableRowModel>({
+  column,
+  value,
+  onCommit,
+  onCancel
+}: SelectMenuEditorProps<TRow>): JSX.Element {
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const dropdownStyle = useDropdownPosition(wrapperRef);
+  const portalRoot = typeof document === "undefined" ? null : document.body;
+  const [activeIndex, setActiveIndex] = useState(() => {
+    const selectedIndex = column.options.findIndex((option) => option.value === String(value ?? ""));
+    return selectedIndex >= 0 ? selectedIndex : 0;
+  });
+
+  useEffect(() => {
+    listRef.current?.focus({ preventScroll: true });
+  }, []);
+
+  useEffect(() => {
+    const activeNode = listRef.current?.querySelector<HTMLElement>("[data-select-option-active='true']");
+    activeNode?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex]);
+
+  const selectedOption = findOption(column.options, String(value ?? ""));
+
+  const commitIndex = (index: number): void => {
+    const option = column.options[index];
+    if (!option) {
+      onCancel();
+      return;
+    }
+    onCommit(option.value);
+  };
+
+  const moveActive = (delta: number): void => {
+    if (column.options.length === 0) {
+      return;
+    }
+
+    const lastIndex = column.options.length - 1;
+    setActiveIndex((current) => Math.min(lastIndex, Math.max(0, current + delta)));
+  };
+
+  return (
+    <div
+      ref={wrapperRef}
+      data-dt-editor-root="true"
+      className="relative h-full w-full"
+      onBlur={(event) => {
+        const nextTarget = event.relatedTarget;
+        if (containsInRefs(nextTarget, [wrapperRef, dialogRef])) {
+          return;
+        }
+        onCancel();
+      }}
+    >
+      <div className="flex h-full w-full items-center">
+        {selectedOption ? (
+          <OptionBadge option={selectedOption} isSelected={true} isActive={false} />
+        ) : (
+          <span className="text-sm text-slate-400">Select value</span>
+        )}
+      </div>
+
+      {portalRoot
+        ? createPortal(
+            <div
+              ref={dialogRef}
+              role="dialog"
+              aria-label={`${column.header} editor`}
+              data-dt-editor-dialog="true"
+              className="fixed z-30 min-w-[220px] max-w-[320px] rounded-xl border border-slate-200 bg-white p-2 shadow-xl"
+              style={dropdownStyle}
+            >
+              <div
+                ref={listRef}
+                role="listbox"
+                tabIndex={0}
+                aria-label={`Edit ${column.header}`}
+                aria-activedescendant={`${column.id}-option-${activeIndex}`}
+                className="flex max-h-56 flex-col gap-1 overflow-auto rounded-lg outline-none"
+                onKeyDown={(event) => {
+                  event.stopPropagation();
+
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    onCancel();
+                    return;
+                  }
+
+                  if (event.key === "ArrowDown" || event.key === "ArrowRight") {
+                    event.preventDefault();
+                    moveActive(1);
+                    return;
+                  }
+
+                  if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
+                    event.preventDefault();
+                    moveActive(-1);
+                    return;
+                  }
+
+                  if (event.key === "Home") {
+                    event.preventDefault();
+                    setActiveIndex(0);
+                    return;
+                  }
+
+                  if (event.key === "End") {
+                    event.preventDefault();
+                    setActiveIndex(Math.max(0, column.options.length - 1));
+                    return;
+                  }
+
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    commitIndex(activeIndex);
+                  }
+                }}
+              >
+                {column.options.map((option, index) => {
+                  const isSelected = option.value === String(value ?? "");
+                  const isActive = index === activeIndex;
+
+                  return (
+                    <button
+                      key={`${column.id}-${option.value}`}
+                      id={`${column.id}-option-${index}`}
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      data-select-option-active={isActive ? "true" : "false"}
+                      className={cn(
+                        "flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left",
+                        isActive ? "bg-slate-100" : "bg-transparent hover:bg-slate-50"
+                      )}
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                      }}
+                      onMouseEnter={() => {
+                        setActiveIndex(index);
+                      }}
+                      onClick={() => {
+                        commitIndex(index);
+                      }}
+                    >
+                      <OptionBadge option={option} isSelected={isSelected} isActive={isActive} />
+                      {isSelected ? <Check className="h-3.5 w-3.5 text-emerald-700" /> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>,
+            portalRoot
+          )
+        : null}
+    </div>
+  );
+}
+
+type DateEditorProps<TRow extends DataTableRowModel> = DefaultEditorProps<TRow> & {
+  initialText: string;
+};
+
+function DateEditor<TRow extends DataTableRowModel>({
+  column,
+  row,
+  onCommit,
+  onCancel,
+  initialText
+}: DateEditorProps<TRow>): JSX.Element {
+  const pickerRef = useRef<HTMLInputElement | null>(null);
+  const draftRef = useRef(initialText);
+  const finalizedRef = useRef(false);
+  const [pickerValue, setPickerValue] = useState(() => dateInputValue(initialText));
+
+  useEffect(() => {
+    const input = pickerRef.current;
+    if (!input) {
+      return;
+    }
+
+    input.focus({ preventScroll: true });
+    if (typeof input.showPicker === "function") {
+      try {
+        input.showPicker();
+      } catch {
+        // Some browsers require a stricter user activation window.
+      }
+    }
+  }, []);
+
+  const syncDraft = (nextValue: string): void => {
+    draftRef.current = nextValue;
+    setPickerValue(nextValue);
+  };
+
+  const commit = (nextValue = draftRef.current): void => {
+    if (finalizedRef.current) {
+      return;
+    }
+
+    finalizedRef.current = true;
+    onCommit(parseEditorValue(column, nextValue, row));
+  };
+
+  const cancel = (): void => {
+    if (finalizedRef.current) {
+      return;
+    }
+
+    finalizedRef.current = true;
+    onCancel();
+  };
+
+  return (
+    <div data-dt-editor-root="true" className="h-full w-full">
+      <Input
+        ref={pickerRef}
+        type="date"
+        aria-label={`Edit ${column.header}`}
+        value={pickerValue}
+        className="h-full min-h-8 rounded-none border-0 bg-transparent px-0 py-0 text-sm text-slate-900 shadow-none focus:ring-0"
+        onChange={(event) => {
+          const nextValue = event.target.value;
+          syncDraft(nextValue);
+          commit(nextValue);
+        }}
+        onBlur={() => {
+          commit();
+        }}
+        onKeyDown={(event) => {
+          event.stopPropagation();
+
+          if (event.key === "Escape") {
+            event.preventDefault();
+            cancel();
+            return;
+          }
+
+          if (event.key === "Tab" || event.key === "Enter") {
+            event.preventDefault();
+            commit();
+          }
+        }}
+      />
+    </div>
+  );
+}
+
 function DefaultEditor<TRow extends DataTableRowModel>({
   column,
   row,
-  rowId,
   value,
   onCommit,
   onCancel
 }: DefaultEditorProps<TRow>): JSX.Element {
-  const [draft, setDraft] = useState<string>(() => {
-    if (Array.isArray(value)) {
-      return value.join(", ");
-    }
-    if (value === null) {
-      return "";
-    }
-    return String(value);
-  });
-
-  const commit = (): void => {
-    const parsed = parseEditorValue(column, draft, row);
-    onCommit(parsed);
-  };
-
-  const onKeyDown = (event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>): void => {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      commit();
-    }
-    if (event.key === "Escape") {
-      event.preventDefault();
-      onCancel();
-    }
-  };
-
-  if (column.kind === "longText") {
+  if (column.kind === "select") {
     return (
-      <textarea
-        aria-label={`Edit ${column.header}`}
-        className="h-full w-full resize-none rounded-md border border-slate-300 bg-white px-2 py-1 text-sm outline-none ring-offset-2 focus:ring-2 focus:ring-sky-500"
-        autoFocus
-        value={draft}
-        onBlur={commit}
-        onKeyDown={onKeyDown}
-        onChange={(event) => {
-          setDraft(event.target.value);
-        }}
+      <SelectMenuEditor
+        column={column}
+        row={row}
+        value={value}
+        onCommit={onCommit}
+        onCancel={onCancel}
       />
     );
   }
 
-  if (column.kind === "select") {
+  const initialText = editorTextValue(column, value);
+
+  if (column.kind === "date") {
     return (
-      <select
-        aria-label={`Edit ${column.header}`}
-        className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-sm outline-none ring-offset-2 focus:ring-2 focus:ring-sky-500"
-        autoFocus
-        value={draft}
-        onBlur={commit}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            onCancel();
-          }
-          if (event.key === "Enter") {
-            commit();
-          }
-        }}
-        onChange={(event) => {
-          setDraft(event.target.value);
-        }}
-      >
-        {column.options.map((option) => (
-          <option key={`${rowId}-${column.id}-${option.value}`} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+      <DateEditor
+        column={column}
+        row={row}
+        value={value}
+        initialText={initialText}
+        onCommit={onCommit}
+        onCancel={onCancel}
+      />
     );
   }
 
-  const type =
-    column.kind === "number" || column.kind === "currency"
-      ? "number"
-      : column.kind === "date"
-        ? "date"
-        : "text";
-
   return (
-    <input
-      aria-label={`Edit ${column.header}`}
-      className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-sm outline-none ring-offset-2 focus:ring-2 focus:ring-sky-500"
-      autoFocus
-      type={type}
-      value={draft}
-      onBlur={commit}
-      onKeyDown={onKeyDown}
-      onChange={(event) => {
-        setDraft(event.target.value);
-      }}
+    <InlineContentEditor
+      column={column}
+      row={row}
+      value={value}
+      initialText={initialText}
+      onCommit={onCommit}
+      onCancel={onCancel}
     />
   );
 }
@@ -316,7 +789,13 @@ function renderDefaultCell<TRow extends DataTableRowModel>(
   const display = formatColumnValue(column, toFormattableValue(value));
 
   return (
-    <span className={cn(column.kind === "text" ? "whitespace-nowrap" : "", column.kind === "longText" ? "whitespace-pre-wrap" : "")}>{display || ""}</span>
+    <span
+      className={cn(
+        column.kind === "text" || column.kind === "longText" ? "whitespace-pre-wrap break-words" : ""
+      )}
+    >
+      {display || ""}
+    </span>
   );
 }
 
@@ -441,7 +920,6 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
             <DefaultEditor
               column={column}
               row={row}
-              rowId={rowId}
               value={value}
               onCommit={(nextValue) => {
                 onCommit({ row, rowId, column, value: nextValue });
@@ -470,8 +948,11 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
             data-column-id={column.id}
             data-column-index={currentCoord.columnIndex}
             className={cn(
-              "group relative box-border h-full min-h-10 w-full min-w-0 overflow-hidden px-2 py-1 text-sm text-slate-800",
-              isRangeSelected ? "bg-[var(--dt-selection-bg)]" : "",
+              "group relative box-border h-full min-h-10 w-full min-w-0 px-2 py-1 text-sm text-slate-800",
+              isEditing && (column.kind === "select" || column.kind === "date")
+                ? "z-20 overflow-visible"
+                : "overflow-hidden",
+              isEditing ? "bg-white" : isRangeSelected ? "bg-[var(--dt-selection-bg)]" : "",
               isSelected ? "outline outline-2 outline-[var(--dt-active-cell-ring)] outline-offset-[-2px]" : ""
             )}
             onClick={(event) => {

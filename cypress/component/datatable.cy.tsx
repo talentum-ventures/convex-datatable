@@ -12,6 +12,11 @@ type TaskRow = {
   website?: string;
 };
 
+type DateRow = {
+  id: string;
+  due: string;
+};
+
 const columns: ReadonlyArray<DataTableColumn<TaskRow>> = [
   {
     id: "title",
@@ -92,6 +97,16 @@ const linkOverflowColumns: ReadonlyArray<DataTableColumn<TaskRow>> = [
   }
 ];
 
+const multilineTextColumns: ReadonlyArray<DataTableColumn<TaskRow>> = [
+  {
+    id: "title",
+    field: "title",
+    header: "Title",
+    kind: "text",
+    width: 160
+  }
+];
+
 const measuredRowColumns: ReadonlyArray<DataTableColumn<TaskRow>> = [
   {
     id: "notes",
@@ -110,6 +125,16 @@ const measuredRowColumns: ReadonlyArray<DataTableColumn<TaskRow>> = [
       { value: "todo", label: "To do", colorClass: "bg-slate-100 text-slate-700" },
       { value: "done", label: "Done", colorClass: "bg-emerald-100 text-emerald-700" }
     ]
+  }
+];
+
+const dateColumns: ReadonlyArray<DataTableColumn<DateRow>> = [
+  {
+    id: "due",
+    field: "due",
+    header: "Due",
+    kind: "date",
+    isEditable: true
   }
 ];
 
@@ -368,6 +393,43 @@ function LinkOverflowHarness({ tableId }: { tableId: string }): JSX.Element {
   );
 }
 
+function MultilineTextHarness({ tableId }: { tableId: string }): JSX.Element {
+  const rows = useMemo<ReadonlyArray<TaskRow>>(
+    () => [
+      { id: "1", title: "Build\nUI", status: "todo", amount: 10 },
+      { id: "2", title: "Ship", status: "done", amount: 20 }
+    ],
+    []
+  );
+
+  const dataSource = useMemo<DataTableDataSource<TaskRow>>(
+    () => ({
+      useRows: () => ({
+        rows,
+        hasMore: false,
+        isLoading: false,
+        isLoadingMore: false,
+        error: null,
+        loadMore: () => undefined,
+        refresh: () => undefined
+      })
+    }),
+    [rows]
+  );
+
+  return (
+    <div className="w-[240px] p-4">
+      <DataTable
+        tableId={tableId}
+        columns={multilineTextColumns}
+        dataSource={dataSource}
+        getRowId={(row) => row.id}
+        features={{ rowSelect: false, rowActions: false, infiniteScroll: false, virtualization: false }}
+      />
+    </div>
+  );
+}
+
 function MeasuredRowsHarness({ tableId }: { tableId: string }): JSX.Element {
   const rows = useMemo<ReadonlyArray<TaskRow>>(
     () => [
@@ -418,13 +480,59 @@ function MeasuredRowsHarness({ tableId }: { tableId: string }): JSX.Element {
   );
 }
 
+function DateHarness({ tableId }: { tableId: string }): JSX.Element {
+  const [rows, setRows] = useState<ReadonlyArray<DateRow>>([{ id: "1", due: "2026-03-05" }]);
+
+  const dataSource = useMemo<DataTableDataSource<DateRow>>(
+    () => ({
+      useRows: () => ({
+        rows,
+        hasMore: false,
+        isLoading: false,
+        isLoadingMore: false,
+        error: null,
+        loadMore: () => undefined,
+        refresh: () => undefined
+      }),
+      updateRows: async (changes) => {
+        setRows((current) =>
+          current.map((row) => {
+            const patch = changes.find((entry) => entry.rowId === row.id)?.patch;
+            return patch
+              ? {
+                  ...row,
+                  ...patch
+                }
+              : row;
+          })
+        );
+      }
+    }),
+    [rows]
+  );
+
+  return (
+    <div className="w-[320px] p-4">
+      <DataTable
+        tableId={tableId}
+        columns={dateColumns}
+        dataSource={dataSource}
+        getRowId={(row) => row.id}
+        features={{ editing: true, rowSelect: false, rowActions: false, infiniteScroll: false, virtualization: false }}
+      />
+      <output data-testid="due-raw">{rows[0]?.due ?? ""}</output>
+    </div>
+  );
+}
+
 describe("DataTable component", () => {
   it("edits a text cell", () => {
     cy.mount(<Harness tableId="cypress-table-edit" />);
 
     cy.contains("Build UI").dblclick();
-    cy.findByLabelText("Edit Title").clear();
-    cy.findByLabelText("Edit Title").type("Build table");
+    cy.findByLabelText("Edit Title")
+      .should("have.attr", "contenteditable", "true")
+      .type("{selectall}{backspace}Build table");
     cy.findByLabelText("Edit Title").blur();
     cy.findByLabelText("Edit Title").should("not.exist");
     cy.contains("Build table").should("exist");
@@ -445,6 +553,26 @@ describe("DataTable component", () => {
     cy.findByRole("columnheader", { name: /Amount/i }).should("exist");
   });
 
+  it("shows hide in the pin action row and only shows unpin for pinned columns", () => {
+    cy.mount(<Harness tableId="cypress-table-column-menu-actions" />);
+
+    cy.get("[data-column-menu-trigger='title']").first().click({ force: true });
+
+    cy.get("[role='dialog'][aria-label='Title options']").within(() => {
+      cy.contains("button", "Left").should("exist");
+      cy.contains("button", "Right").should("exist");
+      cy.contains("button", "Hide").find("svg").should("exist");
+      cy.contains("button", "Unpin").should("not.exist");
+      cy.contains("button", "Left").click();
+      cy.contains("button", "Left").should("not.exist");
+      cy.contains("button", "Right").should("not.exist");
+      cy.contains("button", "Unpin").should("exist");
+      cy.contains("button", "Hide").should("exist");
+    });
+
+    cy.get("th[data-column-id='title']").should("have.attr", "data-pinned-state", "left");
+  });
+
   it("sorts through the column dialog and exposes status in header attrs", () => {
     cy.mount(<Harness tableId="cypress-table-sort" />);
 
@@ -452,6 +580,11 @@ describe("DataTable component", () => {
     cy.contains("button", "Sort desc").click();
 
     cy.get("th[data-column-id='amount']").should("have.attr", "data-column-sort-status", "desc");
+
+    cy.get("[data-column-menu-trigger='amount']").first().click({ force: true });
+    cy.contains("button", "Sort desc").click();
+
+    cy.get("th[data-column-id='amount']").should("have.attr", "data-column-sort-status", "none");
   });
 
   it("applies select filters through the column dialog", () => {
@@ -647,6 +780,28 @@ describe("DataTable component", () => {
       });
   });
 
+  it("preserves newlines when rendering text cells in read mode", () => {
+    cy.mount(<MultilineTextHarness tableId="cypress-table-multiline-text" />);
+
+    cy.get(`tr[data-row-id='1'] [role='gridcell'][data-column-id='title'] span`).should(($value) => {
+      const style = getComputedStyle($value[0]);
+      expect(style.whiteSpace).to.equal("pre-wrap");
+    });
+
+    cy.get(`tr[data-row-id='1'] [role='gridcell'][data-column-id='title']`)
+      .first()
+      .then(($multilineCell) => {
+        const multilineHeight = $multilineCell[0].getBoundingClientRect().height;
+
+        cy.get(`tr[data-row-id='2'] [role='gridcell'][data-column-id='title']`)
+          .first()
+          .then(($singleLineCell) => {
+            const singleLineHeight = $singleLineCell[0].getBoundingClientRect().height;
+            expect(multilineHeight).to.be.greaterThan(singleLineHeight);
+          });
+      });
+  });
+
   it("stacks non-virtualized rows using measured row heights", () => {
     cy.mount(<MeasuredRowsHarness tableId="cypress-table-measured-row-heights" />);
 
@@ -697,8 +852,49 @@ describe("DataTable component", () => {
 
     cy.findByRole("grid").focus().trigger("keydown", { key: "ArrowRight" });
     cy.findByRole("grid").trigger("keydown", { key: "Enter" });
-    cy.findByLabelText("Edit Status").select("done");
+    cy.findByRole("listbox", { name: /Edit Status/i })
+      .should("have.focus")
+      .then(($listbox) => {
+        const dialog = $listbox.closest("[role='dialog']")[0];
+        expect(dialog?.parentElement, "select editor dialog should portal to body").to.equal(
+          $listbox[0].ownerDocument.body
+        );
+      });
+    cy.findByRole("listbox", { name: /Edit Status/i }).within(() => {
+      cy.contains("[role='option']", "Done")
+        .find("span")
+        .first()
+        .should("have.class", "bg-emerald-100");
+    });
+    cy.findByRole("listbox", { name: /Edit Status/i }).trigger("keydown", { key: "ArrowDown", force: true });
+    cy.findByRole("listbox", { name: /Edit Status/i }).trigger("keydown", { key: "Enter", force: true });
     cy.contains("Done").should("exist");
+  });
+
+  it("edits a date cell directly from the native picker", () => {
+    cy.mount(<DateHarness tableId="cypress-table-date-edit" />);
+
+    cy.get("[role='gridcell'][data-column-id='due']").dblclick();
+    cy.findByLabelText("Edit Due")
+      .should("have.attr", "type", "date")
+      .then(($input) => {
+        const input = $input[0];
+        if (!(input instanceof HTMLInputElement)) {
+          throw new Error("Expected a date input");
+        }
+
+        const view = input.ownerDocument.defaultView;
+        if (!view) {
+          throw new Error("Expected a window for the date input");
+        }
+
+        input.focus();
+        input.value = "2026-04-09";
+        input.dispatchEvent(new view.Event("input", { bubbles: true }));
+        input.dispatchEvent(new view.Event("change", { bubbles: true }));
+      });
+    cy.findByLabelText("Edit Due").should("not.exist");
+    cy.get("[data-testid='due-raw']").should("have.text", "2026-04-09");
   });
 
   it("navigates selected cells by visual order when a column is pinned left", () => {
@@ -784,7 +980,7 @@ describe("DataTable component", () => {
     cy.findByRole("grid").should("have.focus");
     cy.findByRole("grid").trigger("keydown", { key: "ArrowRight" });
     cy.findByRole("grid").trigger("keydown", { key: "Enter" });
-    cy.findByLabelText("Edit Status").should("exist");
+    cy.findByRole("listbox", { name: /Edit Status/i }).should("exist");
   });
 
   it("does not continuously emit virtualizer measurement warnings while idle", () => {

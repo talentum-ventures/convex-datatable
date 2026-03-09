@@ -31,8 +31,7 @@ describe("demo app", () => {
       });
 
     cy.contains("Project 1").dblclick();
-    cy.findByLabelText("Edit Project").clear();
-    cy.findByLabelText("Edit Project").type("Project 1 Updated");
+    cy.findByLabelText("Edit Project").type("{selectall}{backspace}Project 1 Updated");
     cy.get("body").click(0, 0);
     cy.findByLabelText("Edit Project").should("not.exist");
   });
