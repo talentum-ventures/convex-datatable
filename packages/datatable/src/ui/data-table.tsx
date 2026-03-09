@@ -10,6 +10,7 @@ import {
   type KeyboardEvent,
   type ReactNode
 } from "react";
+import { flushSync } from "react-dom";
 import {
   flexRender,
   getCoreRowModel,
@@ -19,6 +20,7 @@ import {
   type ColumnFiltersState,
   type ColumnPinningState,
   type ColumnSizingState,
+  type ColumnSizingInfoState,
   type RowSelectionState,
   type SortingState,
   type Updater,
@@ -51,6 +53,7 @@ import {
   DEFAULT_THEME_TOKENS
 } from "../core/defaults";
 import { cn } from "../core/cn";
+import { parseDateValue } from "../core/formatters";
 import {
   getColumnValue,
   orderColumns,
@@ -448,6 +451,231 @@ function fixedTrackStyle(width: number): CSSProperties {
   };
 }
 
+function defaultColumnSizingInfoState(): ColumnSizingInfoState {
+  return {
+    startOffset: null,
+    startSize: null,
+    deltaOffset: null,
+    deltaPercentage: null,
+    isResizingColumn: false,
+    columnSizingStart: []
+  };
+}
+
+function stringifyFilterCellValue(raw: DataTableCellValue): string {
+  if (Array.isArray(raw)) {
+    return raw.map((entry) => String(entry)).join(",");
+  }
+
+  if (raw instanceof Date) {
+    return raw.toISOString();
+  }
+
+  if (typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean") {
+    return String(raw);
+  }
+
+  if (raw === null || raw === undefined) {
+    return "";
+  }
+
+  return String(raw);
+}
+
+function comparableSortValue(raw: DataTableCellValue): string | number | boolean | null {
+  if (raw instanceof Date) {
+    return raw.getTime();
+  }
+
+  if (typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean") {
+    return raw;
+  }
+
+  if (raw === null || raw === undefined) {
+    return null;
+  }
+
+  if (Array.isArray(raw)) {
+    return raw.map((entry) => String(entry)).join(",");
+  }
+
+  return String(raw);
+}
+
+function compareValues(left: string | number | boolean | null, right: string | number | boolean | null): number {
+  if (left === right) {
+    return 0;
+  }
+
+  if (left === null) {
+    return -1;
+  }
+
+  if (right === null) {
+    return 1;
+  }
+
+  if (typeof left === "number" && typeof right === "number") {
+    return left - right;
+  }
+
+  return String(left).localeCompare(String(right));
+}
+
+function numericFilterValue(raw: DataTableCellValue | DataTableFilter["value"]): number | null {
+  if (typeof raw === "number") {
+    return Number.isFinite(raw) ? raw : null;
+  }
+
+  if (typeof raw === "string" && raw.trim().length > 0) {
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  if (raw instanceof Date) {
+    return raw.getTime();
+  }
+
+  return null;
+}
+
+function dateFilterValue(raw: DataTableCellValue | DataTableFilter["value"], locale: string | undefined): string | null {
+  if (raw instanceof Date) {
+    return raw.toISOString().slice(0, 10);
+  }
+
+  if (typeof raw !== "string") {
+    return null;
+  }
+
+  const parsed = parseDateValue(raw, locale);
+  return parsed.length > 0 ? parsed : null;
+}
+
+function rowMatchesFilter<TRow extends DataTableRowModel>(
+  row: TRow,
+  filter: DataTableFilter,
+  column: DataTableColumn<TRow> | undefined
+): boolean {
+  const raw = row[filter.columnId as keyof TRow];
+  const text = stringifyFilterCellValue(raw);
+
+  if (filter.op === "contains") {
+    return text.toLowerCase().includes(String(filter.value ?? "").toLowerCase());
+  }
+
+  if (filter.op === "startsWith") {
+    return text.toLowerCase().startsWith(String(filter.value ?? "").toLowerCase());
+  }
+
+  if (filter.op === "endsWith") {
+    return text.toLowerCase().endsWith(String(filter.value ?? "").toLowerCase());
+  }
+
+  if (filter.op === "eq") {
+    if (column?.kind === "date") {
+      const left = dateFilterValue(raw, column.locale);
+      const right = dateFilterValue(filter.value, column.locale);
+      return left !== null && right !== null && left === right;
+    }
+
+    return text === String(filter.value ?? "");
+  }
+
+  if (filter.op === "neq") {
+    if (column?.kind === "date") {
+      const left = dateFilterValue(raw, column.locale);
+      const right = dateFilterValue(filter.value, column.locale);
+      return left !== null && right !== null && left !== right;
+    }
+
+    return text !== String(filter.value ?? "");
+  }
+
+  if (filter.op === "in") {
+    const filterValues = filter.value;
+    if (!Array.isArray(filterValues)) {
+      return false;
+    }
+
+    if (Array.isArray(raw)) {
+      const rowValues = raw.map((entry) => String(entry));
+      return rowValues.some((value) => filterValues.includes(value));
+    }
+
+    return filterValues.includes(text);
+  }
+
+  if (filter.op === "gt" || filter.op === "gte" || filter.op === "lt" || filter.op === "lte") {
+    if (column?.kind === "date") {
+      const left = dateFilterValue(raw, column.locale);
+      const right = dateFilterValue(filter.value, column.locale);
+      if (left === null || right === null) {
+        return false;
+      }
+
+      if (filter.op === "gt") {
+        return left > right;
+      }
+      if (filter.op === "gte") {
+        return left >= right;
+      }
+      if (filter.op === "lt") {
+        return left < right;
+      }
+      return left <= right;
+    }
+
+    const left = numericFilterValue(raw);
+    const right = numericFilterValue(filter.value);
+    if (left === null || right === null) {
+      return false;
+    }
+
+    if (filter.op === "gt") {
+      return left > right;
+    }
+    if (filter.op === "gte") {
+      return left >= right;
+    }
+    if (filter.op === "lt") {
+      return left < right;
+    }
+    return left <= right;
+  }
+
+  return true;
+}
+
+export function applyClientQuery<TRow extends DataTableRowModel>(
+  rows: ReadonlyArray<TRow>,
+  state: {
+    sorting: ReadonlyArray<{ columnId: string; direction: "asc" | "desc" }>;
+    filters: ReadonlyArray<DataTableFilter>;
+  },
+  columnById: ReadonlyMap<string, DataTableColumn<TRow>>
+): ReadonlyArray<TRow> {
+  let output = [...rows];
+
+  for (const filter of state.filters) {
+    output = output.filter((row) => rowMatchesFilter(row, filter, columnById.get(filter.columnId)));
+  }
+
+  const sortEntry = state.sorting[0];
+  if (!sortEntry) {
+    return output;
+  }
+
+  output.sort((left, right) => {
+    const leftValue = left[sortEntry.columnId as keyof TRow];
+    const rightValue = right[sortEntry.columnId as keyof TRow];
+    const result = compareValues(comparableSortValue(leftValue), comparableSortValue(rightValue));
+    return sortEntry.direction === "asc" ? result : -result;
+  });
+
+  return output;
+}
+
 function renderedWidthForColumn<TRow extends DataTableRowModel, TValue>(
   column: Column<TRow, TValue>,
   renderWidthsById: Readonly<Record<string, number>>
@@ -560,6 +788,9 @@ export function DataTable<TRow extends DataTableRowModel>({
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({ left: [], right: [] });
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
+  const [columnSizingInfo, setColumnSizingInfo] = useState<ColumnSizingInfoState>(() =>
+    defaultColumnSizingInfoState()
+  );
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [editingCell, setEditingCell] = useState<EditingCell>(null);
   const [activeCell, setActiveCell] = useState<CellCoord | null>(null);
@@ -671,6 +902,7 @@ export function DataTable<TRow extends DataTableRowModel>({
       })
     );
     setColumnSizing(internal.columnSizing);
+    setColumnSizingInfo(defaultColumnSizingInfoState());
   }, [dataColumnIds]);
 
   usePersistedState({
@@ -1121,9 +1353,29 @@ export function DataTable<TRow extends DataTableRowModel>({
       }),
     [actionColumn, dataColumnIds, normalizedColumnPinning, rowSelectColumn]
   );
+  const columnById = useMemo(() => {
+    const map = new Map<string, DataTableColumn<TRow>>();
+    for (const column of orderedColumns) {
+      map.set(column.id, column);
+    }
+    return map;
+  }, [orderedColumns]);
+  const displayedRows = useMemo(
+    () =>
+      applyClientQuery(
+        mergedRows,
+        {
+          sorting: queryState.sorting,
+          filters: queryState.filters
+        },
+        columnById
+      ),
+    [columnById, mergedRows, queryState.filters, queryState.sorting]
+  );
+  const tableData = useMemo(() => [...displayedRows], [displayedRows]);
 
   const table = useReactTable({
-    data: mergedRows,
+    data: tableData,
     columns: tableColumns,
     getCoreRowModel: coreRowModel,
     getRowId: (row) => getRowId(row),
@@ -1141,6 +1393,7 @@ export function DataTable<TRow extends DataTableRowModel>({
       columnVisibility,
       columnPinning: managedColumnPinning,
       columnSizing,
+      columnSizingInfo,
       rowSelection
     },
     onSortingChange: (updater) => {
@@ -1191,18 +1444,13 @@ export function DataTable<TRow extends DataTableRowModel>({
     onColumnSizingChange: (updater) => {
       setColumnSizing((current) => applyUpdater(updater, current));
     },
+    onColumnSizingInfoChange: (updater) => {
+      setColumnSizingInfo((current) => applyUpdater(updater, current));
+    },
     onRowSelectionChange: (updater) => {
       setRowSelection((current) => applyUpdater(updater, current));
     }
   });
-
-  const columnById = useMemo(() => {
-    const map = new Map<string, DataTableColumn<TRow>>();
-    for (const column of orderedColumns) {
-      map.set(column.id, column);
-    }
-    return map;
-  }, [orderedColumns]);
 
   const decodedFilters = useMemo(() => fromTanStackFilters(columnFilters), [columnFilters]);
 
@@ -1246,7 +1494,7 @@ export function DataTable<TRow extends DataTableRowModel>({
       return null;
     }
 
-    const row = mergedRows[activeCell.rowIndex];
+    const row = displayedRows[activeCell.rowIndex];
     const column = visibleDataColumns[activeCell.columnIndex];
 
     if (!row || !column) {
@@ -1257,7 +1505,7 @@ export function DataTable<TRow extends DataTableRowModel>({
       rowId: getRowId(row),
       columnId: column.id
     };
-  }, [activeCell, getRowId, mergedRows, visibleDataColumns]);
+  }, [activeCell, displayedRows, getRowId, visibleDataColumns]);
   const firstVisibleDraftColumnId = useMemo(() => {
     for (const column of visibleLeafColumnsInUiOrder) {
       const columnConfig = columnById.get(column.id);
@@ -1361,20 +1609,20 @@ export function DataTable<TRow extends DataTableRowModel>({
     containerWidth
   });
 
-  const totalRows = mergedRows.length + (mergedFeatures.rowAdd ? 1 : 0);
+  const totalRows = displayedRows.length + (mergedFeatures.rowAdd ? 1 : 0);
   const rowOrderSignature = useMemo(
-    () => mergedRows.map((row) => String(getRowId(row))).join("\u001f"),
-    [getRowId, mergedRows]
+    () => displayedRows.map((row) => String(getRowId(row))).join("\u001f"),
+    [displayedRows, getRowId]
   );
 
   const rowVirtualizer = useVirtualizer({
     count: totalRows,
     getScrollElement: () => tableContainerRef.current,
     estimateSize: (index) => {
-      if (index >= mergedRows.length) {
+      if (index >= displayedRows.length) {
         return minHeight;
       }
-      const row = mergedRows[index];
+      const row = displayedRows[index];
       if (!row) {
         return minHeight;
       }
@@ -1505,11 +1753,11 @@ export function DataTable<TRow extends DataTableRowModel>({
     return buildStaticVirtualItems({
       count: totalRows,
       getSize: (index) => {
-        const row = mergedRows[index];
+        const row = displayedRows[index];
         return row ? rowHeights.getFinalHeight(getRowId(row)) : minHeight;
       }
     });
-  }, [getRowId, mergedFeatures.virtualization, mergedRows, minHeight, rowHeights, totalRows]);
+  }, [displayedRows, getRowId, mergedFeatures.virtualization, minHeight, rowHeights, totalRows]);
 
   const virtualItems = mergedFeatures.virtualization
     ? rowVirtualizer.getVirtualItems()
@@ -1534,12 +1782,12 @@ export function DataTable<TRow extends DataTableRowModel>({
       if (isDebugMode) {
         pushDebugEventThrottled(debugScope, "load-more", 300, "infinite scroll loadMore triggered", {
           distanceToEnd: Math.round(distanceToEnd),
-          rowCount: mergedRows.length
+          rowCount: displayedRows.length
         });
       }
       rowsResult.loadMore();
     }
-  }, [debugScope, isDebugMode, mergedFeatures.infiniteScroll, mergedRows.length, rowsResult]);
+  }, [debugScope, displayedRows.length, isDebugMode, mergedFeatures.infiniteScroll, rowsResult]);
 
   useEffect(() => {
     return () => {
@@ -1591,7 +1839,7 @@ export function DataTable<TRow extends DataTableRowModel>({
     if (commitWindow.current.length > 60) {
       pushDebugEventThrottled(debugScope, "render-storm", 1000, "high commit frequency", {
         commits2s: commitWindow.current.length,
-        mergedRows: mergedRows.length,
+        mergedRows: displayedRows.length,
         virtualItems: virtualItems.length,
         selectedRows: Object.keys(rowSelection).length,
         editing: editingCell ? 1 : 0
@@ -1601,7 +1849,7 @@ export function DataTable<TRow extends DataTableRowModel>({
     if (commitCounter.current % 50 === 0) {
       pushDebugEventThrottled(debugScope, "render-checkpoint", 1500, "render checkpoint", {
         commits: commitCounter.current,
-        mergedRows: mergedRows.length,
+        mergedRows: displayedRows.length,
         virtualItems: virtualItems.length
       });
     }
@@ -1609,14 +1857,14 @@ export function DataTable<TRow extends DataTableRowModel>({
 
   const moveActiveCell = useCallback(
     (rowDelta: number, columnDelta: number, expandSelection: boolean) => {
-      if (visibleDataColumns.length === 0 || mergedRows.length === 0) {
+      if (visibleDataColumns.length === 0 || displayedRows.length === 0) {
         return;
       }
 
       const startingCell: CellCoord = activeCell ?? { rowIndex: 0, columnIndex: 0 };
 
       const nextCoord: CellCoord = {
-        rowIndex: clamp(startingCell.rowIndex + rowDelta, 0, Math.max(mergedRows.length - 1, 0)),
+        rowIndex: clamp(startingCell.rowIndex + rowDelta, 0, Math.max(displayedRows.length - 1, 0)),
         columnIndex: clamp(
           startingCell.columnIndex + columnDelta,
           0,
@@ -1631,7 +1879,7 @@ export function DataTable<TRow extends DataTableRowModel>({
         setRangeStart(nextCoord);
       }
     },
-    [activeCell, mergedRows.length, visibleDataColumns.length]
+    [activeCell, displayedRows.length, visibleDataColumns.length]
   );
 
   const copySelection = useCallback(async () => {
@@ -1639,7 +1887,7 @@ export function DataTable<TRow extends DataTableRowModel>({
       return;
     }
 
-    if (visibleDataColumns.length === 0 || mergedRows.length === 0) {
+    if (visibleDataColumns.length === 0 || displayedRows.length === 0) {
       return;
     }
 
@@ -1652,7 +1900,7 @@ export function DataTable<TRow extends DataTableRowModel>({
     const matrix: string[][] = [];
 
     for (let rowIndex = normalized.start.rowIndex; rowIndex <= normalized.end.rowIndex; rowIndex += 1) {
-      const row = mergedRows[rowIndex];
+      const row = displayedRows[rowIndex];
       if (!row) {
         continue;
       }
@@ -1681,7 +1929,7 @@ export function DataTable<TRow extends DataTableRowModel>({
 
     await navigator.clipboard.writeText(serializeTsv(matrix));
     toast.success("Copied selection");
-  }, [activeCell, mergedFeatures.clipboardCopy, mergedRows, rangeStart, visibleDataColumns]);
+  }, [activeCell, displayedRows, mergedFeatures.clipboardCopy, rangeStart, visibleDataColumns]);
 
   const pasteFromText = useCallback(
     async (text: string) => {
@@ -1701,7 +1949,7 @@ export function DataTable<TRow extends DataTableRowModel>({
         return;
       }
 
-      if (!activeCell || visibleDataColumns.length === 0 || mergedRows.length === 0) {
+      if (!activeCell || visibleDataColumns.length === 0 || displayedRows.length === 0) {
         return;
       }
 
@@ -1711,15 +1959,24 @@ export function DataTable<TRow extends DataTableRowModel>({
       }
 
       const selectedRange = cellRange(rangeStart, activeCell);
-      const baseRange = selectedRange
-        ? normalizeRange(selectedRange)
-        : {
+      const normalizedSelectedRange = selectedRange ? normalizeRange(selectedRange) : null;
+      const selectedHeight = normalizedSelectedRange
+        ? normalizedSelectedRange.end.rowIndex - normalizedSelectedRange.start.rowIndex + 1
+        : 0;
+      const selectedWidth = normalizedSelectedRange
+        ? normalizedSelectedRange.end.columnIndex - normalizedSelectedRange.start.columnIndex + 1
+        : 0;
+      const shouldExpandFromActiveCell =
+        normalizedSelectedRange === null || (selectedHeight === 1 && selectedWidth === 1);
+      const baseRange = shouldExpandFromActiveCell
+        ? {
             start: activeCell,
             end: {
               rowIndex: activeCell.rowIndex + parsed.length - 1,
               columnIndex: activeCell.columnIndex + (parsed[0]?.length ?? 1) - 1
             }
-          };
+          }
+        : normalizedSelectedRange;
 
       const expanded = expandPasteMatrix(parsed, baseRange);
       const previousRows = new Map<RowId, TRow>();
@@ -1733,7 +1990,7 @@ export function DataTable<TRow extends DataTableRowModel>({
           continue;
         }
         const rowIndex = baseRange.start.rowIndex + rowOffset;
-        const row = mergedRows[rowIndex];
+        const row = displayedRows[rowIndex];
         if (!row) {
           continue;
         }
@@ -1876,7 +2133,7 @@ export function DataTable<TRow extends DataTableRowModel>({
       mergedFeatures.cellSelect,
       mergedFeatures.editing,
       mergedFeatures.undo,
-      mergedRows,
+      displayedRows,
       rangeStart,
       rowSchema,
       visibleDataColumns,
@@ -1922,7 +2179,7 @@ export function DataTable<TRow extends DataTableRowModel>({
           return;
         }
 
-        const row = mergedRows[target.rowIndex];
+        const row = displayedRows[target.rowIndex];
         const column = visibleDataColumns[target.columnIndex];
         if (!row || !column || !(column.isEditable ?? false)) {
           return;
@@ -2025,7 +2282,7 @@ export function DataTable<TRow extends DataTableRowModel>({
       mergedFeatures.clipboardPaste,
       mergedFeatures.editing,
       mergedFeatures.undo,
-      mergedRows,
+      displayedRows,
       moveActiveCell,
       undoStack,
       visibleDataColumns
@@ -2363,6 +2620,94 @@ export function DataTable<TRow extends DataTableRowModel>({
     null
   );
 
+  const beginColumnResize = useCallback((args: {
+    ownerDocument: Document;
+    columnId: string;
+    startWidth: number;
+    startX: number;
+    minWidth: number;
+    maxWidth: number | null;
+  }): void => {
+    const maxWidth = args.maxWidth ?? Number.MAX_SAFE_INTEGER;
+
+    const applyNextWidth = (clientX: number): void => {
+      const delta = clientX - args.startX;
+      const nextWidth = clamp(args.startWidth + delta, args.minWidth, maxWidth);
+      const normalizedWidth = `${Math.round(nextWidth)}px`;
+
+      for (const headerCell of args.ownerDocument.querySelectorAll<HTMLElement>(`th[data-column-id='${args.columnId}']`)) {
+        headerCell.style.boxSizing = "border-box";
+        headerCell.style.width = normalizedWidth;
+        headerCell.style.minWidth = normalizedWidth;
+        headerCell.style.maxWidth = normalizedWidth;
+        headerCell.style.flex = `0 0 ${normalizedWidth}`;
+      }
+
+      for (const gridCell of args.ownerDocument.querySelectorAll<HTMLElement>(
+        `[role='gridcell'][data-column-id='${args.columnId}']`
+      )) {
+        const bodyCell = gridCell.closest("td");
+        if (!(bodyCell instanceof HTMLElement)) {
+          continue;
+        }
+
+        bodyCell.style.boxSizing = "border-box";
+        bodyCell.style.width = normalizedWidth;
+        bodyCell.style.minWidth = normalizedWidth;
+        bodyCell.style.maxWidth = normalizedWidth;
+        bodyCell.style.flex = `0 0 ${normalizedWidth}`;
+      }
+
+      flushSync(() => {
+        setColumnSizing((current) => {
+          const roundedWidth = Math.round(nextWidth);
+          if (current[args.columnId] === roundedWidth) {
+            return current;
+          }
+
+          return {
+            ...current,
+            [args.columnId]: roundedWidth
+          };
+        });
+      });
+    };
+
+    const cleanup = (): void => {
+      args.ownerDocument.removeEventListener("mousemove", onMouseMove);
+      args.ownerDocument.removeEventListener("mouseup", onMouseUp);
+      args.ownerDocument.removeEventListener("touchmove", onTouchMove);
+      args.ownerDocument.removeEventListener("touchend", onTouchEnd);
+    };
+
+    const onMouseMove = (event: MouseEvent): void => {
+      applyNextWidth(event.clientX);
+    };
+
+    const onMouseUp = (): void => {
+      cleanup();
+    };
+
+    const onTouchMove = (event: TouchEvent): void => {
+      const touch = event.touches[0];
+      if (!touch) {
+        return;
+      }
+
+      applyNextWidth(touch.clientX);
+    };
+
+    const onTouchEnd = (): void => {
+      cleanup();
+    };
+
+    args.ownerDocument.addEventListener("mousemove", onMouseMove);
+    args.ownerDocument.addEventListener("mouseup", onMouseUp);
+    args.ownerDocument.addEventListener("touchmove", onTouchMove, { passive: true });
+    args.ownerDocument.addEventListener("touchend", onTouchEnd);
+    applyNextWidth(args.startX + 1);
+  }, []);
+
   useEffect(() => {
     if (!resizingRow) {
       return;
@@ -2471,7 +2816,7 @@ export function DataTable<TRow extends DataTableRowModel>({
                   hasDraftCellValue(value)
                 );
 
-                rowVirtualizer.scrollToIndex(mergedRows.length, { align: "end" });
+                rowVirtualizer.scrollToIndex(displayedRows.length, { align: "end" });
 
                 if (hasPendingDraftValues) {
                   void commitDraftRow();
@@ -3020,12 +3365,36 @@ export function DataTable<TRow extends DataTableRowModel>({
                               onMouseDown={(event) => {
                                 event.preventDefault();
                                 event.stopPropagation();
-                                header.getResizeHandler(event.currentTarget.ownerDocument)(event.nativeEvent);
+                                const headerRect = event.currentTarget.closest("th")?.getBoundingClientRect();
+                                const startX = Number.isFinite(event.clientX)
+                                  ? event.clientX
+                                  : Math.round((headerRect?.right ?? 0) - 1);
+                                beginColumnResize({
+                                  ownerDocument: event.currentTarget.ownerDocument,
+                                  columnId: header.column.id,
+                                  startWidth: columnSizing[header.column.id] ?? header.getSize(),
+                                  startX,
+                                  minWidth: header.column.columnDef.minSize ?? 20,
+                                  maxWidth: header.column.columnDef.maxSize ?? null
+                                });
                               }}
                               onTouchStart={(event) => {
                                 event.preventDefault();
                                 event.stopPropagation();
-                                header.getResizeHandler(event.currentTarget.ownerDocument)(event.nativeEvent);
+                                const touch = event.touches[0];
+                                const headerRect = event.currentTarget.closest("th")?.getBoundingClientRect();
+                                const startX = touch
+                                  ? touch.clientX
+                                  : Math.round((headerRect?.right ?? 0) - 1);
+
+                                beginColumnResize({
+                                  ownerDocument: event.currentTarget.ownerDocument,
+                                  columnId: header.column.id,
+                                  startWidth: columnSizing[header.column.id] ?? header.getSize(),
+                                  startX,
+                                  minWidth: header.column.columnDef.minSize ?? 20,
+                                  maxWidth: header.column.columnDef.maxSize ?? null
+                                });
                               }}
                               aria-label={`Resize ${resizeLabel}`}
                             />
@@ -3049,7 +3418,7 @@ export function DataTable<TRow extends DataTableRowModel>({
             >
               {virtualItems.map((virtualRow) => {
                 const rowIndex = virtualRow.index;
-                const isDraft = rowIndex >= mergedRows.length;
+                const isDraft = rowIndex >= displayedRows.length;
 
                 if (isDraft) {
                   if (!mergedFeatures.rowAdd || !dataSource.createRow) {
@@ -3122,7 +3491,7 @@ export function DataTable<TRow extends DataTableRowModel>({
                           <td
                             key={`draft-${column.id}`}
                             style={widthStyle}
-                            className="border-r border-b border-slate-200 bg-slate-50 align-top"
+                            className="border-r border-b border-slate-200 bg-slate-50 p-0 align-top"
                           >
                             <div
                               role="gridcell"
@@ -3176,7 +3545,7 @@ export function DataTable<TRow extends DataTableRowModel>({
                 }
 
                 const rowModel = tableRows[rowIndex];
-                const row = mergedRows[rowIndex];
+                const row = displayedRows[rowIndex];
                 if (!rowModel || !row) {
                   return null;
                 }
@@ -3214,7 +3583,7 @@ export function DataTable<TRow extends DataTableRowModel>({
                           key={cell.id}
                           data-pinned-state={pinned || "center"}
                           className={cn(
-                            "border-r border-b border-[var(--dt-border-color)] align-top",
+                            "border-r border-b border-[var(--dt-border-color)] p-0 align-top",
                             isActionCell ? "relative overflow-visible border-l border-l-[var(--dt-border-color)]" : "",
                             isOpenActionMenuCell ? "z-40" : "",
                             pinned
@@ -3234,30 +3603,19 @@ export function DataTable<TRow extends DataTableRowModel>({
                       );
                     })}
                     {mergedFeatures.rowResize ? (
-                      <td
-                        className="relative p-0"
-                        style={{
-                          boxSizing: "border-box",
-                          width: "0px",
-                          minWidth: "0px",
-                          maxWidth: "0px",
-                          flex: "0 0 0px"
+                      <button
+                        type="button"
+                        className="absolute bottom-0 left-0 z-10 h-1 w-full cursor-row-resize bg-transparent hover:bg-sky-200"
+                        aria-label={`Resize row ${rowId}`}
+                        onPointerDown={(event) => {
+                          event.preventDefault();
+                          setResizingRow({
+                            rowId,
+                            startHeight: rowHeights.getFinalHeight(rowId),
+                            startY: event.clientY
+                          });
                         }}
-                      >
-                        <button
-                          type="button"
-                          className="absolute bottom-0 left-0 h-1 w-full cursor-row-resize bg-transparent hover:bg-sky-200"
-                          aria-label={`Resize row ${rowId}`}
-                          onPointerDown={(event) => {
-                            event.preventDefault();
-                            setResizingRow({
-                              rowId,
-                              startHeight: rowHeights.getFinalHeight(rowId),
-                              startY: event.clientY
-                            });
-                          }}
-                        />
-                      </td>
+                      />
                     ) : null}
                   </tr>
                 );

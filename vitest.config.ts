@@ -1,6 +1,29 @@
+import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  resolve: {
+    alias: [
+      {
+        find: "@rolha/datatable/convex-server",
+        replacement: fileURLToPath(
+          new URL("./packages/datatable/src/convex/server.ts", import.meta.url)
+        )
+      },
+      {
+        find: "@rolha/datatable/convex",
+        replacement: fileURLToPath(
+          new URL("./packages/datatable/src/convex/index.ts", import.meta.url)
+        )
+      },
+      {
+        find: /^@rolha\/datatable$/,
+        replacement: fileURLToPath(
+          new URL("./packages/datatable/src/index.ts", import.meta.url)
+        )
+      }
+    ]
+  },
   test: {
     environment: "jsdom",
     globals: true,

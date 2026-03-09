@@ -169,7 +169,7 @@ describe("public api", () => {
 
     expectTypeOf(config.userId).toEqualTypeOf<string>();
     expectTypeOf(useConvexPresence).parameters.toEqualTypeOf<[ConvexPresenceConfig]>();
-    expectTypeOf(useConvexPresence(config).collaborators).toEqualTypeOf<
+    expectTypeOf<ReturnType<typeof useConvexPresence>["collaborators"]>().toEqualTypeOf<
       ReadonlyArray<CollaboratorPresence>
     >();
   });

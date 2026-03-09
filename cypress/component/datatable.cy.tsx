@@ -292,6 +292,16 @@ function dispatchPlainTextPaste(win: Window, node: Element, text: string): boole
   return pasteEvent.defaultPrevented;
 }
 
+function dispatchDocumentMouseEvent(doc: Document, type: "mousemove" | "mouseup", clientX?: number): void {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    clientX: clientX ?? 0
+  });
+
+  doc.dispatchEvent(event);
+}
+
 function Harness({
   tableId,
   features,
@@ -1421,8 +1431,10 @@ describe("DataTable component", () => {
       });
     });
 
-    cy.document().trigger("mousemove", { clientX: resizeStartX + 80 });
-    cy.document().trigger("mouseup");
+    cy.document().then((doc) => {
+      dispatchDocumentMouseEvent(doc, "mousemove", resizeStartX + 80);
+      dispatchDocumentMouseEvent(doc, "mouseup");
+    });
 
     cy.get("th[data-column-id='status']").then(($header) => {
       const afterWidth = $header[0].getBoundingClientRect().width;
@@ -1460,8 +1472,10 @@ describe("DataTable component", () => {
       });
     });
 
-    cy.document().trigger("mousemove", { clientX: resizeStartX + 120 });
-    cy.document().trigger("mouseup");
+    cy.document().then((doc) => {
+      dispatchDocumentMouseEvent(doc, "mousemove", resizeStartX + 120);
+      dispatchDocumentMouseEvent(doc, "mouseup");
+    });
 
     assertHeaderBodyColumnAlignment("title", "1");
     assertHeaderBodyColumnAlignment("status", "1");

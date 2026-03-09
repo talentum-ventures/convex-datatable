@@ -78,16 +78,18 @@ export function filterRow<TRow extends DataTableRowModel>(row: TRow, filter: Dat
   }
 
   if (filter.op === "in") {
-    if (!Array.isArray(filter.value)) {
+    const filterValues = filter.value;
+
+    if (!Array.isArray(filterValues)) {
       return false;
     }
 
     if (Array.isArray(raw)) {
       const rowValues = raw.map((entry) => String(entry));
-      return rowValues.some((value) => filter.value.includes(value));
+      return rowValues.some((value) => filterValues.includes(value));
     }
 
-    return filter.value.includes(text);
+    return filterValues.includes(text);
   }
 
   if (filter.op === "gt" || filter.op === "gte" || filter.op === "lt" || filter.op === "lte") {

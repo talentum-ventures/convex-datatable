@@ -876,6 +876,11 @@ function DateEditor<TRow extends DataTableRowModel>({
     setPickerValue(nextValue);
   };
 
+  const commitFromEventValue = (nextValue: string): void => {
+    syncDraft(nextValue);
+    commit(nextValue);
+  };
+
   const commit = (nextValue = draftRef.current): void => {
     if (finalizedRef.current) {
       return;
@@ -902,13 +907,14 @@ function DateEditor<TRow extends DataTableRowModel>({
         aria-label={`Edit ${column.header}`}
         value={pickerValue}
         className="h-full min-h-8 rounded-none border-0 bg-transparent px-0 py-0 text-sm text-slate-900 shadow-none focus:ring-0"
-        onChange={(event) => {
-          const nextValue = event.target.value;
-          syncDraft(nextValue);
-          commit(nextValue);
+        onInput={(event) => {
+          commitFromEventValue(event.currentTarget.value);
         }}
-        onBlur={() => {
-          commit();
+        onChange={(event) => {
+          commitFromEventValue(event.currentTarget.value);
+        }}
+        onBlur={(event) => {
+          commit(event.currentTarget.value);
         }}
         onKeyDown={(event) => {
           event.stopPropagation();
@@ -1113,9 +1119,9 @@ function renderDefaultCell<TRow extends DataTableRowModel>(
         rel={column.rel ?? "noreferrer"}
         className="inline-flex items-center gap-1 text-sky-700 underline decoration-sky-200 underline-offset-2"
       >
-        <LinkIcon className="h-3.5 w-3.5" />
-        {href}
-        <ExternalLink className="h-3.5 w-3.5" />
+        <LinkIcon className="h-3.5 w-3.5 shrink-0" />
+        <span>{href}</span>
+        <ExternalLink className="h-3.5 w-3.5 shrink-0" />
       </a>
     );
   }
@@ -1276,10 +1282,13 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
                 aria-hidden="true"
                 data-dt-collaborator-outline={collaborator.userId}
                 className="pointer-events-none absolute rounded-[3px]"
-                style={{
-                  inset: `${index * 3}px`,
-                  boxShadow: `inset 0 0 0 2px ${collaborator.color}`
-                }}
+                style={
+                  {
+                    "--dt-collaborator-outline": collaborator.color,
+                    inset: `${index * 3}px`,
+                    boxShadow: "inset 0 0 0 2px var(--dt-collaborator-outline)"
+                  } as CSSProperties & { "--dt-collaborator-outline": string }
+                }
               />
             ))}
             {collaboratorsInCell.length > 0 ? (

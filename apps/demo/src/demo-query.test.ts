@@ -1,3 +1,4 @@
+import { describe, expect, it } from "vitest";
 import type { DataTableFilter, DataTableQueryState } from "@rolha/datatable";
 import { applyServerQuery, filterRow } from "./demo-query";
 
