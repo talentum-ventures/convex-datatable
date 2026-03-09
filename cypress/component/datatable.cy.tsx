@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { DataTable, type DataTableColumn, type DataTableDataSource, type DataTableFeatureFlags } from "@rolha/datatable";
+import { Toaster, toast } from "sonner";
 import { applyServerQuery } from "../../apps/demo/src/demo-query";
 
 type TaskRow = {
@@ -26,6 +27,12 @@ type MultiSelectRow = {
 type FilterableMultiSelectRow = {
   id: string;
   title: string;
+  tags: ReadonlyArray<string>;
+};
+
+type OptionParsingRow = {
+  id: string;
+  status: string;
   tags: ReadonlyArray<string>;
 };
 
@@ -146,6 +153,8 @@ const dateColumns: ReadonlyArray<DataTableColumn<DateRow>> = [
     field: "due",
     header: "Due",
     kind: "date",
+    locale: "pt-BR",
+    dateStyle: "medium",
     isEditable: true
   }
 ];
@@ -185,6 +194,34 @@ const multiSelectFilterColumns: ReadonlyArray<DataTableColumn<FilterableMultiSel
       { value: "urgent", label: "Urgent", colorClass: "bg-rose-100 text-rose-700" },
       { value: "backend", label: "Backend", colorClass: "bg-slate-100 text-slate-700" },
       { value: "ops", label: "Ops", colorClass: "bg-sky-100 text-sky-700" }
+    ]
+  }
+];
+
+const optionParsingColumns: ReadonlyArray<DataTableColumn<OptionParsingRow>> = [
+  {
+    id: "status",
+    field: "status",
+    header: "Status",
+    kind: "select",
+    isEditable: true,
+    width: 150,
+    options: [
+      { value: "todo", label: "To do", colorClass: "bg-slate-100 text-slate-700" },
+      { value: "done", label: "Done", colorClass: "bg-emerald-100 text-emerald-700" }
+    ]
+  },
+  {
+    id: "tags",
+    field: "tags",
+    header: "Tags",
+    kind: "multiselect",
+    isEditable: true,
+    width: 220,
+    options: [
+      { value: "urgent", label: "Urgent", colorClass: "bg-rose-100 text-rose-700" },
+      { value: "design", label: "Design", colorClass: "bg-violet-100 text-violet-700" },
+      { value: "backend", label: "Backend", colorClass: "bg-slate-100 text-slate-700" }
     ]
   }
 ];
@@ -246,6 +283,18 @@ function dispatchPlainTextPaste(win: Window, node: Element, text: string): boole
 
   node.dispatchEvent(pasteEvent);
   return pasteEvent.defaultPrevented;
+}
+
+function setInputValue(node: HTMLInputElement, value: string): void {
+  const ownerWindow = node.ownerDocument.defaultView;
+  const prototype = ownerWindow?.HTMLInputElement.prototype ?? HTMLInputElement.prototype;
+  const valueDescriptor = Object.getOwnPropertyDescriptor(prototype, "value");
+  const inputEvent = new Event("input", { bubbles: true });
+  const changeEvent = new Event("change", { bubbles: true });
+
+  valueDescriptor?.set?.call(node, value);
+  node.dispatchEvent(inputEvent);
+  node.dispatchEvent(changeEvent);
 }
 
 function Harness({
@@ -610,7 +659,14 @@ function DateHarness({ tableId }: { tableId: string }): JSX.Element {
         columns={dateColumns}
         dataSource={dataSource}
         getRowId={(row) => row.id}
-        features={{ editing: true, rowSelect: false, rowActions: false, infiniteScroll: false, virtualization: false }}
+        features={{
+          editing: true,
+          clipboardPaste: true,
+          rowSelect: false,
+          rowActions: false,
+          infiniteScroll: false,
+          virtualization: false
+        }}
       />
       <output data-testid="due-raw">{rows[0]?.due ?? ""}</output>
     </div>
@@ -696,6 +752,65 @@ function MultiSelectHarness({ tableId }: { tableId: string }): JSX.Element {
         features={{ editing: true, rowSelect: false, rowActions: false, infiniteScroll: false, virtualization: false }}
       />
       <output data-testid="tags-raw">{rows[0]?.tags.join(",") ?? ""}</output>
+    </div>
+  );
+}
+
+function StrictOptionParsingHarness({ tableId }: { tableId: string }): JSX.Element {
+  const [rows, setRows] = useState<ReadonlyArray<OptionParsingRow>>([
+    { id: "1", status: "done", tags: ["urgent"] }
+  ]);
+
+  const dataSource = useMemo<DataTableDataSource<OptionParsingRow>>(
+    () => ({
+      useRows: () => ({
+        rows,
+        hasMore: false,
+        isLoading: false,
+        isLoadingMore: false,
+        error: null,
+        loadMore: () => undefined,
+        refresh: () => undefined
+      }),
+      updateRows: async (changes) => {
+        setRows((current) =>
+          current.map((row) => {
+            const patch = changes.find((entry) => entry.rowId === row.id)?.patch;
+            return patch
+              ? {
+                  ...row,
+                  ...patch
+                }
+              : row;
+          })
+        );
+      },
+      createRow: async (draft) => {
+        const row: OptionParsingRow = {
+          id: crypto.randomUUID(),
+          status: String(draft.status ?? ""),
+          tags: Array.isArray(draft.tags) ? draft.tags.map((entry) => String(entry)) : []
+        };
+        setRows((current) => [row, ...current]);
+        return row;
+      }
+    }),
+    [rows]
+  );
+
+  return (
+    <div className="w-[420px] p-4">
+      <Toaster richColors closeButton />
+      <DataTable
+        tableId={tableId}
+        columns={optionParsingColumns}
+        dataSource={dataSource}
+        getRowId={(row) => row.id}
+        features={{ editing: true, rowAdd: true, clipboardPaste: true, rowSelect: false, rowActions: false, infiniteScroll: false, virtualization: false }}
+      />
+      <output data-testid="status-raw">{rows[0]?.status ?? ""}</output>
+      <output data-testid="tags-raw">{rows[0]?.tags.join(",") ?? ""}</output>
+      <output data-testid="row-count">{String(rows.length)}</output>
     </div>
   );
 }
@@ -1089,6 +1204,40 @@ describe("DataTable component", () => {
     cy.get("[data-testid='due-raw']").should("have.text", "2026-04-09");
   });
 
+  it("copies date cells as ISO clipboard values", () => {
+    cy.mount(<DateHarness tableId="cypress-table-date-copy" />);
+
+    cy.window().then((win) => {
+      const writeText = cy.stub().as("writeText");
+      Object.defineProperty(win.navigator, "clipboard", {
+        configurable: true,
+        value: {
+          writeText
+        }
+      });
+    });
+
+    cy.get("[role='gridcell'][data-column-id='due']").first().click();
+    cy.contains("button", "Copy").click();
+
+    cy.get("@writeText").should("have.been.calledWith", "2026-03-05");
+  });
+
+  it("pastes formatted date text into date cells as canonical ISO values", () => {
+    cy.mount(<DateHarness tableId="cypress-table-date-paste" />);
+
+    cy.get("[role='gridcell'][data-column-id='due']").first().click();
+
+    cy.window().then((win) =>
+      cy.findByRole("grid").then(($grid) => {
+        const defaultPrevented = dispatchPlainTextPaste(win, $grid[0], "2 de fev. de 2026");
+        expect(defaultPrevented).to.equal(true);
+      })
+    );
+
+    cy.get("[data-testid='due-raw']").should("have.text", "2026-02-02");
+  });
+
   it("edits multiselect cells with badges and a listbox dialog", () => {
     cy.mount(<MultiSelectHarness tableId="cypress-table-multiselect-edit" />);
 
@@ -1246,6 +1395,100 @@ describe("DataTable component", () => {
     );
 
     cy.findByTestId("title-raw").should("have.text", "Build UI");
+  });
+
+  it("canonicalizes pasted select labels to option values and preserves badge styling", () => {
+    cy.mount(<StrictOptionParsingHarness tableId="cypress-table-option-paste-select" />);
+
+    cy.get("[role='gridcell'][data-column-id='status']").first().click();
+
+    cy.window().then((win) =>
+      cy.findByRole("grid").then(($grid) => {
+        const defaultPrevented = dispatchPlainTextPaste(win, $grid[0], "To do");
+        expect(defaultPrevented).to.equal(true);
+      })
+    );
+
+    cy.findByTestId("status-raw").should("have.text", "todo");
+    cy.get("[role='gridcell'][data-column-id='status']").first().within(() => {
+      cy.contains("span", "To do").should("have.class", "bg-slate-100");
+    });
+  });
+
+  it("canonicalizes pasted multiselect labels to option values and preserves badge styling", () => {
+    cy.mount(<StrictOptionParsingHarness tableId="cypress-table-option-paste-multiselect" />);
+
+    cy.get("[role='gridcell'][data-column-id='tags']").first().click();
+
+    cy.window().then((win) =>
+      cy.findByRole("grid").then(($grid) => {
+        const defaultPrevented = dispatchPlainTextPaste(win, $grid[0], "Urgent, Design");
+        expect(defaultPrevented).to.equal(true);
+      })
+    );
+
+    cy.findByTestId("tags-raw").should("have.text", "urgent,design");
+    cy.get("[role='gridcell'][data-column-id='tags']").first().within(() => {
+      cy.contains("span", "Urgent").should("have.class", "bg-rose-100");
+      cy.contains("span", "Design").should("have.class", "bg-violet-100");
+    });
+  });
+
+  it("skips invalid pasted option cells while applying valid ones", () => {
+    cy.stub(toast, "error").as("toastError");
+    cy.mount(<StrictOptionParsingHarness tableId="cypress-table-option-paste-invalid" />);
+
+    cy.get("[role='gridcell'][data-column-id='status']").first().click();
+
+    cy.window().then((win) =>
+      cy.findByRole("grid").then(($grid) => {
+        const defaultPrevented = dispatchPlainTextPaste(win, $grid[0], "To do\tUrgent, Missing");
+        expect(defaultPrevented).to.equal(true);
+      })
+    );
+
+    cy.findByTestId("status-raw").should("have.text", "todo");
+    cy.findByTestId("tags-raw").should("have.text", "urgent");
+    cy.get("@toastError").should(
+      "have.been.calledWith",
+      "Paste applied with 1 invalid select/multiselect cell skipped."
+    );
+  });
+
+  it("creates a row from valid draft select and multiselect labels", () => {
+    cy.stub(toast, "success").as("toastSuccess");
+    cy.mount(<StrictOptionParsingHarness tableId="cypress-table-option-draft-valid" />);
+
+    cy.get("input[placeholder='Add Status']").then(($input) => {
+      setInputValue($input[0], "To do");
+    });
+    cy.get("input[placeholder='Add Tags']").then(($input) => {
+      setInputValue($input[0], "Urgent, Design");
+    });
+    cy.get("input[placeholder='Add Tags']").focus().trigger("keydown", { key: "Enter" });
+
+    cy.findByTestId("row-count").should("have.text", "2");
+    cy.findByTestId("status-raw").should("have.text", "todo");
+    cy.findByTestId("tags-raw").should("have.text", "urgent,design");
+    cy.get("@toastSuccess").should("have.been.calledWith", "Row added");
+  });
+
+  it("blocks draft row creation when select or multiselect text is invalid", () => {
+    cy.stub(toast, "error").as("toastError");
+    cy.mount(<StrictOptionParsingHarness tableId="cypress-table-option-draft-invalid" />);
+
+    cy.get("input[placeholder='Add Status']").then(($input) => {
+      setInputValue($input[0], "Missing option");
+    });
+    cy.get("input[placeholder='Add Status']").focus().trigger("keydown", { key: "Enter" });
+
+    cy.get("@toastError").should(
+      "have.been.calledWith",
+      "Cannot add row: invalid select/multiselect values in Status."
+    );
+    cy.findByTestId("row-count").should("have.text", "1");
+    cy.findByTestId("status-raw").should("have.text", "done");
+    cy.findByTestId("tags-raw").should("have.text", "urgent");
   });
 
   it("restores grid focus after escape so keyboard navigation resumes immediately", () => {

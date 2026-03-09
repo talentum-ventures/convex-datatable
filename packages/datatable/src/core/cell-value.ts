@@ -6,14 +6,21 @@ import type {
   SelectOption
 } from "./types";
 import { formatColumnValue, parseDateValue, parseTextNumber } from "./formatters";
+import { findOptionByValue, resolveMultiSelectTokens, resolveOptionToken } from "./select-options";
 
 function optionLabel(options: ReadonlyArray<SelectOption>, value: string): string {
-  for (const option of options) {
-    if (option.value === value) {
-      return option.label;
-    }
+  return findOptionByValue(options, value)?.label ?? value;
+}
+
+function serializeDateValue(value: DataTableCellValue, locale?: string): string {
+  if (value instanceof Date) {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   }
-  return value;
+
+  return parseDateValue(String(value ?? ""), locale);
 }
 
 function toReactValue(value: DataTableCellValue): DataTableReactValue {
@@ -91,6 +98,10 @@ export function serializeCellForClipboard<TRow extends DataTableRowModel>(
     return values.map((entry) => optionLabel(column.options, entry)).join(", ");
   }
 
+  if (column.kind === "date") {
+    return serializeDateValue(value, column.locale);
+  }
+
   if (column.kind === "reactNode") {
     return "";
   }
@@ -101,52 +112,101 @@ export function serializeCellForClipboard<TRow extends DataTableRowModel>(
   );
 }
 
+export type CellValueParseResult =
+  | {
+      ok: true;
+      value: DataTableCellValue;
+    }
+  | {
+      ok: false;
+      message: string;
+    };
+
 export function parseClipboardToCellValue<TRow extends DataTableRowModel>(
   column: DataTableColumn<TRow>,
   row: TRow,
   text: string
-): DataTableCellValue {
+): CellValueParseResult {
   if (column.parseClipboard) {
-    if (column.kind === "multiselect") {
-      return column.parseClipboard(text, row);
-    }
-
-    if (column.kind === "number" || column.kind === "currency") {
-      return column.parseClipboard(text, row);
-    }
-
-    if (column.kind === "date") {
-      return column.parseClipboard(text, row);
-    }
-
-    if (column.kind === "reactNode") {
-      return column.parseClipboard(text, row);
-    }
-
-    return column.parseClipboard(text, row);
+    return {
+      ok: true,
+      value: column.parseClipboard(text, row)
+    };
   }
 
   if (column.parseInput) {
-    return column.parseInput(text, row);
+    return {
+      ok: true,
+      value: column.parseInput(text, row)
+    };
   }
 
   switch (column.kind) {
     case "text":
     case "longText":
     case "link":
-    case "select":
-      return text;
+      return {
+        ok: true,
+        value: text
+      };
+    case "select": {
+      const trimmedText = text.trim();
+      if (trimmedText.length === 0) {
+        return {
+          ok: true,
+          value: ""
+        };
+      }
+
+      const option = resolveOptionToken(column.options, trimmedText);
+      if (!option) {
+        return {
+          ok: false,
+          message: `Invalid option "${trimmedText}"`
+        };
+      }
+
+      return {
+        ok: true,
+        value: option.value
+      };
+    }
     case "number":
     case "currency":
-      return parseTextNumber(text);
-    case "multiselect":
-      return text
-        .split(",")
-        .map((entry) => entry.trim())
-        .filter((entry) => entry.length > 0);
+      return {
+        ok: true,
+        value: parseTextNumber(text)
+      };
+    case "multiselect": {
+      if (text.trim().length === 0) {
+        return {
+          ok: true,
+          value: []
+        };
+      }
+
+      const resolvedTokens = resolveMultiSelectTokens(column.options, text);
+      if (!resolvedTokens.ok) {
+        return {
+          ok: false,
+          message: `Invalid option "${resolvedTokens.invalidToken}"`
+        };
+      }
+
+      return {
+        ok: true,
+        value: resolvedTokens.values
+      };
+    }
     case "date":
-      return parseDateValue(text);
+      return {
+        ok: true,
+        value: parseDateValue(text, column.locale)
+      };
     case "reactNode":
-      return text;
+      return {
+        ok: true,
+        value: text
+      };
   }
 }

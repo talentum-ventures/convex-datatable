@@ -84,7 +84,12 @@ import {
   pushDebugEvent,
   pushDebugEventThrottled
 } from "../core/debug";
-import { useColumnDefs, type CellCommit } from "../engine/build-columns";
+import {
+  renderColumnContent,
+  renderColumnEditor,
+  useColumnDefs,
+  type CellCommit
+} from "../engine/build-columns";
 import { expandPasteMatrix, parseTsv, serializeTsv } from "../selection/clipboard";
 import { normalizeRange } from "../selection/range";
 import { usePersistedState } from "../persistence/use-persisted-state";
@@ -182,6 +187,32 @@ export function canHandleGridPaste({
   return !isEditableKeyboardTarget(target);
 }
 
+function appendSkipSuffix(message: string, skippedNonEditable: number): string {
+  if (skippedNonEditable === 0) {
+    return message;
+  }
+
+  const cellLabel = skippedNonEditable === 1 ? "cell" : "cells";
+  return `${message} Skipped ${skippedNonEditable} non-editable ${cellLabel}.`;
+}
+
+function invalidOptionPasteMessage(appliedCells: number, skippedInvalidOptionCells: number): string {
+  const cellLabel = skippedInvalidOptionCells === 1 ? "cell" : "cells";
+  if (appliedCells > 0) {
+    return `Paste applied with ${skippedInvalidOptionCells} invalid select/multiselect ${cellLabel} skipped.`;
+  }
+
+  return `Paste skipped ${skippedInvalidOptionCells} invalid select/multiselect ${cellLabel}.`;
+}
+
+function hasDraftCellValue(value: DataTableCellValue): boolean {
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+
+  return value !== "" && value !== null && value !== undefined;
+}
+
 type CssVarsStyle = CSSProperties & {
   "--dt-font-family": string;
   "--dt-radius": string;
@@ -203,6 +234,7 @@ type ColumnMenuAnchor = "left" | "right";
 
 const COLUMN_MENU_WIDTH_PX = 288;
 const COLUMN_MENU_GUTTER_PX = 8;
+const DRAFT_ROW_ID = "__draft__";
 const useSafeLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 const TEXT_FILTER_OPERATORS: ReadonlyArray<FilterOperator> = [
@@ -515,6 +547,7 @@ export function DataTable<TRow extends DataTableRowModel>({
   const [optimisticRows, setOptimisticRows] = useState<Record<RowId, TRow>>({});
   const [deletedRows, setDeletedRows] = useState<Record<RowId, TRow>>({});
   const [draftRow, setDraftRow] = useState<Partial<TRow>>({});
+  const [draftEditingColumnId, setDraftEditingColumnId] = useState<string | null>(null);
   const commitCounter = useRef(0);
   const commitWindow = useRef<number[]>([]);
   const interactionSequence = useRef(0);
@@ -553,9 +586,11 @@ export function DataTable<TRow extends DataTableRowModel>({
   }, [deletedRowIds, getRowId, optimisticRows, rowsResult.rows]);
   const rowSelectionRef = useRef(rowSelection);
   const mergedRowsRef = useRef(mergedRows);
+  const draftRowRef = useRef(draftRow);
 
   rowSelectionRef.current = rowSelection;
   mergedRowsRef.current = mergedRows;
+  draftRowRef.current = draftRow;
 
   const rowHeights = useRowHeights({ minRowHeight });
   const setContentHeight = rowHeights.setContentHeight;
@@ -652,6 +687,7 @@ export function DataTable<TRow extends DataTableRowModel>({
   }, [debugScope, isDebugMode]);
 
   const onStartEdit = useCallback((rowId: RowId, columnId: string) => {
+    setDraftEditingColumnId(null);
     setEditingCell({ rowId, columnId });
   }, []);
 
@@ -893,7 +929,7 @@ export function DataTable<TRow extends DataTableRowModel>({
       cell: (context) => {
         const row = context.row.original;
         const rowId = getRowId(row);
-        return (
+        return ( 
           <div className="flex items-center justify-center py-1">
             <Checkbox
               aria-label={`Select row ${rowId}`}
@@ -1010,6 +1046,34 @@ export function DataTable<TRow extends DataTableRowModel>({
   const visibleDataColumns = visibleDataColumnIdsInUiOrder
     .map((columnId) => columnById.get(columnId))
     .filter((column): column is DataTableColumn<TRow> => Boolean(column));
+  const visibleDataColumnIndexById = useMemo(() => {
+    const indexById: Record<string, number> = {};
+
+    for (let index = 0; index < visibleDataColumns.length; index += 1) {
+      const column = visibleDataColumns[index];
+      if (!column) {
+        continue;
+      }
+
+      indexById[column.id] = index;
+    }
+
+    return indexById;
+  }, [visibleDataColumns]);
+  const firstVisibleDraftColumnId = useMemo(() => {
+    for (const column of visibleLeafColumnsInUiOrder) {
+      const columnConfig = columnById.get(column.id);
+      if (columnConfig) {
+        return columnConfig.id;
+      }
+    }
+
+    return orderedColumns[0]?.id ?? null;
+  }, [columnById, orderedColumns, visibleLeafColumnsInUiOrder]);
+  const draftHasValues = useMemo(
+    () => Object.values(draftRow).some((value) => hasDraftCellValue(value)),
+    [draftRow]
+  );
 
   const tableRows = table.getRowModel().rows;
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
@@ -1439,6 +1503,7 @@ export function DataTable<TRow extends DataTableRowModel>({
       const previousRows = new Map<RowId, TRow>();
       const patches = new Map<RowId, Partial<TRow>>();
       let skippedNonEditable = 0;
+      let skippedInvalidOptionCells = 0;
 
       for (let rowOffset = 0; rowOffset < expanded.length; rowOffset += 1) {
         const matrixRow = expanded[rowOffset];
@@ -1466,7 +1531,12 @@ export function DataTable<TRow extends DataTableRowModel>({
 
           const rawValue = matrixRow[columnOffset] ?? "";
           const parsedValue = parseClipboardToCellValue(column, row, rawValue);
-          const cellValidation = validateCell(column, row, parsedValue);
+          if (!parsedValue.ok) {
+            skippedInvalidOptionCells += 1;
+            continue;
+          }
+
+          const cellValidation = validateCell(column, row, parsedValue.value);
           if (!cellValidation.ok) {
             continue;
           }
@@ -1476,13 +1546,18 @@ export function DataTable<TRow extends DataTableRowModel>({
             rowId,
             {
               ...currentPatch,
-              [column.field]: parsedValue
+              [column.field]: parsedValue.value
             } as Partial<TRow>
           );
         }
       }
 
       if (patches.size === 0) {
+        if (skippedInvalidOptionCells > 0) {
+          toast.error(appendSkipSuffix(invalidOptionPasteMessage(0, skippedInvalidOptionCells), skippedNonEditable));
+          return;
+        }
+
         if (skippedNonEditable > 0) {
           toast.message(`Skipped ${skippedNonEditable} non-editable cells`);
         }
@@ -1490,6 +1565,8 @@ export function DataTable<TRow extends DataTableRowModel>({
       }
 
       const optimisticUpdate: Record<RowId, TRow> = {};
+      const groupedPatches: Array<{ rowId: RowId; patch: Partial<TRow> }> = [];
+      let appliedCells = 0;
       for (const [rowId, patch] of patches.entries()) {
         const source = previousRows.get(rowId);
         if (!source) {
@@ -1506,9 +1583,14 @@ export function DataTable<TRow extends DataTableRowModel>({
         }
 
         optimisticUpdate[rowId] = next;
+        groupedPatches.push({ rowId, patch });
+        appliedCells += Object.keys(patch).length;
       }
 
       if (Object.keys(optimisticUpdate).length === 0) {
+        if (skippedInvalidOptionCells > 0) {
+          toast.error(appendSkipSuffix(invalidOptionPasteMessage(0, skippedInvalidOptionCells), skippedNonEditable));
+        }
         return;
       }
 
@@ -1517,14 +1599,11 @@ export function DataTable<TRow extends DataTableRowModel>({
         ...optimisticUpdate
       }));
 
-      const groupedPatches = Array.from(patches.entries()).map(([rowId, patch]) => ({
-        rowId,
-        patch
-      }));
-
       try {
         await updateRows(groupedPatches);
-        if (skippedNonEditable > 0) {
+        if (skippedInvalidOptionCells > 0) {
+          toast.error(appendSkipSuffix(invalidOptionPasteMessage(appliedCells, skippedInvalidOptionCells), skippedNonEditable));
+        } else if (skippedNonEditable > 0) {
           toast.message(`Paste applied. Skipped ${skippedNonEditable} non-editable cells`);
         } else {
           toast.success("Paste applied");
@@ -1635,17 +1714,18 @@ export function DataTable<TRow extends DataTableRowModel>({
     ]
   );
 
-  const commitDraftRow = useCallback(async () => {
+  const commitDraftRow = useCallback(async (nextDraftRow?: Partial<TRow>) => {
     if (!mergedFeatures.rowAdd || !dataSource.createRow) {
       return;
     }
 
-    const hasValues = Object.values(draftRow).some((value) => value !== "" && value !== null);
+    const currentDraftRow = nextDraftRow ?? draftRowRef.current;
+    const hasValues = Object.values(currentDraftRow).some((value) => hasDraftCellValue(value));
     if (!hasValues) {
       return;
     }
 
-    const candidate = draftRow as TRow;
+    const candidate = currentDraftRow as TRow;
 
     for (const column of orderedColumns) {
       const value = candidate[column.field];
@@ -1664,14 +1744,40 @@ export function DataTable<TRow extends DataTableRowModel>({
     }
 
     try {
-      await dataSource.createRow(draftRow);
+      await dataSource.createRow(currentDraftRow);
+      draftRowRef.current = {};
       setDraftRow({});
+      setDraftEditingColumnId(null);
       rowsResult.refresh();
       toast.success("Row added");
     } catch (error) {
       toast.error(`Failed to create row: ${String(error)}`);
     }
-  }, [dataSource, draftRow, mergedFeatures.rowAdd, orderedColumns, rowSchema, rowsResult]);
+  }, [
+    dataSource,
+    mergedFeatures.rowAdd,
+    orderedColumns,
+    rowSchema,
+    rowsResult
+  ]);
+
+  const commitDraftCell = useCallback(
+    (column: DataTableColumn<TRow>, value: DataTableCellValue) => {
+      const nextDraftRow = {
+        ...draftRowRef.current,
+        [column.field]: value
+      };
+
+      draftRowRef.current = nextDraftRow;
+      setDraftRow(nextDraftRow);
+      setDraftEditingColumnId(null);
+    },
+    []
+  );
+
+  const cancelDraftCellEdit = useCallback(() => {
+    setDraftEditingColumnId(null);
+  }, []);
 
   const setColumnFilter = useCallback((columnId: string, nextFilter: DataTableFilter | null) => {
     setColumnFilters((current) => {
@@ -2051,9 +2157,17 @@ export function DataTable<TRow extends DataTableRowModel>({
             <Button
               size="sm"
               onClick={() => {
-                setDraftRow((current) => ({
-                  ...current
-                }));
+                rowVirtualizer.scrollToIndex(mergedRows.length, { align: "end" });
+
+                if (draftHasValues) {
+                  void commitDraftRow();
+                  return;
+                }
+
+                if (firstVisibleDraftColumnId) {
+                  setEditingCell(null);
+                  setDraftEditingColumnId(firstVisibleDraftColumnId);
+                }
               }}
             >
               <Plus className="h-4 w-4" />
@@ -2615,16 +2729,19 @@ export function DataTable<TRow extends DataTableRowModel>({
                     return null;
                   }
 
+                  const draftCandidateRow = draftRow as TRow;
+
                   return (
                     <tr
-                      key="__draft__"
-                      className="absolute left-0"
+                      key={DRAFT_ROW_ID}
+                      className="absolute left-0 bg-slate-50"
                       style={{
                         display: "flex",
                         transform: `translateY(${virtualRow.start}px)`,
                         height: `${virtualRow.size}px`,
                         width: `${columnRenderLayout.tableRenderWidth}px`
                       }}
+                      data-row-id={DRAFT_ROW_ID}
                       data-index={rowIndex}
                     >
                       {visibleLeafColumnsInUiOrder.map((column) => {
@@ -2638,41 +2755,85 @@ export function DataTable<TRow extends DataTableRowModel>({
                           );
                         }
 
-                        const rawValue = draftRow[columnConfig.field];
-                        const value =
-                          rawValue === null || rawValue === undefined ? "" : Array.isArray(rawValue) ? rawValue.join(", ") : String(rawValue);
+                        const value = draftRow[columnConfig.field];
+                        const isEditingDraftCell = draftEditingColumnId === columnConfig.id;
+                        const draftColumnIndex = visibleDataColumnIndexById[columnConfig.id] ?? 0;
+                        const showPlaceholder = !hasDraftCellValue(value);
+                        const content = isEditingDraftCell
+                          ? renderColumnEditor({
+                              column: columnConfig,
+                              row: draftCandidateRow,
+                              rowId: DRAFT_ROW_ID,
+                              value,
+                              onCommit: (nextValue) => {
+                                commitDraftCell(columnConfig, nextValue);
+                              },
+                              onCancel: cancelDraftCellEdit
+                            })
+                          : showPlaceholder
+                            ? (
+                                <span className="text-sm text-slate-400">{`Add ${columnConfig.header}`}</span>
+                              )
+                            : (
+                                renderColumnContent({
+                                  column: columnConfig,
+                                  row: draftCandidateRow,
+                                  rowId: DRAFT_ROW_ID,
+                                  value,
+                                  isEditing: false
+                                })
+                              );
 
                         return (
                           <td
                             key={`draft-${column.id}`}
                             style={widthStyle}
-                            className="border-r border-b border-slate-200 bg-slate-50 px-2 py-1"
+                            className="border-r border-b border-slate-200 bg-slate-50 align-top"
                           >
-                            <Input
-                              value={value}
-                              placeholder={`Add ${columnConfig.header}`}
-                              onChange={(event) => {
-                                const nextValue = parseClipboardToCellValue(
-                                  columnConfig,
-                                  draftRow as TRow,
-                                  event.target.value
-                                );
-
-                                setDraftRow((current) => ({
-                                  ...current,
-                                  [columnConfig.field]: nextValue
-                                }));
+                            <div
+                              role="gridcell"
+                              data-row-id={DRAFT_ROW_ID}
+                              data-row-index={rowIndex}
+                              data-column-id={columnConfig.id}
+                              data-column-index={draftColumnIndex}
+                              className={cn(
+                                "group relative box-border h-full min-h-10 w-full min-w-0 px-2 py-1 text-sm text-slate-800",
+                                isEditingDraftCell &&
+                                  (columnConfig.kind === "select" ||
+                                    columnConfig.kind === "multiselect" ||
+                                    columnConfig.kind === "date")
+                                  ? "z-20 overflow-visible bg-white"
+                                  : "overflow-hidden",
+                                isEditingDraftCell ? "outline outline-2 outline-[var(--dt-active-cell-ring)] outline-offset-[-2px]" : ""
+                              )}
+                              onClick={() => {
+                                setEditingCell(null);
+                                setDraftEditingColumnId(columnConfig.id);
                               }}
-                              onBlur={() => {
-                                void commitDraftRow();
+                              onDoubleClick={() => {
+                                setEditingCell(null);
+                                setDraftEditingColumnId(columnConfig.id);
                               }}
                               onKeyDown={(event) => {
-                                if (event.key === "Enter") {
+                                if (event.key === "Enter" || event.key === "F2") {
                                   event.preventDefault();
-                                  void commitDraftRow();
+                                  setEditingCell(null);
+                                  setDraftEditingColumnId(columnConfig.id);
                                 }
                               }}
-                            />
+                              tabIndex={0}
+                            >
+                              {content}
+                              {!isEditingDraftCell ? (
+                                <span className="pointer-events-none absolute right-1 top-1 hidden rounded bg-white/80 p-0.5 text-slate-500 group-hover:block">
+                                  <Plus className="h-3 w-3" />
+                                </span>
+                              ) : (
+                                <span className="pointer-events-none absolute right-1 top-1 rounded bg-emerald-100 p-0.5 text-emerald-700">
+                                  <Plus className="h-3 w-3" />
+                                </span>
+                              )}
+                            </div>
                           </td>
                         );
                       })}

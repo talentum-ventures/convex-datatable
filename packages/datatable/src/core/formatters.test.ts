@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatColumnValue } from "./formatters";
+import { formatColumnValue, parseDateValue } from "./formatters";
 import type { DataTableColumn } from "./types";
 
 type Row = {
@@ -41,5 +41,12 @@ describe("formatters", () => {
     };
 
     expect(formatColumnValue(dateColumn, "not-a-date")).toBe("");
+  });
+
+  it("normalizes parseable date input to ISO date strings", () => {
+    expect(parseDateValue("2026-03-05")).toBe("2026-03-05");
+    expect(parseDateValue("2026-03-05T00:00:00.000Z")).toBe("2026-03-05");
+    expect(parseDateValue("3/6/26")).toBe("2026-03-06");
+    expect(parseDateValue("2 de fev. de 2026", "pt-BR")).toBe("2026-02-02");
   });
 });

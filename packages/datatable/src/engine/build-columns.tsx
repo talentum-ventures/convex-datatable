@@ -13,6 +13,7 @@ import type {
 } from "../core/types";
 import { cn } from "../core/cn";
 import { formatColumnValue, parseDateValue, parseTextNumber } from "../core/formatters";
+import { findOptionByValue } from "../core/select-options";
 import { Input } from "../ui/primitives";
 import { getVisibleDataColumnIdsInUiOrder } from "../ui/visible-column-order";
 
@@ -43,15 +44,6 @@ export type BuildColumnsArgs<TRow extends DataTableRowModel> = {
   onRangeSelect: (coord: CellCoord) => void;
   enableEditing: boolean;
 };
-
-function findOption(options: ReadonlyArray<SelectOption>, value: string): SelectOption | null {
-  for (const option of options) {
-    if (option.value === value) {
-      return option;
-    }
-  }
-  return null;
-}
 
 function isInRange(cell: CellCoord, start: ActiveCell, end: ActiveCell): boolean {
   if (!start || !end) {
@@ -90,7 +82,7 @@ function parseEditorValue<TRow extends DataTableRowModel>(
     case "currency":
       return parseTextNumber(raw);
     case "date":
-      return parseDateValue(raw);
+      return parseDateValue(raw, column.locale);
     case "multiselect":
       return raw
         .split(",")
@@ -384,7 +376,7 @@ function MultiSelectBadges({
   return (
     <div className="flex flex-wrap gap-1">
       {values.map((entry) => {
-        const option = findOption(options, entry);
+        const option = findOptionByValue(options, entry);
         const Icon = option?.icon;
         return (
           <span
@@ -521,7 +513,7 @@ function SelectMenuEditor<TRow extends DataTableRowModel>({
     activeNode?.scrollIntoView({ block: "nearest" });
   }, [activeIndex]);
 
-  const selectedOption = findOption(column.options, String(value ?? ""));
+  const selectedOption = findOptionByValue(column.options, String(value ?? ""));
 
   const commitIndex = (index: number): void => {
     const option = column.options[index];
@@ -993,12 +985,104 @@ function DefaultEditor<TRow extends DataTableRowModel>({
   );
 }
 
+type SharedCellContentArgs<TRow extends DataTableRowModel> = {
+  column: DataTableColumn<TRow>;
+  row: TRow;
+  rowId: RowId;
+  value: DataTableCellValue;
+  isEditing: boolean;
+};
+
+type SharedCellEditorArgs<TRow extends DataTableRowModel> = {
+  column: DataTableColumn<TRow>;
+  row: TRow;
+  rowId: RowId;
+  value: DataTableCellValue;
+  onCommit: (nextValue: DataTableCellValue) => void;
+  onCancel: () => void;
+};
+
+export function renderColumnContent<TRow extends DataTableRowModel>({
+  column,
+  row,
+  rowId,
+  value,
+  isEditing
+}: SharedCellContentArgs<TRow>): ReactNode {
+  const customCell = column.renderCell as
+    | ((ctx: {
+        row: TRow;
+        rowId: RowId;
+        value: DataTableCellValue;
+        isEditing: boolean;
+      }) => ReactNode)
+    | undefined;
+
+  if (customCell) {
+    return (
+      <>
+        {customCell({
+          row,
+          rowId,
+          value: column.kind === "reactNode" ? toReactValue(value) : value,
+          isEditing
+        })}
+      </>
+    );
+  }
+
+  return renderDefaultCell(column, value);
+}
+
+export function renderColumnEditor<TRow extends DataTableRowModel>({
+  column,
+  row,
+  rowId,
+  value,
+  onCommit,
+  onCancel
+}: SharedCellEditorArgs<TRow>): ReactNode {
+  const customEditor = column.renderEditor as
+    | ((ctx: {
+        row: TRow;
+        rowId: RowId;
+        value: DataTableCellValue;
+        commit: (nextValue: DataTableCellValue) => void;
+        cancel: () => void;
+      }) => ReactNode)
+    | undefined;
+
+  if (customEditor) {
+    return (
+      <>
+        {customEditor({
+          row,
+          rowId,
+          value: column.kind === "reactNode" ? toReactValue(value) : value,
+          commit: onCommit,
+          cancel: onCancel
+        })}
+      </>
+    );
+  }
+
+  return (
+    <DefaultEditor
+      column={column}
+      row={row}
+      value={value}
+      onCommit={onCommit}
+      onCancel={onCancel}
+    />
+  );
+}
+
 function renderDefaultCell<TRow extends DataTableRowModel>(
   column: DataTableColumn<TRow>,
   value: DataTableCellValue
 ): JSX.Element {
   if (column.kind === "select") {
-    const option = findOption(column.options, String(value));
+    const option = findOptionByValue(column.options, String(value));
     if (!option) {
       return <span className="text-slate-700">{String(value ?? "")}</span>;
     }
@@ -1127,65 +1211,25 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
           currentEditingCell?.rowId === rowId && currentEditingCell?.columnId === column.id;
         const canEdit = enableEditing && (column.isEditable ?? false);
 
-        const customEditor = column.renderEditor as
-          | ((ctx: {
-              row: TRow;
-              rowId: RowId;
-              value: DataTableCellValue;
-              commit: (nextValue: DataTableCellValue) => void;
-              cancel: () => void;
-            }) => ReactNode)
-          | undefined;
-
-        const customCell = column.renderCell as
-          | ((ctx: {
-              row: TRow;
-              rowId: RowId;
-              value: DataTableCellValue;
-              isEditing: boolean;
-            }) => ReactNode)
-          | undefined;
-
         const content = isEditing ? (
-          customEditor ? (
-            <>{
-              customEditor({
-                row,
-                rowId,
-                value: column.kind === "reactNode" ? toReactValue(value) : value,
-                commit: (nextValue) => {
-                  onCommit({
-                    row,
-                    rowId,
-                    column,
-                    value: nextValue
-                  });
-                },
-                cancel: onCancelEdit
-              })
-            }</>
-          ) : (
-            <DefaultEditor
-              column={column}
-              row={row}
-              value={value}
-              onCommit={(nextValue) => {
-                onCommit({ row, rowId, column, value: nextValue });
-              }}
-              onCancel={onCancelEdit}
-            />
-          )
-        ) : customCell ? (
-          <>{
-            customCell({
-              row,
-              rowId,
-              value: column.kind === "reactNode" ? toReactValue(value) : value,
-              isEditing
-            })
-          }</>
+          renderColumnEditor({
+            column,
+            row,
+            rowId,
+            value,
+            onCommit: (nextValue) => {
+              onCommit({ row, rowId, column, value: nextValue });
+            },
+            onCancel: onCancelEdit
+          })
         ) : (
-          renderDefaultCell(column, value)
+          renderColumnContent({
+            column,
+            row,
+            rowId,
+            value,
+            isEditing
+          })
         );
 
         return (
