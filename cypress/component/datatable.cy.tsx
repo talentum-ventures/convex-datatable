@@ -1,7 +1,7 @@
 /// <reference types="@testing-library/cypress" />
 
 import { useMemo, useState } from "react";
-import { DataTable, type DataTableColumn, type DataTableDataSource } from "@rolha/datatable";
+import { DataTable, type DataTableColumn, type DataTableDataSource, type DataTableFeatureFlags } from "@rolha/datatable";
 import { applyServerQuery } from "../../apps/demo/src/demo-query";
 
 type TaskRow = {
@@ -226,11 +226,49 @@ function assertBodyColumnWidthConsistency(columnId: string, firstRowId: string, 
     });
 }
 
-function Harness({ tableId }: { tableId: string }): JSX.Element {
+function dispatchPlainTextPaste(win: Window, node: Element, text: string): boolean {
+  const pasteEvent =
+    typeof win.ClipboardEvent === "function"
+      ? new win.ClipboardEvent("paste", {
+          bubbles: true,
+          cancelable: true
+        })
+      : new win.Event("paste", {
+          bubbles: true,
+          cancelable: true
+        });
+
+  Object.defineProperty(pasteEvent, "clipboardData", {
+    value: {
+      getData: (format: string): string => (format === "text/plain" ? text : "")
+    }
+  });
+
+  node.dispatchEvent(pasteEvent);
+  return pasteEvent.defaultPrevented;
+}
+
+function Harness({
+  tableId,
+  features
+}: {
+  tableId: string;
+  features?: DataTableFeatureFlags;
+}): JSX.Element {
   const [rows, setRows] = useState<ReadonlyArray<TaskRow>>([
     { id: "1", title: "Build UI", status: "todo", amount: 10 },
     { id: "2", title: "Ship", status: "done", amount: 20 }
   ]);
+  const tableFeatures = useMemo<DataTableFeatureFlags>(
+    () => ({
+      editing: true,
+      rowDelete: true,
+      rowAdd: true,
+      clipboardPaste: true,
+      ...features
+    }),
+    [features]
+  );
 
   const dataSource = useMemo<DataTableDataSource<TaskRow>>(
     () => ({
@@ -283,8 +321,11 @@ function Harness({ tableId }: { tableId: string }): JSX.Element {
         columns={columns}
         dataSource={dataSource}
         getRowId={(row) => row.id}
-        features={{ editing: true, rowDelete: true, rowAdd: true, clipboardPaste: true }}
+        features={tableFeatures}
       />
+      <output data-testid="title-raw">{rows[0]?.title ?? ""}</output>
+      <output data-testid="status-raw">{rows[0]?.status ?? ""}</output>
+      <output data-testid="amount-raw">{String(rows[0]?.amount ?? "")}</output>
     </div>
   );
 }
@@ -1153,6 +1194,58 @@ describe("DataTable component", () => {
     cy.findByLabelText("Edit Title").should("not.exist");
     cy.findByRole("grid").should("have.focus").trigger("keydown", { key: "Enter" });
     cy.findByLabelText("Edit Title").should("exist");
+  });
+
+  it("applies enhanced paste only while sheet selection mode owns the grid", () => {
+    cy.mount(<Harness tableId="cypress-table-grid-paste-selection" />);
+
+    cy.get("[role='gridcell'][data-column-id='title']").first().click();
+
+    cy.window().then((win) =>
+      cy.findByRole("grid").then(($grid) => {
+        const defaultPrevented = dispatchPlainTextPaste(win, $grid[0], "Pasted title");
+        expect(defaultPrevented).to.equal(true);
+      })
+    );
+
+    cy.findByTestId("title-raw").should("have.text", "Pasted title");
+  });
+
+  it("does not hijack paste while editing inside a cell", () => {
+    cy.mount(<Harness tableId="cypress-table-editor-native-paste" />);
+
+    cy.contains("Build UI").dblclick();
+    cy.findByLabelText("Edit Title").should("exist");
+
+    cy.window().then((win) =>
+      cy.findByLabelText("Edit Title").then(($editor) => {
+        const defaultPrevented = dispatchPlainTextPaste(win, $editor[0], "native paste");
+        expect(defaultPrevented).to.equal(false);
+      })
+    );
+
+    cy.findByLabelText("Edit Title").should("exist");
+    cy.findByTestId("title-raw").should("have.text", "Build UI");
+  });
+
+  it("does not apply enhanced paste when cell selection is disabled", () => {
+    cy.mount(
+      <Harness
+        tableId="cypress-table-grid-paste-disabled-without-selection"
+        features={{ cellSelect: false }}
+      />
+    );
+
+    cy.get("[role='gridcell'][data-column-id='title']").first().click();
+
+    cy.window().then((win) =>
+      cy.findByRole("grid").then(($grid) => {
+        const defaultPrevented = dispatchPlainTextPaste(win, $grid[0], "Should not paste");
+        expect(defaultPrevented).to.equal(false);
+      })
+    );
+
+    cy.findByTestId("title-raw").should("have.text", "Build UI");
   });
 
   it("restores grid focus after escape so keyboard navigation resumes immediately", () => {

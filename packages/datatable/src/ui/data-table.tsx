@@ -99,6 +99,15 @@ type EditingCell = {
   columnId: string;
 } | null;
 
+type GridPasteEligibilityArgs = {
+  clipboardPaste: boolean;
+  editing: boolean;
+  cellSelect: boolean;
+  editingCell: EditingCell;
+  hasUpdateRows: boolean;
+  target?: EventTarget | null;
+};
+
 function applyUpdater<TValue>(updater: Updater<TValue>, current: TValue): TValue {
   if (typeof updater === "function") {
     const fn = updater as (old: TValue) => TValue;
@@ -151,11 +160,26 @@ function isEditableKeyboardTarget(target: EventTarget | null): boolean {
     return true;
   }
 
-  if (element.isContentEditable) {
+  if (element.isContentEditable || element.getAttribute("contenteditable") === "true") {
     return true;
   }
 
   return element.closest("[data-dt-editor-root='true'], [data-dt-editor-dialog='true']") !== null;
+}
+
+export function canHandleGridPaste({
+  clipboardPaste,
+  editing,
+  cellSelect,
+  editingCell,
+  hasUpdateRows,
+  target = null
+}: GridPasteEligibilityArgs): boolean {
+  if (!clipboardPaste || !editing || !cellSelect || editingCell !== null || !hasUpdateRows) {
+    return false;
+  }
+
+  return !isEditableKeyboardTarget(target);
 }
 
 type CssVarsStyle = CSSProperties & {
@@ -1375,7 +1399,19 @@ export function DataTable<TRow extends DataTableRowModel>({
 
   const pasteFromText = useCallback(
     async (text: string) => {
-      if (!mergedFeatures.clipboardPaste || !mergedFeatures.editing || !dataSource.updateRows) {
+      const updateRows = dataSource.updateRows;
+      if (
+        !canHandleGridPaste({
+          clipboardPaste: mergedFeatures.clipboardPaste,
+          editing: mergedFeatures.editing,
+          cellSelect: mergedFeatures.cellSelect,
+          editingCell,
+          hasUpdateRows: updateRows !== undefined
+        })
+      ) {
+        return;
+      }
+      if (updateRows === undefined) {
         return;
       }
 
@@ -1487,7 +1523,7 @@ export function DataTable<TRow extends DataTableRowModel>({
       }));
 
       try {
-        await dataSource.updateRows(groupedPatches);
+        await updateRows(groupedPatches);
         if (skippedNonEditable > 0) {
           toast.message(`Paste applied. Skipped ${skippedNonEditable} non-editable cells`);
         } else {
@@ -1512,11 +1548,13 @@ export function DataTable<TRow extends DataTableRowModel>({
       dataSource,
       getRowId,
       mergedFeatures.clipboardPaste,
+      mergedFeatures.cellSelect,
       mergedFeatures.editing,
       mergedRows,
       rangeStart,
       rowSchema,
-      visibleDataColumns
+      visibleDataColumns,
+      editingCell
     ]
   );
 
@@ -1580,7 +1618,7 @@ export function DataTable<TRow extends DataTableRowModel>({
       }
 
       if (commandKey && event.key.toLowerCase() === "v" && mergedFeatures.clipboardPaste) {
-        // Keep default browser paste event and handle via onPaste.
+        // Keep default browser paste event and conditionally handle it via onPaste in selection mode.
       }
     },
     [
@@ -2142,7 +2180,16 @@ export function DataTable<TRow extends DataTableRowModel>({
           });
         }}
         onPaste={(event) => {
-          if (!mergedFeatures.clipboardPaste) {
+          if (
+            !canHandleGridPaste({
+              clipboardPaste: mergedFeatures.clipboardPaste,
+              editing: mergedFeatures.editing,
+              cellSelect: mergedFeatures.cellSelect,
+              editingCell,
+              hasUpdateRows: dataSource.updateRows !== undefined,
+              target: event.target
+            })
+          ) {
             return;
           }
           const text = event.clipboardData.getData("text/plain");
