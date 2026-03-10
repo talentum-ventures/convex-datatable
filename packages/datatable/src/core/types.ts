@@ -91,6 +91,7 @@ export type DataTableFeatureFlags = {
   clipboardCopy?: boolean;
   clipboardPaste?: boolean;
   undo?: boolean;
+  autoSave?: boolean;
   infiniteScroll?: boolean;
   virtualization?: boolean;
 };

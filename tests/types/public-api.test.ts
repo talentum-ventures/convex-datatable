@@ -7,6 +7,7 @@ import type {
   ConvexPresenceConfig,
   DataTableColumn,
   DataTableDataSource,
+  DataTableFeatureFlags,
   DataTableProps,
   DataTableRowAction
 } from "@rolha/datatable";
@@ -108,11 +109,16 @@ const dataSource: DataTableDataSource<InvoiceRow> = {
   })
 };
 
+const featureFlags: DataTableFeatureFlags = {
+  autoSave: false
+};
+
 const props: DataTableProps<InvoiceRow> = {
   tableId: "invoice-table",
   columns,
   getRowId: (row) => row.id,
   dataSource,
+  features: featureFlags,
   rowSchema: z.object({
     id: z.string(),
     description: z.string(),

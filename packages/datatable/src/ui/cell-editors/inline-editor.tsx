@@ -13,16 +13,21 @@ export type InlineContentEditorProps<TRow extends DataTableRowModel> = DefaultEd
   initialText: string;
 };
 
+const AUTO_SAVE_DEBOUNCE_MS = 300;
+
 export function InlineContentEditor<TRow extends DataTableRowModel>({
   column,
   row,
   onCommit,
+  onAutoSave,
   onCancel,
   initialText
 }: InlineContentEditorProps<TRow>): JSX.Element {
   const editorRef = useRef<HTMLDivElement | null>(null);
+  const initialTextRef = useRef(initialText);
   const draftRef = useRef(initialText);
   const finalizedRef = useRef(false);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const node = editorRef.current;
@@ -30,13 +35,26 @@ export function InlineContentEditor<TRow extends DataTableRowModel>({
       return;
     }
 
-    setEditableText(node, initialText);
+    setEditableText(node, initialTextRef.current);
     focusEditableAtEnd(node);
-  }, [initialText]);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current !== null) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, []);
 
   const commit = (): void => {
     if (finalizedRef.current) {
       return;
+    }
+
+    if (autoSaveTimerRef.current !== null) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
     }
 
     finalizedRef.current = true;
@@ -47,6 +65,11 @@ export function InlineContentEditor<TRow extends DataTableRowModel>({
   const cancel = (): void => {
     if (finalizedRef.current) {
       return;
+    }
+
+    if (autoSaveTimerRef.current !== null) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
     }
 
     finalizedRef.current = true;
@@ -71,6 +94,24 @@ export function InlineContentEditor<TRow extends DataTableRowModel>({
         )}
         onInput={(event) => {
           draftRef.current = readEditableText(event.currentTarget);
+
+          if (!onAutoSave || finalizedRef.current) {
+            return;
+          }
+
+          if (autoSaveTimerRef.current !== null) {
+            clearTimeout(autoSaveTimerRef.current);
+          }
+
+          autoSaveTimerRef.current = setTimeout(() => {
+            autoSaveTimerRef.current = null;
+            if (finalizedRef.current) {
+              return;
+            }
+
+            const parsed = parseEditorValue(column, draftRef.current, row);
+            onAutoSave(parsed);
+          }, AUTO_SAVE_DEBOUNCE_MS);
         }}
         onBlur={() => {
           commit();

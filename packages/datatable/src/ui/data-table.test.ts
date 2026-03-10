@@ -145,7 +145,7 @@ describe("header content alignment", () => {
 describe("DataTable surfaces", () => {
   it("supports a plain surface without the framed shell styles", () => {
     const { container } = render(
-      createElement(DataTable, {
+      createElement(DataTable<TestRow>, {
         tableId: "plain-surface",
         columns,
         getRowId: (row: TestRow) => row.id,
@@ -159,9 +159,14 @@ describe("DataTable surfaces", () => {
     const grid = screen.getByRole("grid");
     const shell = grid.parentElement?.parentElement;
 
-    expect(root).toHaveClass("w-full", "bg-transparent", "p-0", "shadow-none");
-    expect(root).not.toHaveClass("border");
-    expect(shell).toHaveClass("bg-transparent", "border-0", "rounded-none");
+    expect(root?.classList.contains("w-full")).toBe(true);
+    expect(root?.classList.contains("bg-transparent")).toBe(true);
+    expect(root?.classList.contains("p-0")).toBe(true);
+    expect(root?.classList.contains("shadow-none")).toBe(true);
+    expect(root?.classList.contains("border")).toBe(false);
+    expect(shell?.classList.contains("bg-transparent")).toBe(true);
+    expect(shell?.classList.contains("border-0")).toBe(true);
+    expect(shell?.classList.contains("rounded-none")).toBe(true);
   });
 });
 
@@ -170,7 +175,7 @@ describe("DataTable active-cell broadcasts", () => {
     const onActiveCellChange = vi.fn<(cell: CollaboratorCellCoord | null) => void>();
     const initialRows = [{ id: "row-1", name: "Alpha" }];
     const { rerender } = render(
-      createElement(DataTable, {
+      createElement(DataTable<TestRow>, {
         tableId: "active-cell-dedupe",
         columns,
         getRowId: (row: TestRow) => row.id,
@@ -191,7 +196,7 @@ describe("DataTable active-cell broadcasts", () => {
     });
 
     rerender(
-      createElement(DataTable, {
+      createElement(DataTable<TestRow>, {
         tableId: "active-cell-dedupe",
         columns,
         getRowId: (row: TestRow) => row.id,

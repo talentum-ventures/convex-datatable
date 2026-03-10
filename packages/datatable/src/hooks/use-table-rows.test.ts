@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { toast } from "sonner";
 import { useUndoStack } from "./use-undo-stack";
 import { useTableRows } from "./use-table-rows";
 import type {
@@ -40,7 +41,10 @@ if (!titleColumn) {
 }
 
 function createDataSource(
-  createRow: NonNullable<DataTableDataSource<TestRow>["createRow"]>
+  options: {
+    createRow?: NonNullable<DataTableDataSource<TestRow>["createRow"]>;
+    updateRows?: NonNullable<DataTableDataSource<TestRow>["updateRows"]>;
+  }
 ): DataTableDataSource<TestRow> {
   return {
     useRows: () => ({
@@ -52,20 +56,22 @@ function createDataSource(
       loadMore: () => undefined,
       refresh: () => undefined
     }),
-    createRow
+    ...(options.createRow ? { createRow: options.createRow } : {}),
+    ...(options.updateRows ? { updateRows: options.updateRows } : {})
   };
 }
 
 function useTestTableRows(
   dataSource: DataTableDataSource<TestRow>,
   rowsRefresh: () => void,
-  rowSchema?: RowSchema<TestRow>
+  rowSchema?: RowSchema<TestRow>,
+  sourceRows: ReadonlyArray<TestRow> = []
 ) {
   const [, setEditingCell] = useState<EditingCellState>(null);
   const undoStack = useUndoStack<TestRow>();
 
   return useTableRows<TestRow>({
-    sourceRows: [],
+    sourceRows,
     getRowId: (row) => row.id,
     orderedColumns: columns,
     rowSchema,
@@ -103,7 +109,7 @@ describe("useTableRows", () => {
             }
     };
     const { result } = renderHook(() =>
-      useTestTableRows(createDataSource(createRow), rowsRefresh, rowSchema)
+      useTestTableRows(createDataSource({ createRow }), rowsRefresh, rowSchema)
     );
 
     act(() => {
@@ -125,10 +131,12 @@ describe("useTableRows", () => {
   it("discards the draft row values", () => {
     const { result } = renderHook(() =>
       useTestTableRows(
-        createDataSource(async (draft) => ({
-          id: "row-1",
-          title: String(draft.title ?? "")
-        })),
+        createDataSource({
+          createRow: async (draft) => ({
+            id: "row-1",
+            title: String(draft.title ?? "")
+          })
+        }),
         vi.fn()
       )
     );
@@ -144,5 +152,61 @@ describe("useTableRows", () => {
 
     expect(result.current.draftRow).toEqual({});
     expect(result.current.draftEditingColumnId).toBeNull();
+  });
+
+  it("autosaves valid cell edits optimistically and persists them", async () => {
+    const row = { id: "row-1", title: "Alpha" };
+    const updateRows = vi.fn(async () => undefined);
+    const { result } = renderHook(() =>
+      useTestTableRows(createDataSource({ updateRows }), vi.fn(), undefined, [row])
+    );
+
+    await act(async () => {
+      await result.current.autoSaveCellEdit({
+        row,
+        rowId: "row-1",
+        column: titleColumn,
+        value: "Beta"
+      });
+    });
+
+    expect(result.current.optimisticRows).toEqual({
+      "row-1": {
+        id: "row-1",
+        title: "Beta"
+      }
+    });
+    expect(updateRows).toHaveBeenCalledTimes(1);
+    expect(updateRows).toHaveBeenCalledWith([
+      {
+        rowId: "row-1",
+        patch: {
+          title: "Beta"
+        }
+      }
+    ]);
+  });
+
+  it("rolls back autosave when persistence fails", async () => {
+    const row = { id: "row-1", title: "Alpha" };
+    const updateRows = vi.fn(async () => {
+      throw new Error("offline");
+    });
+    const { result } = renderHook(() =>
+      useTestTableRows(createDataSource({ updateRows }), vi.fn(), undefined, [row])
+    );
+
+    await act(async () => {
+      await result.current.autoSaveCellEdit({
+        row,
+        rowId: "row-1",
+        column: titleColumn,
+        value: "Beta"
+      });
+    });
+
+    expect(result.current.optimisticRows).toEqual({});
+    expect(updateRows).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith("Failed to update row: Error: offline");
   });
 });

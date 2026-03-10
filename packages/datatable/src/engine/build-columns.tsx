@@ -22,6 +22,7 @@ export type BuildColumnsArgs<TRow extends DataTableRowModel> = {
   getRowId: (row: TRow) => RowId;
   onStartEdit: (rowId: RowId, columnId: string) => void;
   onCommit: CellCommit<TRow>;
+  onAutoSave?: CellCommit<TRow>;
   onCancelEdit: () => void;
   onCellSelect: (coord: CellCoord) => void;
   onRangeSelect: (coord: CellCoord) => void;
@@ -33,6 +34,7 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
   getRowId,
   onStartEdit,
   onCommit,
+  onAutoSave,
   onCancelEdit,
   onCellSelect,
   onRangeSelect,
@@ -97,6 +99,7 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
               onStartEdit={onStartEdit}
               onCellSelect={onCellSelect}
               onRangeSelect={onRangeSelect}
+              {...(onAutoSave ? { onAutoSave } : {})}
             />
           );
         }
@@ -118,6 +121,7 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
     columns,
     enableEditing,
     getRowId,
+    onAutoSave,
     onCancelEdit,
     onCellSelect,
     onCommit,

@@ -38,6 +38,12 @@ export type DataCellProps<TRow extends DataTableRowModel> = {
     column: DataTableColumn<TRow>;
     value: DataTableCellValue;
   }) => void;
+  onAutoSave?: (args: {
+    row: TRow;
+    rowId: RowId;
+    column: DataTableColumn<TRow>;
+    value: DataTableCellValue;
+  }) => void;
   onCancelEdit: () => void;
   onStartEdit: (rowId: RowId, columnId: string) => void;
   onCellSelect: (coord: CellCoord) => void;
@@ -53,6 +59,7 @@ const DataCellInner = <TRow extends DataTableRowModel>({
   columnIndex,
   enableEditing,
   onCommit,
+  onAutoSave,
   onCancelEdit,
   onStartEdit,
   onCellSelect,
@@ -83,7 +90,14 @@ const DataCellInner = <TRow extends DataTableRowModel>({
         onCommit: (nextValue) => {
           onCommit({ row, rowId, column, value: nextValue });
         },
-        onCancel: onCancelEdit
+        onCancel: onCancelEdit,
+        ...(onAutoSave
+          ? {
+              onAutoSave: (nextValue: DataTableCellValue) => {
+                onAutoSave({ row, rowId, column, value: nextValue });
+              }
+            }
+          : {})
       })
     : renderColumnContent({
         column,

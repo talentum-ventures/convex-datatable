@@ -26,6 +26,7 @@ export const DEFAULT_FEATURE_FLAGS: Required<DataTableFeatureFlags> = {
   clipboardCopy: true,
   clipboardPaste: false,
   undo: false,
+  autoSave: true,
   infiniteScroll: true,
   virtualization: true
 };

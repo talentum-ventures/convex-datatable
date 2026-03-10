@@ -66,6 +66,7 @@ export type UseTableRowsResult<TRow extends DataTableRowModel> = {
   onStartEdit: (rowId: RowId, columnId: string) => void;
   onCancelEdit: () => void;
   commitCellEdit: CellCommit<TRow>;
+  autoSaveCellEdit: CellCommit<TRow>;
   deleteRowsNow: (rowsToDelete: ReadonlyArray<TRow>) => Promise<void>;
   commitDraftRow: (nextDraftRow?: Partial<TRow>) => Promise<void>;
   commitDraftCell: (column: DataTableColumn<TRow>, value: DataTableCellValue) => void;
@@ -206,6 +207,39 @@ export function useTableRows<TRow extends DataTableRowModel>({
     }
   }, [dataSource, rowSchema, setEditingCell, undoEnabled, undoStack]);
 
+  const autoSaveCellEdit = useCallback<CellCommit<TRow>>(async ({ row, rowId, column, value }) => {
+    const cellValidation = validateCell(column, row, value);
+    if (!cellValidation.ok) {
+      return;
+    }
+
+    const updateResult = setColumnValue(row, rowId, column, value);
+    const rowValidation = validateRow(rowSchema, updateResult.nextRow);
+    if (!rowValidation.ok) {
+      return;
+    }
+
+    setOptimisticRows((current) => ({
+      ...current,
+      [rowId]: updateResult.nextRow
+    }));
+
+    if (!dataSource.updateRows) {
+      return;
+    }
+
+    try {
+      await dataSource.updateRows([updateResult.patch]);
+    } catch (error) {
+      setOptimisticRows((current) => {
+        const next = { ...current };
+        delete next[rowId];
+        return next;
+      });
+      toast.error(`Failed to update row: ${String(error)}`);
+    }
+  }, [dataSource, rowSchema]);
+
   const deleteRowsNow = useCallback(async (rowsToDelete: ReadonlyArray<TRow>) => {
     if (!rowDeleteEnabled || !dataSource.deleteRows || rowsToDelete.length === 0) {
       return;
@@ -335,6 +369,7 @@ export function useTableRows<TRow extends DataTableRowModel>({
     onStartEdit,
     onCancelEdit,
     commitCellEdit,
+    autoSaveCellEdit,
     deleteRowsNow,
     commitDraftRow,
     commitDraftCell,
