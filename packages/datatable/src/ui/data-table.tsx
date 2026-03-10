@@ -373,11 +373,10 @@ const DataTableInner = <TRow extends DataTableRowModel>({
       header: () => <span className="sr-only">Row actions</span>,
       size: 65,
       minSize: 65,
-      maxSize: 65,
       accessorFn: () => "",
       enableHiding: false,
       enablePinning: true,
-      enableResizing: true,
+      enableResizing: false,
       cell: (context) => {
         const row = context.row.original;
         const rowId = getRowId(row);
@@ -762,6 +761,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
         baseWidth: columnSizing[column.id] ?? column.getSize(),
         pinned: pinnedState === "left" || pinnedState === "right" ? pinnedState : "center",
         isDataColumn: Boolean(columnConfig),
+        isFillColumn: column.id === ACTIONS_COLUMN_ID,
         canResize: column.getCanResize(),
         maxWidth: maxSize
       };

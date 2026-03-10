@@ -5,6 +5,7 @@ export type ColumnLayoutInput = {
   baseWidth: number;
   pinned: PinnedSide;
   isDataColumn: boolean;
+  isFillColumn: boolean;
   canResize: boolean;
   maxWidth: number | null;
 };
@@ -56,6 +57,43 @@ export function computeColumnLayout(args: {
   let remainingExtra = Math.max(0, containerWidth - baseTotal);
 
   while (remainingExtra > 0) {
+    const fillIndices: number[] = [];
+    for (let index = 0; index < columns.length; index += 1) {
+      const column = columns[index];
+      if (!column?.isFillColumn) {
+        continue;
+      }
+      const currentWidth = widths[index] ?? 0;
+      const maxWidth = maxWidths[index] ?? null;
+      if (capacityRemaining(currentWidth, maxWidth) <= 0) {
+        continue;
+      }
+      fillIndices.push(index);
+    }
+
+    if (fillIndices.length > 0) {
+      let assigned = 0;
+      for (const index of fillIndices) {
+        if (remainingExtra <= assigned) {
+          break;
+        }
+        const currentWidth = widths[index] ?? 0;
+        const maxWidth = maxWidths[index] ?? null;
+        const maxCapacity = capacityRemaining(currentWidth, maxWidth);
+        if (maxCapacity <= 0) {
+          continue;
+        }
+        const allocation = Math.min(maxCapacity, remainingExtra - assigned);
+        widths[index] = currentWidth + allocation;
+        assigned += allocation;
+      }
+      if (assigned <= 0) {
+        break;
+      }
+      remainingExtra -= assigned;
+      continue;
+    }
+
     const activeIndices: number[] = [];
     for (let index = 0; index < columns.length; index += 1) {
       const column = columns[index];

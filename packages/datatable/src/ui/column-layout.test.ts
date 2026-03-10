@@ -16,6 +16,7 @@ describe("column layout", () => {
         baseWidth: 180,
         pinned: "center",
         isDataColumn: true,
+        isFillColumn: false,
         canResize: true,
         maxWidth: null
       },
@@ -24,6 +25,7 @@ describe("column layout", () => {
         baseWidth: 120,
         pinned: "center",
         isDataColumn: true,
+        isFillColumn: false,
         canResize: true,
         maxWidth: null
       }
@@ -44,6 +46,7 @@ describe("column layout", () => {
         baseWidth: 100,
         pinned: "center",
         isDataColumn: true,
+        isFillColumn: false,
         canResize: true,
         maxWidth: null
       },
@@ -52,6 +55,7 @@ describe("column layout", () => {
         baseWidth: 200,
         pinned: "center",
         isDataColumn: true,
+        isFillColumn: false,
         canResize: true,
         maxWidth: null
       }
@@ -72,6 +76,7 @@ describe("column layout", () => {
         baseWidth: 100,
         pinned: "center",
         isDataColumn: true,
+        isFillColumn: false,
         canResize: true,
         maxWidth: null
       },
@@ -80,6 +85,7 @@ describe("column layout", () => {
         baseWidth: 100,
         pinned: "center",
         isDataColumn: true,
+        isFillColumn: false,
         canResize: true,
         maxWidth: null
       },
@@ -88,6 +94,7 @@ describe("column layout", () => {
         baseWidth: 100,
         pinned: "center",
         isDataColumn: true,
+        isFillColumn: false,
         canResize: true,
         maxWidth: null
       }
@@ -109,6 +116,7 @@ describe("column layout", () => {
         baseWidth: 100,
         pinned: "center",
         isDataColumn: true,
+        isFillColumn: false,
         canResize: true,
         maxWidth: 110
       },
@@ -117,6 +125,7 @@ describe("column layout", () => {
         baseWidth: 100,
         pinned: "center",
         isDataColumn: true,
+        isFillColumn: false,
         canResize: true,
         maxWidth: null
       }
@@ -130,13 +139,14 @@ describe("column layout", () => {
     expect(result.tableRenderWidth).toBe(260);
   });
 
-  it("fills only resizable data columns", () => {
+  it("lets the action fill column absorb remaining space", () => {
     const columns: ReadonlyArray<ColumnLayoutInput> = [
       {
         id: "name",
         baseWidth: 100,
         pinned: "center",
         isDataColumn: true,
+        isFillColumn: false,
         canResize: true,
         maxWidth: null
       },
@@ -145,6 +155,7 @@ describe("column layout", () => {
         baseWidth: 44,
         pinned: "left",
         isDataColumn: false,
+        isFillColumn: false,
         canResize: true,
         maxWidth: 44
       },
@@ -153,14 +164,16 @@ describe("column layout", () => {
         baseWidth: 65,
         pinned: "right",
         isDataColumn: false,
-        canResize: true,
-        maxWidth: 65
+        isFillColumn: true,
+        canResize: false,
+        maxWidth: null
       },
       {
         id: "locked",
         baseWidth: 120,
         pinned: "center",
         isDataColumn: true,
+        isFillColumn: false,
         canResize: false,
         maxWidth: null
       }
@@ -168,49 +181,102 @@ describe("column layout", () => {
 
     const result = layout(columns, 436);
     expect(result.renderWidthsById).toEqual({
-      name: 207,
+      name: 100,
       __select__: 44,
-      __actions__: 65,
+      __actions__: 172,
       locked: 120
     });
     expect(result.tableRenderWidth).toBe(436);
   });
 
-  it("keeps base width when there are no eligible fill columns", () => {
+  it("keeps the fill column at its base width when there is no extra space", () => {
     const columns: ReadonlyArray<ColumnLayoutInput> = [
+      {
+        id: "name",
+        baseWidth: 180,
+        pinned: "center",
+        isDataColumn: true,
+        isFillColumn: false,
+        canResize: true,
+        maxWidth: null
+      },
       {
         id: "__select__",
         baseWidth: 44,
         pinned: "left",
         isDataColumn: false,
+        isFillColumn: false,
         canResize: true,
         maxWidth: 44
-      },
-      {
-        id: "locked",
-        baseWidth: 140,
-        pinned: "center",
-        isDataColumn: true,
-        canResize: false,
-        maxWidth: null
       },
       {
         id: "__actions__",
         baseWidth: 65,
         pinned: "right",
         isDataColumn: false,
-        canResize: true,
-        maxWidth: 65
+        isFillColumn: true,
+        canResize: false,
+        maxWidth: null
       }
     ];
 
-    const result = layout(columns, 700);
+    const result = layout(columns, 289);
     expect(result.renderWidthsById).toEqual({
+      name: 180,
       __select__: 44,
-      locked: 140,
       __actions__: 65
     });
-    expect(result.tableRenderWidth).toBe(249);
+    expect(result.tableRenderWidth).toBe(289);
+  });
+
+  it("falls back to resizable data columns when no fill column exists", () => {
+    const columns: ReadonlyArray<ColumnLayoutInput> = [
+      {
+        id: "name",
+        baseWidth: 100,
+        pinned: "center",
+        isDataColumn: true,
+        isFillColumn: false,
+        canResize: true,
+        maxWidth: null
+      },
+      {
+        id: "__select__",
+        baseWidth: 44,
+        pinned: "left",
+        isDataColumn: false,
+        isFillColumn: false,
+        canResize: true,
+        maxWidth: 44
+      },
+      {
+        id: "__actions__",
+        baseWidth: 65,
+        pinned: "right",
+        isDataColumn: false,
+        isFillColumn: false,
+        canResize: false,
+        maxWidth: 65
+      },
+      {
+        id: "description",
+        baseWidth: 120,
+        pinned: "center",
+        isDataColumn: true,
+        isFillColumn: false,
+        canResize: true,
+        maxWidth: null
+      }
+    ];
+
+    const result = layout(columns, 436);
+    expect(result.renderWidthsById).toEqual({
+      name: 149,
+      __select__: 44,
+      __actions__: 65,
+      description: 178
+    });
+    expect(result.tableRenderWidth).toBe(436);
   });
 
   it("computes pinned offsets from render widths", () => {
@@ -220,6 +286,7 @@ describe("column layout", () => {
         baseWidth: 44,
         pinned: "left",
         isDataColumn: false,
+        isFillColumn: false,
         canResize: true,
         maxWidth: 44
       },
@@ -228,6 +295,7 @@ describe("column layout", () => {
         baseWidth: 160,
         pinned: "left",
         isDataColumn: true,
+        isFillColumn: false,
         canResize: true,
         maxWidth: null
       },
@@ -236,6 +304,7 @@ describe("column layout", () => {
         baseWidth: 120,
         pinned: "center",
         isDataColumn: true,
+        isFillColumn: false,
         canResize: true,
         maxWidth: null
       },
@@ -244,6 +313,7 @@ describe("column layout", () => {
         baseWidth: 180,
         pinned: "right",
         isDataColumn: true,
+        isFillColumn: false,
         canResize: true,
         maxWidth: null
       },
@@ -252,8 +322,9 @@ describe("column layout", () => {
         baseWidth: 65,
         pinned: "right",
         isDataColumn: false,
-        canResize: true,
-        maxWidth: 65
+        isFillColumn: true,
+        canResize: false,
+        maxWidth: null
       }
     ];
 
