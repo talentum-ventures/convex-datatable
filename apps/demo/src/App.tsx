@@ -49,7 +49,7 @@ export function App(): JSX.Element {
   }, []);
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-[1400px] flex-col gap-6 p-6">
+    <main className="mx-auto flex h-screen max-w-[1400px] flex-col gap-6 overflow-hidden p-6">
       <header className="shrink-0 space-y-4">
         <div className="space-y-2">
           <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Convex DataTable</h1>

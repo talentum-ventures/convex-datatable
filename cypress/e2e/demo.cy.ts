@@ -44,6 +44,27 @@ describe("demo app", () => {
     cy.findByLabelText("Edit Project").should("not.exist");
   });
 
+  it("keeps the demo page pinned to the viewport and scrolls inside the grid", () => {
+    cy.visit("/");
+
+    cy.get("main").then(($main) => {
+      const mainRect = $main[0].getBoundingClientRect();
+      expect(Math.round(mainRect.height), "main height").to.equal(Cypress.config("viewportHeight"));
+    });
+
+    cy.findByRole("grid").then(($grid) => {
+      expect($grid[0].scrollHeight, "grid scroll height").to.be.greaterThan($grid[0].clientHeight);
+    });
+
+    cy.findByRole("grid")
+      .scrollTo("bottom")
+      .then(($grid) => {
+        expect($grid[0].scrollTop, "grid scrollTop").to.be.greaterThan(0);
+      });
+
+    cy.window().its("scrollY").should("equal", 0);
+  });
+
   it("switches to the Convex page", () => {
     cy.visit("/");
 

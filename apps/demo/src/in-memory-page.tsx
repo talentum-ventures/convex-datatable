@@ -639,7 +639,7 @@ export function InMemoryPage(): JSX.Element {
   );
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col gap-5">
+    <div className="flex flex-1 min-h-0 flex-col gap-5 overflow-hidden">
       <section className="space-y-2">
         <h2 className="text-2xl font-semibold tracking-tight text-slate-900">In-memory example</h2>
         <p className="max-w-4xl text-sm text-slate-600">
