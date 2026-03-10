@@ -1,0 +1,374 @@
+# Convex DataTable — llms.txt
+
+> A production-ready, fully typed React data-grid component with Airtable-style editing, selection, clipboard, state persistence, and optional Convex real-time adapters.
+
+Package name: `@talentum/convex-datatable`
+License: MIT
+Framework: React 18+
+Language: TypeScript (strict mode)
+Internal engine: TanStack Table (not exposed in public API)
+
+## Package Exports
+
+- `@talentum/convex-datatable` — main entry point with all components, types, defaults, persistence utils, debug utils
+- `@talentum/convex-datatable/styles.css` — bundled CSS stylesheet (must be imported)
+- `@talentum/convex-datatable/convex` — Convex client adapter hooks (`useConvexDataSource`, `useConvexPresence`)
+- `@talentum/convex-datatable/convex-server` — Convex server-side helpers (`presenceFields`, `heartbeatHandler`, `getPresenceHandler`, `clearStalePresenceHandler`)
+
+## Installation
+
+```bash
+npm install @talentum/convex-datatable
+```
+
+Peer dependencies: `react` ^18.3.1, `react-dom` ^18.3.1, `convex` ^1.32.0 (optional, only for Convex adapter).
+
+Import the CSS in your app entry:
+```ts
+import "@talentum/convex-datatable/styles.css";
+```
+
+## Components
+
+### DataTable<TRow>
+
+The main component. Renders a full-featured data grid with toolbar, headers, scrollable virtualized body, and optional draft row.
+
+Required props:
+- `tableId: string` — unique identifier for persistence keys
+- `columns: ReadonlyArray<DataTableColumn<TRow>>` — column definitions
+- `getRowId: (row: TRow) => string` — extract unique row ID
+- `dataSource: DataTableDataSource<TRow>` — data fetching and mutation interface
+
+Optional props:
+- `features?: DataTableFeatureFlags` — toggles merged with defaults
+- `rowActions?: ReadonlyArray<DataTableRowAction<TRow>>` — per-row context menu items
+- `rowSchema?: RowSchema<TRow>` — validation schema for draft rows (Zod-compatible `safeParse` interface)
+- `minRowHeight?: number` — minimum row height in px (default 40)
+- `pageSize?: number` — rows per page (default 50)
+- `theme?: Partial<DataTableThemeTokens>` — partial theme overrides
+- `surface?: "default" | "plain"` — container visual style
+- `className?: string` — additional CSS class
+- `collaborators?: ReadonlyArray<CollaboratorPresence>` — other users' presence data
+- `onActiveCellChange?: (cell: CollaboratorCellCoord | null) => void` — callback for presence
+- `onError?: (message: string) => void` — error callback
+
+### DataTableContainer
+
+Optional gradient-background wrapper for visual polish. Place DataTable as a child.
+
+## Column Kinds
+
+All columns share: `id`, `field` (typed as keyof TRow), `header`, `kind`, and optional: `description`, `width`, `minWidth`, `maxWidth`, `isEditable`, `isResizable`, `isReorderable`, `isPinnable`, `isHideable`, `isSortable`, `isFilterable`, `accessor`, `validator`, `parseInput`, `serializeClipboard`, `parseClipboard`, `renderCell`, `renderEditor`.
+
+### text
+Single-line text. Extra: `placeholder?: string`.
+
+### longText
+Multi-line text with `pre-wrap`. Extra: `placeholder?: string`, `maxLines?: number`.
+
+### number
+Numeric input. Extra: `precision?: number`, `minimum?: number`, `maximum?: number`.
+
+### currency
+Currency formatted via Intl.NumberFormat. Extra: `currency: string` (required, ISO 4217), `locale?: string`, `minimumFractionDigits?: number`, `maximumFractionDigits?: number`.
+
+### select
+Single-value dropdown. Extra: `options: ReadonlyArray<SelectOption>` (required).
+SelectOption: `{ value: string; label: string; colorClass: string; icon?: ComponentType }`.
+
+### multiselect
+Multi-value tag selector. Cell value is `ReadonlyArray<string>`. Extra: `options: ReadonlyArray<SelectOption>` (required).
+
+### link
+Clickable URL. Extra: `target?: "_self" | "_blank"`, `rel?: string`.
+
+### date
+Date formatted via Intl.DateTimeFormat. Accepts string (ISO) or Date. Extra: `locale?: string`, `timezone?: string`, `dateStyle?: "full" | "long" | "medium" | "short"`.
+
+### reactNode
+Fully custom column. All five callbacks required: `renderCell`, `renderEditor`, `parseInput`, `parseClipboard`, `serializeClipboard`.
+
+## Data Source
+
+```ts
+type DataTableDataSource<TRow> = {
+  useRows: (query: DataTableQueryState) => DataTableRowsResult<TRow>;
+  createRow?: (draft: Partial<TRow>) => Promise<TRow>;
+  updateRows?: (changes: ReadonlyArray<RowPatch<TRow>>) => Promise<void>;
+  deleteRows?: (rowIds: ReadonlyArray<string>) => Promise<void>;
+  restoreRows?: (rows: ReadonlyArray<TRow>) => Promise<void>;
+};
+```
+
+DataTableQueryState: `{ sorting, filters, pageSize, cursor }`.
+DataTableRowsResult: `{ rows, hasMore, isLoading, isLoadingMore, error, loadMore, refresh }`.
+RowPatch: `{ rowId: string; patch: Partial<TRow> }`.
+
+`useRows` is a React hook (called during render). Mutation functions are async.
+
+## Feature Flags
+
+All flags are optional booleans. Unspecified flags use these defaults:
+
+| Flag | Default | Purpose |
+|------|---------|---------|
+| columnResize | true | Drag column borders to resize |
+| rowResize | true | Drag row borders to resize height |
+| columnReorder | true | Drag-and-drop column headers |
+| columnPinning | true | Pin columns left/right |
+| columnVisibility | true | Show/hide columns from toolbar |
+| columnFilter | true | Per-column filtering |
+| columnSort | true | Column sorting |
+| rowDelete | false | Delete rows with undo toast |
+| rowSelect | true | Row selection checkboxes |
+| rowAdd | false | "Add row" button and draft row |
+| rowActions | true | Row action overflow menu |
+| editing | false | Cell editing (columns must also set isEditable) |
+| cellSelect | true | Click-to-select cells and keyboard navigation |
+| clipboardCopy | true | Ctrl+C copy selected cells |
+| clipboardPaste | true | Ctrl+V paste into cells |
+| undo | false | Ctrl+Z/Ctrl+Shift+Z undo/redo |
+| autoSave | true | Auto-save edits on blur |
+| infiniteScroll | true | Auto load more on scroll |
+| virtualization | true | Only render visible rows |
+
+## Row Actions
+
+```ts
+type DataTableRowAction<TRow> = {
+  id: string;
+  label: string;
+  icon?: ComponentType<{ className?: string }>;
+  variant?: "default" | "destructive";
+  isVisible?: (row: TRow) => boolean;
+  isDisabled?: (row: TRow) => boolean;
+  onSelect: (ctx: { row: TRow; rowId: string }) => void | Promise<void>;
+};
+```
+
+## Row Schema Validation
+
+The `rowSchema` prop uses a structural interface compatible with Zod, Valibot, or any library with `safeParse`:
+
+```ts
+type RowSchema<TRow> = {
+  safeParse: (value: TRow) => { success: true; data: TRow } | { success: false; error: { issues: ReadonlyArray<{ path: ReadonlyArray<PropertyKey>; message: string }> } };
+};
+```
+
+## Theming
+
+Pass `theme?: Partial<DataTableThemeTokens>` to override any subset. Tokens are injected as CSS variables on the table root.
+
+| Token | CSS Variable | Default |
+|-------|-------------|---------|
+| fontFamily | --dt-font-family | 'IBM Plex Sans', 'Avenir Next', 'Segoe UI', sans-serif |
+| radius | --dt-radius | 14px |
+| borderColor | --dt-border-color | hsl(215 18% 85%) |
+| headerBg | --dt-header-bg | linear-gradient(180deg, hsl(210 33% 98%), hsl(210 35% 95%)) |
+| pinnedHeaderBg | --dt-pinned-header-bg | linear-gradient(180deg, hsl(210 28% 96%), hsl(210 28% 92.5%)) |
+| rowBg | --dt-row-bg | hsl(0 0% 100%) |
+| rowHoverBg | --dt-row-hover-bg | hsl(206 45% 97%) |
+| pinnedRowBg | --dt-pinned-row-bg | hsl(210 20% 97%) |
+| pinnedRowHoverBg | --dt-pinned-row-hover-bg | hsl(206 42% 95%) |
+| pinnedShadow | --dt-pinned-shadow | 0 0 0 1px hsl(213 20% 84%), 0 8px 24px -16px hsl(215 30% 35%) |
+| activeCellRing | --dt-active-cell-ring | hsl(206 90% 48%) |
+| selectionBg | --dt-selection-bg | hsl(205 86% 94%) |
+
+## Persistence
+
+Table state (sorting, filters, column order, pinning, visibility, widths) is automatically persisted:
+
+- **URL**: Parameters prefixed `dt_{tableId}_` (debounced at 150ms)
+- **localStorage**: Key `rolha-grid:{pathname}:{tableId}:state:v1` (debounced at 250ms)
+- URL values take priority over localStorage when both exist
+
+Exported utilities: `encodePersistedStateToUrl`, `decodePersistedStateFromUrl`, `mergePersistedState`, `storageKey`.
+
+## Convex Adapter
+
+### Client — useConvexDataSource
+
+Import from `@talentum/convex-datatable/convex`.
+
+```ts
+function useConvexDataSource<TRow>(config: ConvexDataSourceConfig<TRow>): DataTableDataSource<TRow>;
+```
+
+ConvexDataSourceConfig: `{ tableId, pageSize?, usePageQuery, createRow?, updateRows?, deleteRows?, restoreRows? }`.
+
+`usePageQuery` receives `{ cursor, pageSize, state }` and returns `ConvexPageResult<TRow>: { rows, nextCursor, status, error }`.
+
+### Client — useConvexPresence
+
+Import from `@talentum/convex-datatable/convex`.
+
+```ts
+function useConvexPresence(config: ConvexPresenceConfig): {
+  collaborators: ReadonlyArray<CollaboratorPresence>;
+  onActiveCellChange: (cell: CollaboratorCellCoord | null) => void;
+};
+```
+
+ConvexPresenceConfig: `{ tableId, userId, userName, userColor?, usePresenceData, sendHeartbeat, debounceMs?, heartbeatIntervalMs? }`.
+
+Pass `collaborators` and `onActiveCellChange` to the DataTable component.
+
+### Server Helpers
+
+Import from `@talentum/convex-datatable/convex-server`.
+
+- `presenceFields` — Convex validator for the presence document schema
+- `heartbeatHandler(tableName)` — mutation handler to upsert presence entries
+- `getPresenceHandler(tableName)` — query handler to get active presence entries (stale after 30s by default)
+- `clearStalePresenceHandler(tableName)` — mutation handler to remove stale entries
+
+Usage in Convex schema:
+```ts
+import { defineSchema, defineTable } from "convex/server";
+import { presenceFields } from "@talentum/convex-datatable/convex-server";
+export default defineSchema({ presence: defineTable(presenceFields) });
+```
+
+Usage in Convex functions:
+```ts
+import { mutation, query } from "./_generated/server";
+import { heartbeatHandler, getPresenceHandler, clearStalePresenceHandler } from "@talentum/convex-datatable/convex-server";
+export const heartbeat = mutation(heartbeatHandler("presence"));
+export const getPresence = query(getPresenceHandler("presence"));
+export const clearStale = mutation(clearStalePresenceHandler("presence"));
+```
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| Arrow keys | Move active cell |
+| Tab / Shift+Tab | Move to next/previous cell |
+| Enter / F2 | Start editing |
+| Escape | Cancel edit or deselect |
+| Ctrl+C | Copy selection as TSV |
+| Ctrl+V | Paste from clipboard |
+| Ctrl+Z | Undo |
+| Ctrl+Shift+Z | Redo |
+| Shift+Click | Range select |
+
+## Clipboard
+
+Copy serializes selected cells as TSV text. Paste parses TSV and writes values starting at the active cell. The paste matrix is expanded to fill the selection if smaller. Each column kind has built-in serialization; override via `serializeClipboard` / `parseClipboard` on the column.
+
+## Filter Operators
+
+`eq`, `neq`, `contains`, `startsWith`, `endsWith`, `gt`, `gte`, `lt`, `lte`, `in`.
+
+## Debug Mode
+
+Enable: `?dt_debug=1` (persisted in localStorage). Disable: `?dt_debug=0`.
+Exported: `debugEnabled()`, `readDebugEvents()`, `clearDebugEvents()`, `pushDebugEvent()`, `pushDebugEventThrottled()`, `DEBUG_EVENTS_STORAGE_KEY`.
+
+## Exported Types
+
+CellCoord, CellRange, CollaboratorCellCoord, CollaboratorPresence, ColumnId, ConvexDataSourceConfig, ConvexPresenceConfig, ConvexPresenceEntry, DataTableCellEditorContext, DataTableCellRenderContext, DataTableColumn, DataTableColumnKind, DataTableDataSource, DataTableFeatureFlags, DataTableFilter, DataTableFilterValue, DataTableOnError, DataTableProps, DataTableQueryState, DataTableRowAction, DataTableRowActionContext, DataTableThemeTokens, DataTableRowModel, DataTableCellValue, DateColumn, FilterOperator, LinkColumn, LongTextColumn, MultiSelectColumn, NumberColumn, CurrencyColumn, ReactNodeColumn, RowSchema, RowSchemaIssue, RowSchemaResult, RowPatch, RowId, SelectColumn, SelectOption, SortDirection, StringKey, TextColumn.
+
+## Exported Values
+
+Components: DataTable, DataTableContainer.
+Hooks: useConvexDataSource, useConvexPresence.
+Constants: DEFAULT_FEATURE_FLAGS, DEFAULT_THEME_TOKENS, DEFAULT_PAGE_SIZE.
+Persistence: encodePersistedStateToUrl, decodePersistedStateFromUrl, mergePersistedState, storageKey.
+Debug: debugEnabled, readDebugEvents, clearDebugEvents, pushDebugEvent, pushDebugEventThrottled, DEBUG_EVENTS_STORAGE_KEY.
+
+## Quick Start Example
+
+```tsx
+import "@talentum/convex-datatable/styles.css";
+import { DataTable, DataTableContainer, type DataTableColumn, type DataTableDataSource } from "@talentum/convex-datatable";
+
+type Invoice = { id: string; customer: string; amount: number; status: string };
+
+const columns: DataTableColumn<Invoice>[] = [
+  { id: "customer", field: "customer", header: "Customer", kind: "text" },
+  { id: "amount", field: "amount", header: "Amount", kind: "currency", currency: "USD" },
+  { id: "status", field: "status", header: "Status", kind: "select", options: [
+    { value: "draft", label: "Draft", colorClass: "bg-amber-100 text-amber-900" },
+    { value: "paid", label: "Paid", colorClass: "bg-emerald-100 text-emerald-900" }
+  ]}
+];
+
+const dataSource: DataTableDataSource<Invoice> = {
+  useRows: () => ({
+    rows: [{ id: "1", customer: "Acme", amount: 1250, status: "paid" }],
+    hasMore: false, isLoading: false, isLoadingMore: false, error: null,
+    loadMore: () => {}, refresh: () => {}
+  })
+};
+
+function App() {
+  return (
+    <DataTableContainer>
+      <DataTable tableId="invoices" columns={columns} getRowId={(r) => r.id} dataSource={dataSource} />
+    </DataTableContainer>
+  );
+}
+```
+
+## Convex Full Example
+
+```tsx
+import "@talentum/convex-datatable/styles.css";
+import { DataTable, DataTableContainer, type DataTableColumn } from "@talentum/convex-datatable";
+import { useConvexDataSource, useConvexPresence } from "@talentum/convex-datatable/convex";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../convex/_generated/api";
+
+type Deployment = { id: string; name: string; status: string; monthlySpend: number };
+
+function useDeploymentPage(args: { cursor: string | null; pageSize: number; state: any }) {
+  const result = useQuery(api.deployments.listPage, args);
+  if (!result) return { rows: [], nextCursor: null, status: "loading" as const, error: null };
+  return { ...result, status: "loaded" as const, error: null };
+}
+
+function DeploymentTable() {
+  const dataSource = useConvexDataSource<Deployment>({
+    tableId: "deployments",
+    usePageQuery: useDeploymentPage,
+    createRow: useMutation(api.deployments.create),
+    updateRows: useMutation(api.deployments.update),
+    deleteRows: useMutation(api.deployments.delete),
+    restoreRows: useMutation(api.deployments.restore)
+  });
+
+  const presence = useConvexPresence({
+    tableId: "deployments",
+    userId: "user_123",
+    userName: "Alice",
+    usePresenceData: (tableId) => useQuery(api.presence.getPresence, { tableId }) ?? [],
+    sendHeartbeat: useMutation(api.presence.heartbeat)
+  });
+
+  const columns: DataTableColumn<Deployment>[] = [
+    { id: "name", field: "name", header: "Name", kind: "text", isEditable: true },
+    { id: "status", field: "status", header: "Status", kind: "select", isEditable: true, options: [
+      { value: "live", label: "Live", colorClass: "bg-green-100 text-green-800" },
+      { value: "paused", label: "Paused", colorClass: "bg-amber-100 text-amber-800" }
+    ]},
+    { id: "monthlySpend", field: "monthlySpend", header: "Spend", kind: "currency", currency: "USD", isEditable: true }
+  ];
+
+  return (
+    <DataTableContainer>
+      <DataTable
+        tableId="deployments"
+        columns={columns}
+        getRowId={(r) => r.id}
+        dataSource={dataSource}
+        features={{ editing: true, rowAdd: true, rowDelete: true, undo: true }}
+        collaborators={presence.collaborators}
+        onActiveCellChange={presence.onActiveCellChange}
+      />
+    </DataTableContainer>
+  );
+}
+```
