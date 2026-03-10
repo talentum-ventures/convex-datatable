@@ -157,9 +157,13 @@ describe("DataTable surfaces", () => {
 
     const root = container.firstElementChild;
     const grid = screen.getByRole("grid");
-    const shell = grid.parentElement?.parentElement;
+    const shell = grid.parentElement;
 
     expect(root?.classList.contains("w-full")).toBe(true);
+    expect(root?.classList.contains("flex")).toBe(true);
+    expect(root?.classList.contains("flex-col")).toBe(true);
+    expect(root?.classList.contains("h-full")).toBe(true);
+    expect(root?.classList.contains("min-h-0")).toBe(true);
     expect(root?.classList.contains("bg-transparent")).toBe(true);
     expect(root?.classList.contains("p-0")).toBe(true);
     expect(root?.classList.contains("shadow-none")).toBe(true);
@@ -167,6 +171,14 @@ describe("DataTable surfaces", () => {
     expect(shell?.classList.contains("bg-transparent")).toBe(true);
     expect(shell?.classList.contains("border-0")).toBe(true);
     expect(shell?.classList.contains("rounded-none")).toBe(true);
+    expect(shell?.classList.contains("flex")).toBe(true);
+    expect(shell?.classList.contains("flex-1")).toBe(true);
+    expect(shell?.classList.contains("flex-col")).toBe(true);
+    expect(shell?.classList.contains("min-h-0")).toBe(true);
+    expect(grid.classList.contains("w-full")).toBe(true);
+    expect(grid.classList.contains("h-full")).toBe(true);
+    expect(grid.classList.contains("min-h-0")).toBe(true);
+    expect(grid.classList.contains("max-h-[560px]")).toBe(false);
   });
 });
 
@@ -209,5 +221,66 @@ describe("DataTable active-cell broadcasts", () => {
     await waitFor(() => {
       expect(onActiveCellChange).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+describe("DataTable column menus", () => {
+  it("keeps the header menu in document.body so filters can be cleared after zero results", async () => {
+    render(
+      createElement(DataTable<TestRow>, {
+        tableId: "column-menu-empty-results",
+        columns,
+        getRowId: (row: TestRow) => row.id,
+        dataSource: createDataSource([{ id: "row-1", name: "Alpha" }]),
+        features: { virtualization: false }
+      })
+    );
+
+    const trigger = screen.getByRole("button", { name: "Open column menu" });
+    fireEvent.click(trigger);
+
+    const dialog = await screen.findByRole("dialog", { name: "Name options" });
+    expect(dialog.parentElement).toBe(document.body);
+    expect(screen.getByRole("grid").contains(dialog)).toBe(false);
+
+    fireEvent.change(screen.getByPlaceholderText("Filter value"), {
+      target: { value: "Missing" }
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Alpha")).toBeNull();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Alpha")).not.toBeNull();
+    });
+  });
+
+  it("closes the portaled menu on Escape and restores focus to the trigger", async () => {
+    render(
+      createElement(DataTable<TestRow>, {
+        tableId: "column-menu-escape",
+        columns,
+        getRowId: (row: TestRow) => row.id,
+        dataSource: createDataSource([{ id: "row-1", name: "Alpha" }]),
+        features: { virtualization: false }
+      })
+    );
+
+    const trigger = screen.getByRole("button", { name: "Open column menu" });
+    fireEvent.click(trigger);
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByPlaceholderText("Filter value"));
+    });
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Name options" })).toBeNull();
+    });
+    expect(document.activeElement).toBe(trigger);
   });
 });

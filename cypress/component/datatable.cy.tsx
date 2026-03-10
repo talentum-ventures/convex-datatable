@@ -514,7 +514,7 @@ function VirtualizationHarness({ tableId }: { tableId: string }): JSX.Element {
   );
 
   return (
-    <div className="p-4">
+    <div className="flex h-[520px] min-h-0 flex-col p-4">
       <DataTable
         tableId={tableId}
         columns={columns}

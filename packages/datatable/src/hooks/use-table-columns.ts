@@ -7,7 +7,6 @@ import {
   useState,
   type Dispatch,
   type DragEvent,
-  type RefObject,
   type SetStateAction
 } from "react";
 import type { ColumnPinningState, ColumnSizingState, SortingState } from "@tanstack/react-table";
@@ -46,7 +45,6 @@ function pinZoneForColumnId(columnId: string, pinning: ColumnPinningState): PinZ
 }
 
 export type UseTableColumnsArgs = {
-  tableContainerRef: RefObject<HTMLDivElement | null>;
   columnPinning: ColumnPinningState;
   normalizedColumnOrder: string[];
   normalizedColumnPinning: ColumnPinningState;
@@ -58,8 +56,9 @@ export type UseTableColumnsArgs = {
 
 export type UseTableColumnsResult = {
   columnMenuId: string | null;
-  setColumnMenuId: Dispatch<SetStateAction<string | null>>;
-  columnMenuAnchorById: Readonly<Record<string, ColumnMenuAnchor>>;
+  activeColumnMenuAnchor: ColumnMenuAnchor;
+  activeColumnMenuTrigger: HTMLElement | null;
+  closeColumnMenu: () => void;
   draggingColumnId: string | null;
   dragOverTarget: { columnId: string; placement: DropPlacement } | null;
   resolveColumnMenuAnchor: (trigger: HTMLElement) => ColumnMenuAnchor;
@@ -81,7 +80,6 @@ export type UseTableColumnsResult = {
 };
 
 export function useTableColumns({
-  tableContainerRef,
   columnPinning,
   normalizedColumnOrder,
   normalizedColumnPinning,
@@ -90,15 +88,22 @@ export function useTableColumns({
   setColumnSizing,
   setSorting
 }: UseTableColumnsArgs): UseTableColumnsResult {
-  const [columnMenuId, setColumnMenuId] = useState<string | null>(null);
-  const [columnMenuAnchorById, setColumnMenuAnchorById] = useState<
-    Readonly<Record<string, ColumnMenuAnchor>>
-  >({});
+  const [activeColumnMenu, setActiveColumnMenu] = useState<{
+    id: string;
+    anchor: ColumnMenuAnchor;
+    trigger: HTMLElement;
+  } | null>(null);
   const [draggingColumnId, setDraggingColumnId] = useState<string | null>(null);
   const [dragOverTarget, setDragOverTarget] = useState<{
     columnId: string;
     placement: DropPlacement;
   } | null>(null);
+  const columnMenuId = activeColumnMenu?.id ?? null;
+  const activeColumnMenuAnchor = activeColumnMenu?.anchor ?? "right";
+  const activeColumnMenuTrigger = activeColumnMenu?.trigger ?? null;
+  const closeColumnMenu = useCallback((): void => {
+    setActiveColumnMenu(null);
+  }, []);
 
   useEffect(() => {
     if (!columnMenuId) {
@@ -107,19 +112,19 @@ export function useTableColumns({
 
     const onPointerDown = (event: MouseEvent): void => {
       if (!(event.target instanceof Element)) {
-        setColumnMenuId(null);
+        closeColumnMenu();
         return;
       }
 
       if (event.target.closest("[data-dt-column-menu-root='true']")) {
         return;
       }
-      setColumnMenuId(null);
+      closeColumnMenu();
     };
 
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === "Escape") {
-        setColumnMenuId(null);
+        closeColumnMenu();
       }
     };
 
@@ -129,27 +134,26 @@ export function useTableColumns({
       window.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [columnMenuId]);
+  }, [closeColumnMenu, columnMenuId]);
 
   const resolveColumnMenuAnchor = useCallback((trigger: HTMLElement): ColumnMenuAnchor => {
     const triggerRect = trigger.getBoundingClientRect();
-    const containerRect = tableContainerRef.current?.getBoundingClientRect();
-    const minLeft = (containerRect?.left ?? 0) + COLUMN_MENU_GUTTER_PX;
+    const minLeft = trigger.ownerDocument.defaultView ? COLUMN_MENU_GUTTER_PX : 0;
     const projectedLeft = triggerRect.right - COLUMN_MENU_WIDTH_PX;
     return projectedLeft < minLeft ? "left" : "right";
-  }, [tableContainerRef]);
+  }, []);
 
   const toggleColumnMenu = useCallback((columnId: string, trigger: HTMLElement) => {
-    setColumnMenuId((current) => {
-      const nextOpen = current === columnId ? null : columnId;
-      if (nextOpen) {
-        const nextAnchor = resolveColumnMenuAnchor(trigger);
-        setColumnMenuAnchorById((anchorState) => ({
-          ...anchorState,
-          [columnId]: nextAnchor
-        }));
+    setActiveColumnMenu((current) => {
+      if (current?.id === columnId) {
+        return null;
       }
-      return nextOpen;
+
+      return {
+        id: columnId,
+        anchor: resolveColumnMenuAnchor(trigger),
+        trigger
+      };
     });
   }, [resolveColumnMenuAnchor]);
 
@@ -181,8 +185,8 @@ export function useTableColumns({
 
       return [{ id: columnId, desc: direction === "desc" }];
     });
-    setColumnMenuId(null);
-  }, [setSorting]);
+    closeColumnMenu();
+  }, [closeColumnMenu, setSorting]);
 
   const moveColumnByDrop = useCallback((sourceColumnId: string, targetColumnId: string, placement: DropPlacement) => {
     const next = reorderDataColumnsByPinZone({
@@ -211,10 +215,10 @@ export function useTableColumns({
       const offsetY = Math.max(0, event.clientY - previewRect.top);
       event.dataTransfer.setDragImage(dragPreview, offsetX, offsetY);
     }
-    setColumnMenuId(null);
+    closeColumnMenu();
     setDraggingColumnId(columnId);
     setDragOverTarget(null);
-  }, []);
+  }, [closeColumnMenu]);
 
   const onHeaderDragOver = useCallback((event: DragEvent<HTMLTableCellElement>, targetColumnId: string): void => {
     if (!draggingColumnId || draggingColumnId === targetColumnId) {
@@ -346,8 +350,9 @@ export function useTableColumns({
 
   return {
     columnMenuId,
-    setColumnMenuId,
-    columnMenuAnchorById,
+    activeColumnMenuAnchor,
+    activeColumnMenuTrigger,
+    closeColumnMenu,
     draggingColumnId,
     dragOverTarget,
     resolveColumnMenuAnchor,

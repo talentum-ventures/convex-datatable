@@ -1,11 +1,15 @@
+import { useLayoutEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, ChevronUp, EyeOff, Pin, PinOff } from "lucide-react";
 import type { FilterOperator, DataTableColumn, DataTableRowModel } from "../core/types";
 import { filterOperatorsForColumn } from "../core/filtering";
 import type { ColumnMenuAnchor } from "../hooks/use-table-columns";
+import { useHeaderMenuPosition } from "../hooks/use-header-menu-position";
 import { Button, Checkbox, Input } from "./primitives";
 
 export type ColumnMenuProps<TRow extends DataTableRowModel> = {
   column: DataTableColumn<TRow>;
+  trigger: HTMLElement;
   sortState: false | "asc" | "desc";
   canSort: boolean;
   canHide: boolean;
@@ -27,6 +31,7 @@ export type ColumnMenuProps<TRow extends DataTableRowModel> = {
 
 export function ColumnMenu<TRow extends DataTableRowModel>({
   column,
+  trigger,
   sortState,
   canSort,
   canHide,
@@ -46,6 +51,8 @@ export function ColumnMenu<TRow extends DataTableRowModel>({
   onToggleFilterValue
 }: ColumnMenuProps<TRow>): JSX.Element {
   const filterOperators = filterOperatorsForColumn(column);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const style = useHeaderMenuPosition(trigger, anchor);
 
   let menuActionGridColumns = "grid-cols-1";
   if (isPinned && canPin && canHide) {
@@ -56,14 +63,28 @@ export function ColumnMenu<TRow extends DataTableRowModel>({
     menuActionGridColumns = "grid-cols-2";
   }
 
-  return (
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    if (!menu) {
+      return;
+    }
+
+    const focusTarget =
+      menu.querySelector<HTMLElement>("[data-dt-column-menu-text-filter='true']") ??
+      menu.querySelector<HTMLElement>("[data-dt-column-menu-filter-select='true']") ??
+      menu.querySelector<HTMLElement>("[data-dt-column-menu-filter-checkbox='true']") ??
+      menu.querySelector<HTMLElement>("button");
+    focusTarget?.focus({ preventScroll: true });
+  }, []);
+
+  return createPortal(
     <div
+      ref={menuRef}
       role="dialog"
       aria-label={`${column.header} options`}
-      className={[
-        "absolute z-40 mt-1 w-72 rounded-md border border-slate-200 bg-white p-2 shadow-xl",
-        anchor === "left" ? "left-0" : "right-0"
-      ].join(" ")}
+      data-dt-column-menu-root="true"
+      className="z-40 rounded-md border border-slate-200 bg-white p-2 shadow-xl"
+      style={style}
     >
       <div className="mb-2 border-b border-slate-200 pb-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -166,6 +187,7 @@ export function ColumnMenu<TRow extends DataTableRowModel>({
 
           {filterOperators.length > 1 ? (
             <select
+              data-dt-column-menu-filter-select="true"
               value={activeFilterOperator}
               onChange={(event) => {
                 onSetFilterOperator(event.target.value as FilterOperator);
@@ -192,6 +214,7 @@ export function ColumnMenu<TRow extends DataTableRowModel>({
                   className="flex items-center gap-2 text-xs text-slate-700"
                 >
                   <Checkbox
+                    data-dt-column-menu-filter-checkbox="true"
                     checked={selectedFilterValues.includes(option.value)}
                     onChange={(event) => {
                       onToggleFilterValue(option.value, event.target.checked);
@@ -205,6 +228,7 @@ export function ColumnMenu<TRow extends DataTableRowModel>({
 
           {column.kind !== "select" && column.kind !== "multiselect" ? (
             <Input
+              data-dt-column-menu-text-filter="true"
               type={
                 column.kind === "number" || column.kind === "currency"
                   ? "number"
@@ -222,6 +246,7 @@ export function ColumnMenu<TRow extends DataTableRowModel>({
           ) : null}
         </div>
       ) : null}
-    </div>
+    </div>,
+    trigger.ownerDocument.body
   );
 }

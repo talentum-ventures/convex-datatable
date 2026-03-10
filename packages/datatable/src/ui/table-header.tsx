@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useEffect, useRef } from "react";
 import { flexRender, type Table } from "@tanstack/react-table";
 import { ChevronDown, ChevronUp, Filter, GripVertical, MoreVertical } from "lucide-react";
 import { cn } from "../core/cn";
@@ -29,7 +29,8 @@ export type TableHeaderProps<TRow extends DataTableRowModel> = {
   columnSizing: Readonly<Record<string, number>>;
   fixedTrackStyle: (width: number) => React.CSSProperties;
   columnMenuId: string | null;
-  columnMenuAnchorById: Readonly<Record<string, ColumnMenuAnchor>>;
+  activeColumnMenuAnchor: ColumnMenuAnchor;
+  activeColumnMenuTrigger: HTMLElement | null;
   dragOverTarget: { columnId: string; placement: DropPlacement } | null;
   mergedFeatures: {
     columnSort: boolean;
@@ -48,7 +49,7 @@ export type TableHeaderProps<TRow extends DataTableRowModel> = {
   toggleColumnFilterInValue: (column: DataTableColumn<TRow>, value: string, enabled: boolean) => void;
   clearColumnFilter: (columnId: string) => void;
   toggleColumnMenu: (columnId: string, trigger: HTMLElement) => void;
-  setColumnMenuId: (columnId: string | null) => void;
+  closeColumnMenu: () => void;
   updatePinnedColumn: (columnId: string, side: "left" | "right" | "none") => void;
   setColumnSortDirection: (columnId: string, direction: "asc" | "desc") => void;
   onHeaderDragStart: (event: React.DragEvent<HTMLElement>, columnId: string) => void;
@@ -72,7 +73,8 @@ function TableHeaderInner<TRow extends DataTableRowModel>({
   columnSizing,
   fixedTrackStyle,
   columnMenuId,
-  columnMenuAnchorById,
+  activeColumnMenuAnchor,
+  activeColumnMenuTrigger,
   dragOverTarget,
   mergedFeatures,
   filterByColumnId,
@@ -84,7 +86,7 @@ function TableHeaderInner<TRow extends DataTableRowModel>({
   toggleColumnFilterInValue,
   clearColumnFilter,
   toggleColumnMenu,
-  setColumnMenuId,
+  closeColumnMenu,
   updatePinnedColumn,
   setColumnSortDirection,
   onHeaderDragStart,
@@ -93,6 +95,26 @@ function TableHeaderInner<TRow extends DataTableRowModel>({
   onHeaderDragEnd,
   beginColumnResize
 }: TableHeaderProps<TRow>): JSX.Element {
+  const previousColumnMenuIdRef = useRef<string | null>(null);
+  const lastOpenTriggerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (columnMenuId) {
+      lastOpenTriggerRef.current = activeColumnMenuTrigger;
+      previousColumnMenuIdRef.current = columnMenuId;
+      return;
+    }
+
+    if (previousColumnMenuIdRef.current) {
+      const trigger = lastOpenTriggerRef.current;
+      if (trigger?.isConnected) {
+        trigger.focus({ preventScroll: true });
+      }
+    }
+
+    previousColumnMenuIdRef.current = null;
+  }, [activeColumnMenuTrigger, columnMenuId]);
+
   return (
     <thead
       className="sticky top-0 z-30"
@@ -248,16 +270,17 @@ function TableHeaderInner<TRow extends DataTableRowModel>({
                         <span className="sr-only">Open column menu</span>
                       </Button>
 
-                      {isMenuOpen ? (
+                      {isMenuOpen && activeColumnMenuTrigger ? (
                         <ColumnMenu
                           column={columnConfig}
+                          trigger={activeColumnMenuTrigger}
                           sortState={sortState}
                           canSort={canSort}
                           canHide={canHide}
                           canPin={canPin}
                           canFilter={canFilter}
                           isPinned={isPinned}
-                          anchor={columnMenuAnchorById[columnConfig.id] ?? "right"}
+                          anchor={activeColumnMenuAnchor}
                           activeFilterOperator={activeFilterOperator}
                           textFilterValue={textFilterValue}
                           selectedFilterValues={selectedFilterValues}
@@ -269,7 +292,7 @@ function TableHeaderInner<TRow extends DataTableRowModel>({
                           }}
                           onHide={() => {
                             table.getColumn(columnConfig.id)?.toggleVisibility(false);
-                            setColumnMenuId(null);
+                            closeColumnMenu();
                           }}
                           onClearFilter={() => {
                             clearColumnFilter(columnConfig.id);

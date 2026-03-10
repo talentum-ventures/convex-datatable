@@ -49,8 +49,8 @@ export function App(): JSX.Element {
   }, []);
 
   return (
-    <main className="mx-auto max-w-[1400px] space-y-6 p-6">
-      <header className="space-y-4">
+    <main className="mx-auto flex min-h-screen max-w-[1400px] flex-col gap-6 p-6">
+      <header className="shrink-0 space-y-4">
         <div className="space-y-2">
           <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Rolha Grid</h1>
           <p className="max-w-4xl text-sm text-slate-600">
@@ -91,20 +91,22 @@ export function App(): JSX.Element {
         </nav>
       </header>
 
-      {page === "convex" ? (
-        convexClient ? (
-          <ConvexProvider client={convexClient}>
-            <ConvexPage />
-          </ConvexProvider>
+      <div className="flex min-h-0 flex-1 flex-col">
+        {page === "convex" ? (
+          convexClient ? (
+            <ConvexProvider client={convexClient}>
+              <ConvexPage />
+            </ConvexProvider>
+          ) : (
+            <section className="rounded-2xl border border-amber-200 bg-amber-50/90 p-5 text-sm text-amber-950">
+              Set <code>VITE_CONVEX_URL</code> in <code>apps/demo/.env.local</code> and run{" "}
+              <code>npx convex dev</code> from <code>apps/demo</code> to use the real Convex page.
+            </section>
+          )
         ) : (
-          <section className="rounded-2xl border border-amber-200 bg-amber-50/90 p-5 text-sm text-amber-950">
-            Set <code>VITE_CONVEX_URL</code> in <code>apps/demo/.env.local</code> and run{" "}
-            <code>npx convex dev</code> from <code>apps/demo</code> to use the real Convex page.
-          </section>
-        )
-      ) : (
-        <InMemoryPage />
-      )}
+          <InMemoryPage />
+        )}
+      </div>
     </main>
   );
 }

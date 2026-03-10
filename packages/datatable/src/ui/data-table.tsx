@@ -728,8 +728,9 @@ const DataTableInner = <TRow extends DataTableRowModel>({
   }, [cellStore]);
   const {
     columnMenuId,
-    setColumnMenuId,
-    columnMenuAnchorById,
+    activeColumnMenuAnchor,
+    activeColumnMenuTrigger,
+    closeColumnMenu,
     dragOverTarget,
     toggleColumnMenu,
     updatePinnedColumn,
@@ -740,7 +741,6 @@ const DataTableInner = <TRow extends DataTableRowModel>({
     onHeaderDragEnd,
     beginColumnResize
   } = useTableColumns({
-    tableContainerRef,
     columnPinning,
     normalizedColumnOrder,
     normalizedColumnPinning,
@@ -1203,7 +1203,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
       <CollaboratorStoreContext.Provider value={collaboratorStore}>
         <div
           className={cn(
-            "relative w-full",
+            "relative flex h-full min-h-0 w-full flex-col",
             isPlainSurface
               ? "rounded-none border-0 bg-transparent p-0 shadow-none"
               : "rounded-[var(--dt-radius)] border border-[var(--dt-border-color)] bg-white/90 p-3 shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]",
@@ -1232,6 +1232,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
 
           <div
             className={cn(
+              "flex flex-1 min-h-0 flex-col",
               isPlainSurface
                 ? "rounded-none border-0 bg-transparent"
                 : "rounded-md border border-slate-200 bg-[linear-gradient(180deg,hsl(210_50%_98%),hsl(210_35%_97%))]"
@@ -1278,7 +1279,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
           >
             <div
               ref={tableContainerRef}
-              className="relative isolate max-h-[560px] overflow-auto"
+              className="relative isolate h-full min-h-0 w-full overflow-auto"
               onScroll={onGridScroll}
               onKeyDown={onGridKeyDown}
               tabIndex={0}
@@ -1304,7 +1305,8 @@ const DataTableInner = <TRow extends DataTableRowModel>({
                   columnSizing={columnSizing}
                   fixedTrackStyle={fixedTrackStyle}
                   columnMenuId={columnMenuId}
-                  columnMenuAnchorById={columnMenuAnchorById}
+                  activeColumnMenuAnchor={activeColumnMenuAnchor}
+                  activeColumnMenuTrigger={activeColumnMenuTrigger}
                   dragOverTarget={dragOverTarget}
                   mergedFeatures={headerFeatures}
                   filterByColumnId={filterByColumnId}
@@ -1316,7 +1318,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
                   toggleColumnFilterInValue={toggleColumnFilterInValue}
                   clearColumnFilter={clearColumnFilter}
                   toggleColumnMenu={toggleColumnMenu}
-                  setColumnMenuId={setColumnMenuId}
+                  closeColumnMenu={closeColumnMenu}
                   updatePinnedColumn={updatePinnedColumn}
                   setColumnSortDirection={setColumnSortDirection}
                   onHeaderDragStart={onHeaderDragStart}

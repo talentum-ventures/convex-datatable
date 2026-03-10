@@ -405,7 +405,7 @@ export function ConvexPage(): JSX.Element {
   });
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-1 min-h-0 flex-col gap-5">
       <section className="space-y-3">
         <div className="space-y-1">
           <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
