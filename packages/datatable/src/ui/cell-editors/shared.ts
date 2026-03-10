@@ -12,6 +12,8 @@ export type DefaultEditorProps<TRow extends DataTableRowModel> = {
   value: DataTableCellValue;
   onCommit: (value: DataTableCellValue) => void;
   onAutoSave?: (value: DataTableCellValue) => void;
+  restoredDraft?: string | null;
+  onDraftChange?: (value: DataTableCellValue) => void;
   onCancel: () => void;
 };
 

@@ -28,6 +28,8 @@ export type SharedCellEditorArgs<TRow extends DataTableRowModel> = {
   value: DataTableCellValue;
   onCommit: (nextValue: DataTableCellValue) => void;
   onAutoSave?: (nextValue: DataTableCellValue) => void;
+  restoredDraft?: string | null;
+  onDraftChange?: (nextValue: DataTableCellValue) => void;
   onCancel: () => void;
 };
 
@@ -116,6 +118,8 @@ export function renderColumnEditor<TRow extends DataTableRowModel>({
   value,
   onCommit,
   onAutoSave,
+  restoredDraft,
+  onDraftChange,
   onCancel
 }: SharedCellEditorArgs<TRow>): ReactNode {
   const customEditor = column.renderEditor as
@@ -149,6 +153,8 @@ export function renderColumnEditor<TRow extends DataTableRowModel>({
       value={value}
       onCommit={onCommit}
       onCancel={onCancel}
+      {...(restoredDraft !== undefined ? { restoredDraft } : {})}
+      {...(onDraftChange ? { onDraftChange } : {})}
       {...(onAutoSave ? { onAutoSave } : {})}
     />
   );

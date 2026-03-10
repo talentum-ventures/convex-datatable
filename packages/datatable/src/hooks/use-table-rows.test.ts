@@ -86,6 +86,74 @@ function useTestTableRows(
 }
 
 describe("useTableRows", () => {
+  it("keeps the editing row snapshot and draft value until editing ends", () => {
+    const initialRow = { id: "row-1", title: "Alpha" };
+    const serverUpdatedRow = { id: "row-1", title: "Server update" };
+    const { result, rerender } = renderHook(
+      ({ sourceRows }: { sourceRows: ReadonlyArray<TestRow> }) =>
+        useTestTableRows(createDataSource({}), vi.fn(), undefined, sourceRows),
+      {
+        initialProps: {
+          sourceRows: [initialRow]
+        }
+      }
+    );
+
+    act(() => {
+      result.current.onStartEdit("row-1", "title");
+      result.current.onEditingDraftChange("row-1", "title", "Alpha draft");
+    });
+
+    expect(result.current.getEditingDraftValue("row-1", "title")).toBe("Alpha draft");
+
+    rerender({
+      sourceRows: [serverUpdatedRow]
+    });
+
+    expect(result.current.mergedRows).toEqual([initialRow]);
+
+    act(() => {
+      result.current.onCancelEdit();
+    });
+
+    rerender({
+      sourceRows: [serverUpdatedRow]
+    });
+
+    expect(result.current.getEditingDraftValue("row-1", "title")).toBeNull();
+    expect(result.current.mergedRows).toEqual([serverUpdatedRow]);
+  });
+
+  it("clears the editing draft snapshot after a manual commit", async () => {
+    const row = { id: "row-1", title: "Alpha" };
+    const updateRows = vi.fn(async () => undefined);
+    const { result } = renderHook(() =>
+      useTestTableRows(createDataSource({ updateRows }), vi.fn(), undefined, [row])
+    );
+
+    act(() => {
+      result.current.onStartEdit("row-1", "title");
+      result.current.onEditingDraftChange("row-1", "title", "Alpha draft");
+    });
+
+    await act(async () => {
+      await result.current.commitCellEdit({
+        row,
+        rowId: "row-1",
+        column: titleColumn,
+        value: "Beta"
+      });
+    });
+
+    expect(result.current.getEditingDraftValue("row-1", "title")).toBeNull();
+    expect(result.current.optimisticRows).toEqual({
+      "row-1": {
+        id: "row-1",
+        title: "Beta"
+      }
+    });
+  });
+
   it("commits the draft row even when the row schema requires server-generated fields", async () => {
     const rowsRefresh = vi.fn();
     const createRow = vi.fn(async (draft: Partial<TestRow>) => ({
@@ -208,5 +276,76 @@ describe("useTableRows", () => {
     expect(result.current.optimisticRows).toEqual({});
     expect(updateRows).toHaveBeenCalledTimes(1);
     expect(vi.mocked(toast.error)).toHaveBeenCalledWith("Failed to update row: Error: offline");
+  });
+
+  it("keeps the latest optimistic autosave when an older request fails later", async () => {
+    const updateRowsResolvers: Array<{
+      resolve: () => void;
+      reject: (error: Error) => void;
+    }> = [];
+    const updateRows = vi.fn(
+      async () =>
+        await new Promise<void>((resolve, reject: (error: Error) => void) => {
+          updateRowsResolvers.push({
+            resolve,
+            reject
+          });
+        })
+    );
+    const { result } = renderHook(() =>
+      useTestTableRows(createDataSource({ updateRows }), vi.fn(), undefined, [{ id: "row-1", title: "Alpha" }])
+    );
+
+    let firstSave = Promise.resolve();
+    let secondSave = Promise.resolve();
+
+    await act(async () => {
+      firstSave = result.current.autoSaveCellEdit({
+        row: { id: "row-1", title: "Alpha" },
+        rowId: "row-1",
+        column: titleColumn,
+        value: "Beta"
+      });
+
+      secondSave = result.current.autoSaveCellEdit({
+        row: { id: "row-1", title: "Beta" },
+        rowId: "row-1",
+        column: titleColumn,
+        value: "Gamma"
+      });
+
+      await Promise.resolve();
+    });
+
+    expect(result.current.optimisticRows).toEqual({
+      "row-1": {
+        id: "row-1",
+        title: "Gamma"
+      }
+    });
+
+    await act(async () => {
+      updateRowsResolvers[0]?.reject(new Error("offline"));
+      await firstSave;
+    });
+
+    expect(result.current.optimisticRows).toEqual({
+      "row-1": {
+        id: "row-1",
+        title: "Gamma"
+      }
+    });
+
+    await act(async () => {
+      updateRowsResolvers[1]?.resolve();
+      await secondSave;
+    });
+
+    expect(result.current.optimisticRows).toEqual({
+      "row-1": {
+        id: "row-1",
+        title: "Gamma"
+      }
+    });
   });
 });
