@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import type { ColumnDef, Table } from "@tanstack/react-table";
 import type {
   CellCoord,
-  CollaboratorPresence,
   DataTableCellValue,
   DataTableColumn,
   DataTableRowModel,
@@ -21,7 +20,6 @@ export type CellCommit<TRow extends DataTableRowModel> = (args: {
 export type BuildColumnsArgs<TRow extends DataTableRowModel> = {
   columns: ReadonlyArray<DataTableColumn<TRow>>;
   getRowId: (row: TRow) => RowId;
-  collaborators: ReadonlyArray<CollaboratorPresence>;
   onStartEdit: (rowId: RowId, columnId: string) => void;
   onCommit: CellCommit<TRow>;
   onCancelEdit: () => void;
@@ -33,7 +31,6 @@ export type BuildColumnsArgs<TRow extends DataTableRowModel> = {
 export function useColumnDefs<TRow extends DataTableRowModel>({
   columns,
   getRowId,
-  collaborators,
   onStartEdit,
   onCommit,
   onCancelEdit,
@@ -94,7 +91,6 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
               value={value}
               rowIndex={context.row.index}
               columnIndex={dynamicColumnIndex >= 0 ? dynamicColumnIndex : 0}
-              collaborators={collaborators}
               enableEditing={enableEditing}
               onCommit={onCommit}
               onCancelEdit={onCancelEdit}
@@ -120,7 +116,6 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
     });
   }, [
     columns,
-    collaborators,
     enableEditing,
     getRowId,
     onCancelEdit,

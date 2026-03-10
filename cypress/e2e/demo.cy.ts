@@ -5,6 +5,7 @@ describe("demo app", () => {
     cy.visit("/");
 
     cy.contains("Rolha Grid").should("exist");
+    cy.contains("In-memory example").should("exist");
     cy.contains("Project 1").should("exist");
 
     cy.get("[data-column-menu-trigger='status']").click();
@@ -41,5 +42,13 @@ describe("demo app", () => {
     cy.findByLabelText("Edit Project").type("{selectall}{backspace}Project 1 Updated");
     cy.get("body").click(0, 0);
     cy.findByLabelText("Edit Project").should("not.exist");
+  });
+
+  it("switches to the Convex page", () => {
+    cy.visit("/");
+
+    cy.contains("a", "Convex").click();
+
+    cy.contains(/Convex adapter example|Set VITE_CONVEX_URL/).should("exist");
   });
 });

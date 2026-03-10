@@ -58,6 +58,7 @@ const MemoRowInner = <TRow extends DataTableRowModel>({
       const rightOffset = columnRenderLayout.rightPinnedOffsetById[cell.column.id];
       const isActionCell = cell.column.id === ACTIONS_COLUMN_ID;
       const isOpenActionMenuCell = isActionCell && isRowActionMenuOpen;
+      const isFirstRightPinned = columnRenderLayout.firstRightPinnedColumnId === cell.column.id;
 
       return (
         <td
@@ -65,6 +66,7 @@ const MemoRowInner = <TRow extends DataTableRowModel>({
           data-pinned-state={pinned || "center"}
           className={cn(
             "border-r border-b border-[var(--dt-border-color)] p-0 align-top",
+            isFirstRightPinned ? "border-l border-l-[var(--dt-border-color)]" : "",
             isActionCell ? "relative overflow-visible border-l border-l-[var(--dt-border-color)]" : "",
             isOpenActionMenuCell ? "z-40" : "",
             pinned

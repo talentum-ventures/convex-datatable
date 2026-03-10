@@ -143,4 +143,48 @@ describe("useConvexPresence", () => {
 
     expect(sendHeartbeat).toHaveBeenCalledTimes(2);
   });
+
+  it("keeps the same collaborators reference when only lastSeen changes", () => {
+    const sendHeartbeat = vi.fn<(entry: ReturnType<typeof buildPresenceEntry>) => void>();
+    let entries = [
+      {
+        tableId: "tasks",
+        userId: "remote-user",
+        userName: "Remote",
+        userColor: "#222222",
+        activeRowId: "row-2",
+        activeColumnId: "status",
+        lastSeen: Date.now()
+      }
+    ];
+
+    const { result, rerender } = renderHook(() =>
+      useConvexPresence({
+        tableId: "tasks",
+        userId: "local-user",
+        userName: "Local",
+        usePresenceData: () => entries,
+        sendHeartbeat,
+        heartbeatIntervalMs: 10_000
+      })
+    );
+
+    const initialCollaborators = result.current.collaborators;
+
+    entries = [
+      {
+        tableId: "tasks",
+        userId: "remote-user",
+        userName: "Remote",
+        userColor: "#222222",
+        activeRowId: "row-2",
+        activeColumnId: "status",
+        lastSeen: Date.now() + 10_000
+      }
+    ];
+
+    rerender();
+
+    expect(result.current.collaborators).toBe(initialCollaborators);
+  });
 });

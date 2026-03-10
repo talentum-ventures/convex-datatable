@@ -121,7 +121,7 @@ export function getPresenceHandler<
     handler: async (
       ctx: GenericQueryCtx<DataModel>,
       args: { tableId: string; staleAfterMs?: number }
-    ): Promise<ReadonlyArray<ConvexPresenceEntry>> => {
+    ): Promise<ConvexPresenceEntry[]> => {
       const rows = (await ctx.db.query(tableName).collect()).filter(isPresenceTableDocument);
       const staleAfterMs = args.staleAfterMs ?? DEFAULT_PRESENCE_STALE_AFTER_MS;
       const now = Date.now();

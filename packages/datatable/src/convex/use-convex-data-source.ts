@@ -16,7 +16,7 @@ function querySignature(state: DataTableQueryState): string {
 }
 
 function useConvexRows<TRow extends DataTableRowModel>(
-  config: ConvexDataSourceConfig<TRow>,
+  config: Pick<ConvexDataSourceConfig<TRow>, "usePageQuery">,
   query: DataTableQueryState
 ): ReturnType<DataTableDataSource<TRow>["useRows"]> {
   const [activeCursor, setActiveCursor] = useState<string | null>(null);
@@ -96,28 +96,35 @@ function useConvexRows<TRow extends DataTableRowModel>(
 export function useConvexDataSource<TRow extends DataTableRowModel>(
   config: ConvexDataSourceConfig<TRow>
 ): DataTableDataSource<TRow> {
+  const { pageSize, usePageQuery, createRow, updateRows, deleteRows, restoreRows } = config;
+
   return useMemo(() => {
     const source: DataTableDataSource<TRow> = {
       useRows: (query) =>
-        useConvexRows(config, {
-          ...query,
-          pageSize: query.pageSize > 0 ? query.pageSize : config.pageSize ?? DEFAULT_PAGE_SIZE
-        })
+        useConvexRows(
+          {
+            usePageQuery
+          },
+          {
+            ...query,
+            pageSize: query.pageSize > 0 ? query.pageSize : pageSize ?? DEFAULT_PAGE_SIZE
+          }
+        )
     };
 
-    if (config.createRow) {
-      source.createRow = config.createRow;
+    if (createRow) {
+      source.createRow = createRow;
     }
-    if (config.updateRows) {
-      source.updateRows = config.updateRows;
+    if (updateRows) {
+      source.updateRows = updateRows;
     }
-    if (config.deleteRows) {
-      source.deleteRows = config.deleteRows;
+    if (deleteRows) {
+      source.deleteRows = deleteRows;
     }
-    if (config.restoreRows) {
-      source.restoreRows = config.restoreRows;
+    if (restoreRows) {
+      source.restoreRows = restoreRows;
     }
 
     return source;
-  }, [config]);
+  }, [createRow, deleteRows, pageSize, restoreRows, updateRows, usePageQuery]);
 }

@@ -147,6 +147,7 @@ function TableHeaderInner<TRow extends DataTableRowModel>({
             const leftOffset = columnRenderLayout.leftPinnedOffsetById[header.column.id];
             const rightOffset = columnRenderLayout.rightPinnedOffsetById[header.column.id];
             const isActionHeader = header.column.id === ACTIONS_COLUMN_ID;
+            const isFirstRightPinned = columnRenderLayout.firstRightPinnedColumnId === header.column.id;
 
             return (
               <th
@@ -171,6 +172,7 @@ function TableHeaderInner<TRow extends DataTableRowModel>({
                 data-pinned-state={pinnedState || "center"}
                 className={cn(
                   "group relative border-b border-r border-[var(--dt-border-color)] px-2 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600",
+                  isFirstRightPinned ? "border-l border-l-[var(--dt-border-color)]" : "",
                   isActionHeader ? "border-l border-l-[var(--dt-border-color)]" : "",
                   pinnedState
                     ? "sticky z-30 shadow-[var(--dt-pinned-shadow)] [background:var(--dt-pinned-header-bg)]"

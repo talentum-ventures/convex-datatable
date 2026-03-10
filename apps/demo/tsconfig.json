@@ -8,5 +8,5 @@
       "@rolha/datatable": ["../../packages/datatable/src/index.ts"]
     }
   },
-  "include": ["src", "vite.config.ts", "../../packages/datatable/src"]
+  "include": ["src", "convex", "vite.config.ts", "../../packages/datatable/src"]
 }

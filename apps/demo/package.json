@@ -8,6 +8,7 @@
   },
   "scripts": {
     "check:no-js-src": "if rg --files src -g '*.js' -g '*.jsx' > /dev/null; then echo 'Error: JavaScript source files are not allowed in apps/demo/src'; rg --files src -g '*.js' -g '*.jsx'; exit 1; fi",
+    "convex:dev": "convex dev",
     "dev": "vite",
     "build": "bun run check:no-js-src && tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
@@ -15,6 +16,7 @@
   },
   "dependencies": {
     "@rolha/datatable": "workspace:*",
+    "convex": "^1.32.0",
     "lucide-react": "^0.469.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

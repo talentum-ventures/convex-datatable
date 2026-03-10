@@ -1413,6 +1413,23 @@ describe("DataTable component", () => {
       });
   });
 
+  it("renders a left separator for the first right-pinned column", () => {
+    cy.mount(<Harness tableId="cypress-table-right-pinned-separator" />);
+
+    cy.get("[data-column-menu-trigger='title']").first().click({ force: true });
+    cy.contains("button", "Right").click({ force: true });
+
+    cy.get("th[data-column-id='title']")
+      .should("have.attr", "data-pinned-state", "right")
+      .should("have.class", "border-l");
+
+    cy.get(`tr[data-row-id='1'] [role='gridcell'][data-column-id='title']`)
+      .first()
+      .closest("td")
+      .should("have.attr", "data-pinned-state", "right")
+      .should("have.class", "border-l");
+  });
+
   it("resizes a column from the resize handle without changing header order", () => {
     cy.mount(<Harness tableId="cypress-table-resize-no-reorder" />);
 

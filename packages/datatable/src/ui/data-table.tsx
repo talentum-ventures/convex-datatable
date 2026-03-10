@@ -1,4 +1,5 @@
 import {
+  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -19,6 +20,10 @@ import {
   CellStore,
   CellStoreContext,
 } from "../core/cell-store";
+import {
+  CollaboratorStore,
+  CollaboratorStoreContext
+} from "../core/collaborator-store";
 import {
   DEFAULT_FEATURE_FLAGS,
   DEFAULT_MIN_ROW_HEIGHT,
@@ -163,7 +168,7 @@ function resolveThemeTokens(
 }
 
 
-export function DataTable<TRow extends DataTableRowModel>({
+const DataTableInner = <TRow extends DataTableRowModel>({
   tableId,
   columns,
   getRowId,
@@ -178,7 +183,7 @@ export function DataTable<TRow extends DataTableRowModel>({
   collaborators,
   onActiveCellChange,
   onError
-}: DataTableProps<TRow>): JSX.Element {
+}: DataTableProps<TRow>): JSX.Element => {
   const mergedFeatures = useMemo(() => asRequiredFeatureFlags(features), [features]);
   const mergedTheme = useMemo(
     () => resolveThemeTokens(theme),
@@ -193,7 +198,12 @@ export function DataTable<TRow extends DataTableRowModel>({
   if (!cellStoreRef.current) {
     cellStoreRef.current = new CellStore();
   }
+  const collaboratorStoreRef = useRef<CollaboratorStore | null>(null);
+  if (!collaboratorStoreRef.current) {
+    collaboratorStoreRef.current = new CollaboratorStore(collaborators ?? EMPTY_COLLABORATORS);
+  }
   const cellStore = cellStoreRef.current;
+  const collaboratorStore = collaboratorStoreRef.current;
   const setEditingCell = cellStore.setEditingCell;
   const undoStack = useUndoStack<TRow>();
   const commitCounter = useRef(0);
@@ -317,7 +327,6 @@ export function DataTable<TRow extends DataTableRowModel>({
   const dataColumnDefs = useColumnDefs({
     columns: orderedColumns,
     getRowId,
-    collaborators: collaborators ?? EMPTY_COLLABORATORS,
     onStartEdit,
     onCommit: commitCellEdit,
     onCancelEdit,
@@ -629,6 +638,10 @@ export function DataTable<TRow extends DataTableRowModel>({
       observer.disconnect();
     };
   }, []);
+
+  useEffect(() => {
+    collaboratorStore.update(collaborators ?? EMPTY_COLLABORATORS);
+  }, [collaboratorStore, collaborators]);
 
   useEffect(() => {
     if (!onActiveCellChange) {
@@ -1143,171 +1156,175 @@ export function DataTable<TRow extends DataTableRowModel>({
 
   return (
     <CellStoreContext.Provider value={cellStore}>
-    <div
-      className={cn(
-        "relative rounded-[var(--dt-radius)] border border-[var(--dt-border-color)] bg-white/90 p-3 shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]",
-        className
-      )}
-      style={rootStyle}
-    >
-      <TableToolbar
-        canAddRow={mergedFeatures.rowAdd && Boolean(dataSource.createRow)}
-        canDeleteRows={mergedFeatures.rowDelete && Boolean(dataSource.deleteRows)}
-        canCopySelection={mergedFeatures.clipboardCopy}
-        canManageVisibility={mergedFeatures.columnVisibility}
-        isLoadingRows={rowsResult.isLoading}
-        hiddenColumns={hiddenColumns}
-        orderedColumns={orderedColumns}
-        table={table}
-        rowSelection={rowSelection}
-        mergedRows={mergedRows}
-        getRowId={getRowId}
-        onAddRow={handleAddRow}
-        onDeleteSelected={handleDeleteSelected}
-        onCopy={handleCopySelection}
-      />
-
-      <div
-        className="rounded-md border border-slate-200 bg-[linear-gradient(180deg,hsl(210_50%_98%),hsl(210_35%_97%))]"
-        onPointerDownCapture={(event) => {
-          logInteractionCapture("pointerdown", event.target, {
-            shift: event.shiftKey,
-            ctrl: event.ctrlKey,
-            alt: event.altKey,
-            meta: event.metaKey,
-            button: event.button
-          });
-        }}
-        onClickCapture={(event) => {
-          logInteractionCapture("click", event.target, {
-            shift: event.shiftKey,
-            ctrl: event.ctrlKey,
-            alt: event.altKey,
-            meta: event.metaKey,
-            button: event.button
-          });
-        }}
-        onPaste={(event) => {
-          const editingCell = cellStore.getEditingCell();
-          if (
-            !canHandleGridPaste({
-              clipboardPaste: mergedFeatures.clipboardPaste,
-              editing: mergedFeatures.editing,
-              cellSelect: mergedFeatures.cellSelect,
-              editingCell,
-              hasUpdateRows: dataSource.updateRows !== undefined,
-              target: event.target
-            })
-          ) {
-            return;
-          }
-          const text = event.clipboardData.getData("text/plain");
-          if (!text) {
-            return;
-          }
-          event.preventDefault();
-          void pasteFromText(text);
-        }}
-      >
+      <CollaboratorStoreContext.Provider value={collaboratorStore}>
         <div
-          ref={tableContainerRef}
-          className="relative isolate max-h-[560px] overflow-auto"
-          onScroll={onGridScroll}
-          onKeyDown={onGridKeyDown}
-          tabIndex={0}
-          role="grid"
-          aria-rowcount={totalRows}
-          aria-colcount={visibleDataColumns.length}
+          className={cn(
+            "relative rounded-[var(--dt-radius)] border border-[var(--dt-border-color)] bg-white/90 p-3 shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]",
+            className
+          )}
+          style={rootStyle}
         >
-          <table
-            className="border-separate border-spacing-0 text-left"
-            style={{
-              boxSizing: "border-box",
-              display: "grid",
-              tableLayout: "fixed",
-              width: `${columnRenderLayout.tableRenderWidth}px`,
-              minWidth: `${columnRenderLayout.tableRenderWidth}px`,
-              fontFamily: "var(--dt-font-family)"
+          <TableToolbar
+            canAddRow={mergedFeatures.rowAdd && Boolean(dataSource.createRow)}
+            canDeleteRows={mergedFeatures.rowDelete && Boolean(dataSource.deleteRows)}
+            canCopySelection={mergedFeatures.clipboardCopy}
+            canManageVisibility={mergedFeatures.columnVisibility}
+            isLoadingRows={rowsResult.isLoading}
+            hiddenColumns={hiddenColumns}
+            orderedColumns={orderedColumns}
+            table={table}
+            rowSelection={rowSelection}
+            mergedRows={mergedRows}
+            getRowId={getRowId}
+            onAddRow={handleAddRow}
+            onDeleteSelected={handleDeleteSelected}
+            onCopy={handleCopySelection}
+          />
+
+          <div
+            className="rounded-md border border-slate-200 bg-[linear-gradient(180deg,hsl(210_50%_98%),hsl(210_35%_97%))]"
+            onPointerDownCapture={(event) => {
+              logInteractionCapture("pointerdown", event.target, {
+                shift: event.shiftKey,
+                ctrl: event.ctrlKey,
+                alt: event.altKey,
+                meta: event.metaKey,
+                button: event.button
+              });
+            }}
+            onClickCapture={(event) => {
+              logInteractionCapture("click", event.target, {
+                shift: event.shiftKey,
+                ctrl: event.ctrlKey,
+                alt: event.altKey,
+                meta: event.metaKey,
+                button: event.button
+              });
+            }}
+            onPaste={(event) => {
+              const editingCell = cellStore.getEditingCell();
+              if (
+                !canHandleGridPaste({
+                  clipboardPaste: mergedFeatures.clipboardPaste,
+                  editing: mergedFeatures.editing,
+                  cellSelect: mergedFeatures.cellSelect,
+                  editingCell,
+                  hasUpdateRows: dataSource.updateRows !== undefined,
+                  target: event.target
+                })
+              ) {
+                return;
+              }
+              const text = event.clipboardData.getData("text/plain");
+              if (!text) {
+                return;
+              }
+              event.preventDefault();
+              void pasteFromText(text);
             }}
           >
-            <TableHeader
-              table={table}
-              columnById={columnById}
-              columnRenderLayout={columnRenderLayout}
-              columnSizing={columnSizing}
-              fixedTrackStyle={fixedTrackStyle}
-              columnMenuId={columnMenuId}
-              columnMenuAnchorById={columnMenuAnchorById}
-              dragOverTarget={dragOverTarget}
-              mergedFeatures={headerFeatures}
-              filterByColumnId={filterByColumnId}
-              selectedFilterOperator={selectedFilterOperator}
-              selectColumnFilterTextValue={selectColumnFilterTextValue}
-              selectColumnFilterValues={selectColumnFilterValues}
-              setColumnFilterOperator={setColumnFilterOperator}
-              setColumnFilterTextValue={setColumnFilterTextValue}
-              toggleColumnFilterInValue={toggleColumnFilterInValue}
-              clearColumnFilter={clearColumnFilter}
-              toggleColumnMenu={toggleColumnMenu}
-              setColumnMenuId={setColumnMenuId}
-              updatePinnedColumn={updatePinnedColumn}
-              setColumnSortDirection={setColumnSortDirection}
-              onHeaderDragStart={onHeaderDragStart}
-              onHeaderDragOver={onHeaderDragOver}
-              onHeaderDrop={onHeaderDrop}
-              onHeaderDragEnd={onHeaderDragEnd}
-              beginColumnResize={beginColumnResize}
-            />
+            <div
+              ref={tableContainerRef}
+              className="relative isolate max-h-[560px] overflow-auto"
+              onScroll={onGridScroll}
+              onKeyDown={onGridKeyDown}
+              tabIndex={0}
+              role="grid"
+              aria-rowcount={totalRows}
+              aria-colcount={visibleDataColumns.length}
+            >
+              <table
+                className="border-separate border-spacing-0 text-left"
+                style={{
+                  boxSizing: "border-box",
+                  display: "grid",
+                  tableLayout: "fixed",
+                  width: `${columnRenderLayout.tableRenderWidth}px`,
+                  minWidth: `${columnRenderLayout.tableRenderWidth}px`,
+                  fontFamily: "var(--dt-font-family)"
+                }}
+              >
+                <TableHeader
+                  table={table}
+                  columnById={columnById}
+                  columnRenderLayout={columnRenderLayout}
+                  columnSizing={columnSizing}
+                  fixedTrackStyle={fixedTrackStyle}
+                  columnMenuId={columnMenuId}
+                  columnMenuAnchorById={columnMenuAnchorById}
+                  dragOverTarget={dragOverTarget}
+                  mergedFeatures={headerFeatures}
+                  filterByColumnId={filterByColumnId}
+                  selectedFilterOperator={selectedFilterOperator}
+                  selectColumnFilterTextValue={selectColumnFilterTextValue}
+                  selectColumnFilterValues={selectColumnFilterValues}
+                  setColumnFilterOperator={setColumnFilterOperator}
+                  setColumnFilterTextValue={setColumnFilterTextValue}
+                  toggleColumnFilterInValue={toggleColumnFilterInValue}
+                  clearColumnFilter={clearColumnFilter}
+                  toggleColumnMenu={toggleColumnMenu}
+                  setColumnMenuId={setColumnMenuId}
+                  updatePinnedColumn={updatePinnedColumn}
+                  setColumnSortDirection={setColumnSortDirection}
+                  onHeaderDragStart={onHeaderDragStart}
+                  onHeaderDragOver={onHeaderDragOver}
+                  onHeaderDrop={onHeaderDrop}
+                  onHeaderDragEnd={onHeaderDragEnd}
+                  beginColumnResize={beginColumnResize}
+                />
 
-            <TableBody
-              ref={tableBodyRef}
-              scrollContainerRef={tableContainerRef}
-              virtualizationEnabled={mergedFeatures.virtualization}
-              totalRows={totalRows}
-              minHeight={minHeight}
-              overscan={DEFAULT_OVERSCAN}
-              tableRows={tableRows}
-              displayedRows={displayedRows}
-              rowAddEnabled={mergedFeatures.rowAdd}
-              rowResizeEnabled={mergedFeatures.rowResize}
-              canCreateRow={Boolean(dataSource.createRow)}
-              draftRowId={DRAFT_ROW_ID}
-              draftRow={draftRow}
-              draftEditingColumnId={draftEditingColumnId}
-              visibleLeafColumnsInUiOrder={visibleLeafColumnsInUiOrder}
-              columnById={columnById}
-              columnRenderLayout={columnRenderLayout}
-              visibleDataColumnIndexById={visibleDataColumnIndexById}
-              fixedTrackStyle={fixedTrackStyle}
-              isDraftValuePresent={hasDraftCellValue}
-              onBeginDraftEdit={handleBeginDraftEdit}
-              onCommitDraftCell={commitDraftCell}
-              onCancelDraftEdit={cancelDraftCellEdit}
-              getRowId={getRowId}
-              rowActionMenuRowId={rowActionMenuRowId}
-              getRowRefHandler={getRowRefHandler}
-              rowHeights={rowHeights}
-              onStartRowResize={handleStartRowResize}
-            />
-          </table>
+                <TableBody
+                  ref={tableBodyRef}
+                  scrollContainerRef={tableContainerRef}
+                  virtualizationEnabled={mergedFeatures.virtualization}
+                  totalRows={totalRows}
+                  minHeight={minHeight}
+                  overscan={DEFAULT_OVERSCAN}
+                  tableRows={tableRows}
+                  displayedRows={displayedRows}
+                  rowAddEnabled={mergedFeatures.rowAdd}
+                  rowResizeEnabled={mergedFeatures.rowResize}
+                  canCreateRow={Boolean(dataSource.createRow)}
+                  draftRowId={DRAFT_ROW_ID}
+                  draftRow={draftRow}
+                  draftEditingColumnId={draftEditingColumnId}
+                  visibleLeafColumnsInUiOrder={visibleLeafColumnsInUiOrder}
+                  columnById={columnById}
+                  columnRenderLayout={columnRenderLayout}
+                  visibleDataColumnIndexById={visibleDataColumnIndexById}
+                  fixedTrackStyle={fixedTrackStyle}
+                  isDraftValuePresent={hasDraftCellValue}
+                  onBeginDraftEdit={handleBeginDraftEdit}
+                  onCommitDraftCell={commitDraftCell}
+                  onCancelDraftEdit={cancelDraftCellEdit}
+                  getRowId={getRowId}
+                  rowActionMenuRowId={rowActionMenuRowId}
+                  getRowRefHandler={getRowRefHandler}
+                  rowHeights={rowHeights}
+                  onStartRowResize={handleStartRowResize}
+                />
+              </table>
+            </div>
+          </div>
+
+          {rowsResult.error ? <p className="mt-2 text-sm text-rose-600">{rowsResult.error}</p> : null}
+          {rowsResult.isLoadingMore ? (
+            <p className="mt-2 inline-flex items-center gap-1 text-xs text-slate-500">
+              <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+              Loading more rows...
+            </p>
+          ) : null}
+
+          <style>{`
+            [role="grid"]:focus {
+              outline: 2px solid color-mix(in srgb, var(--dt-active-cell-ring), white 42%);
+              outline-offset: 2px;
+            }
+          `}</style>
         </div>
-      </div>
-
-      {rowsResult.error ? <p className="mt-2 text-sm text-rose-600">{rowsResult.error}</p> : null}
-      {rowsResult.isLoadingMore ? (
-        <p className="mt-2 inline-flex items-center gap-1 text-xs text-slate-500">
-          <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-          Loading more rows...
-        </p>
-      ) : null}
-
-      <style>{`
-        [role="grid"]:focus {
-          outline: 2px solid color-mix(in srgb, var(--dt-active-cell-ring), white 42%);
-          outline-offset: 2px;
-        }
-      `}</style>
-    </div>
+      </CollaboratorStoreContext.Provider>
     </CellStoreContext.Provider>
   );
-}
+};
+
+export const DataTable = memo(DataTableInner) as typeof DataTableInner;

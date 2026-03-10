@@ -1,6 +1,11 @@
-import { useCallback, type Dispatch, type SetStateAction } from "react";
+import {
+  useCallback,
+  type Dispatch,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type SetStateAction
+} from "react";
 import { toast } from "sonner";
-import type { KeyboardEvent as ReactKeyboardEvent } from "react";
+import { diffRows } from "../core/column-utils";
 import type { DataTableRowModel, EditingCellState, RowId, RowPatch } from "../core/types";
 import type { CellStore } from "../core/cell-store";
 import type { UseUndoStackResult, UndoEntry } from "./use-undo-stack";
@@ -18,10 +23,11 @@ function buildUndoSnapshotUpdate<TRow extends DataTableRowModel>(
 
   for (const change of entry.changes) {
     const row = direction === "previous" ? change.previousRow : change.nextRow;
+    const sourceRow = direction === "previous" ? change.nextRow : change.previousRow;
     optimisticUpdate[change.rowId] = row;
     patches.push({
       rowId: change.rowId,
-      patch: row
+      patch: diffRows(sourceRow, row)
     });
   }
 

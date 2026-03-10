@@ -60,6 +60,43 @@ export function toCollaboratorPresence(
     }));
 }
 
+function isSameActiveCell(
+  left: CollaboratorPresence["activeCell"],
+  right: CollaboratorPresence["activeCell"]
+): boolean {
+  return left?.rowId === right?.rowId && left?.columnId === right?.columnId;
+}
+
+function areCollaboratorsEqual(
+  left: ReadonlyArray<CollaboratorPresence>,
+  right: ReadonlyArray<CollaboratorPresence>
+): boolean {
+  if (left === right) {
+    return true;
+  }
+
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  for (let index = 0; index < left.length; index += 1) {
+    const leftCollaborator = left[index];
+    const rightCollaborator = right[index];
+    if (
+      !leftCollaborator ||
+      !rightCollaborator ||
+      leftCollaborator.userId !== rightCollaborator.userId ||
+      leftCollaborator.name !== rightCollaborator.name ||
+      leftCollaborator.color !== rightCollaborator.color ||
+      !isSameActiveCell(leftCollaborator.activeCell, rightCollaborator.activeCell)
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export function buildPresenceEntry(args: {
   tableId: string;
   userId: string;
@@ -105,10 +142,17 @@ export function useConvexPresence(
 
   sendHeartbeatRef.current = sendHeartbeat;
 
-  const collaborators = useMemo(
+  const mappedCollaborators = useMemo(
     () => toCollaboratorPresence(rawPresenceEntries, userId),
     [rawPresenceEntries, userId]
   );
+  const collaboratorsRef = useRef(mappedCollaborators);
+
+  if (!areCollaboratorsEqual(collaboratorsRef.current, mappedCollaborators)) {
+    collaboratorsRef.current = mappedCollaborators;
+  }
+
+  const collaborators = collaboratorsRef.current;
 
   const flushHeartbeat = useCallback(() => {
     const entry = buildPresenceEntry({

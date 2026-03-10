@@ -266,5 +266,6 @@ describe("column layout", () => {
       __actions__: 0,
       website: 65
     });
+    expect(result.firstRightPinnedColumnId).toBe("website");
   });
 });

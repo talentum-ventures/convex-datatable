@@ -49,6 +49,18 @@ export function getColumnValue<TRow extends DataTableRowModel>(
   return row[column.field];
 }
 
+export function diffRows<TRow extends DataTableRowModel>(previousRow: TRow, nextRow: TRow): Partial<TRow> {
+  const patch: Partial<TRow> = {};
+
+  for (const key of Object.keys(nextRow) as Array<keyof TRow>) {
+    if (previousRow[key] !== nextRow[key]) {
+      patch[key] = nextRow[key];
+    }
+  }
+
+  return patch;
+}
+
 export function setColumnValue<TRow extends DataTableRowModel>(
   row: TRow,
   rowId: RowId,
@@ -65,7 +77,9 @@ export function setColumnValue<TRow extends DataTableRowModel>(
 
   const patch: RowPatch<TRow> = {
     rowId,
-    patch: nextRow
+    patch: {
+      [column.field]: value
+    } as Partial<TRow>
   };
 
   return {

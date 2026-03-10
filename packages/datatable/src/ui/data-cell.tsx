@@ -6,9 +6,12 @@ import {
   useCellIsSelected,
   useCellStore
 } from "../core/cell-store";
+import {
+  useCollaboratorStore,
+  useCollaboratorsForCell
+} from "../core/collaborator-store";
 import type {
   CellCoord,
-  CollaboratorPresence,
   DataTableCellValue,
   DataTableColumn,
   DataTableRowModel,
@@ -28,7 +31,6 @@ export type DataCellProps<TRow extends DataTableRowModel> = {
   value: DataTableCellValue;
   rowIndex: number;
   columnIndex: number;
-  collaborators: ReadonlyArray<CollaboratorPresence>;
   enableEditing: boolean;
   onCommit: (args: {
     row: TRow;
@@ -49,7 +51,6 @@ const DataCellInner = <TRow extends DataTableRowModel>({
   value,
   rowIndex,
   columnIndex,
-  collaborators,
   enableEditing,
   onCommit,
   onCancelEdit,
@@ -58,18 +59,16 @@ const DataCellInner = <TRow extends DataTableRowModel>({
   onRangeSelect
 }: DataCellProps<TRow>): JSX.Element => {
   const cellStore = useCellStore();
+  const collaboratorStore = useCollaboratorStore();
   const isSelected = useCellIsSelected(cellStore, rowIndex, columnIndex);
   const isRangeSelected = useCellIsInRange(cellStore, rowIndex, columnIndex);
   const isEditing = useCellIsEditing(cellStore, rowId, column.id);
+  const collaboratorsInCell = useCollaboratorsForCell(collaboratorStore, rowId, column.id);
   const currentCoord: CellCoord = {
     rowIndex,
     columnIndex
   };
   const canEdit = enableEditing && (column.isEditable ?? false);
-  const collaboratorsInCell = collaborators.filter(
-    (collaborator) =>
-      collaborator.activeCell?.rowId === rowId && collaborator.activeCell?.columnId === column.id
-  );
 
   const content = isEditing
     ? renderColumnEditor({

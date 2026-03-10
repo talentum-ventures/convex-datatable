@@ -14,6 +14,7 @@ export type ColumnLayoutResult = {
   tableRenderWidth: number;
   leftPinnedOffsetById: Readonly<Record<string, number>>;
   rightPinnedOffsetById: Readonly<Record<string, number>>;
+  firstRightPinnedColumnId: string | null;
 };
 
 function toNonNegativeInteger(value: number): number {
@@ -186,6 +187,7 @@ export function computeColumnLayout(args: {
 
   const rightPinnedOffsetById: Record<string, number> = {};
   let rightOffset = 0;
+  let firstRightPinnedColumnId: string | null = null;
   for (let index = columns.length - 1; index >= 0; index -= 1) {
     const column = columns[index];
     if (!column || column.pinned !== "right") {
@@ -193,12 +195,14 @@ export function computeColumnLayout(args: {
     }
     rightPinnedOffsetById[column.id] = rightOffset;
     rightOffset += widths[index] ?? 0;
+    firstRightPinnedColumnId = column.id;
   }
 
   return {
     renderWidthsById,
     tableRenderWidth,
     leftPinnedOffsetById,
-    rightPinnedOffsetById
+    rightPinnedOffsetById,
+    firstRightPinnedColumnId
   };
 }
