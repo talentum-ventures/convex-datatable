@@ -14,6 +14,7 @@ describe("defaults", () => {
     expect(DEFAULT_FEATURE_FLAGS.rowActions).toBe(true);
     expect(DEFAULT_FEATURE_FLAGS.cellSelect).toBe(true);
     expect(DEFAULT_FEATURE_FLAGS.clipboardCopy).toBe(true);
+    expect(DEFAULT_FEATURE_FLAGS.autoSave).toBe(true);
     expect(DEFAULT_FEATURE_FLAGS.infiniteScroll).toBe(true);
     expect(DEFAULT_FEATURE_FLAGS.virtualization).toBe(true);
 

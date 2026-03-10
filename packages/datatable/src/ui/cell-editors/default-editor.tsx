@@ -11,6 +11,8 @@ export function DefaultEditor<TRow extends DataTableRowModel>({
   value,
   onCommit,
   onAutoSave,
+  restoredDraft,
+  onDraftChange,
   onCancel
 }: DefaultEditorProps<TRow>): JSX.Element {
   if (column.kind === "select") {
@@ -59,8 +61,10 @@ export function DefaultEditor<TRow extends DataTableRowModel>({
       value={value}
       initialText={initialText}
       onCommit={onCommit}
-      onAutoSave={onAutoSave}
       onCancel={onCancel}
+      {...(restoredDraft !== undefined ? { restoredDraft } : {})}
+      {...(onDraftChange ? { onDraftChange } : {})}
+      {...(onAutoSave ? { onAutoSave } : {})}
     />
   );
 }

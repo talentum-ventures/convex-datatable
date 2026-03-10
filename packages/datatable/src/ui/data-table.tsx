@@ -313,6 +313,8 @@ const DataTableInner = <TRow extends DataTableRowModel>({
     draftRowRef,
     onStartEdit,
     onCancelEdit,
+    getEditingDraftValue,
+    onEditingDraftChange,
     commitCellEdit,
     autoSaveCellEdit,
     deleteRowsNow,
@@ -350,11 +352,15 @@ const DataTableInner = <TRow extends DataTableRowModel>({
     getRowId,
     onStartEdit,
     onCommit: commitCellEdit,
-    onAutoSave: mergedFeatures.autoSave && mergedFeatures.editing ? autoSaveCellEdit : undefined,
     onCancelEdit,
+    getEditingDraftValue,
+    onEditingDraftChange,
     onCellSelect,
     onRangeSelect,
-    enableEditing: mergedFeatures.editing
+    enableEditing: mergedFeatures.editing,
+    ...(mergedFeatures.autoSave && mergedFeatures.editing
+      ? { onAutoSave: autoSaveCellEdit }
+      : {})
   });
 
   const actionColumn = useMemo(() => {
