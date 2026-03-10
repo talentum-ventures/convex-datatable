@@ -20,30 +20,14 @@ export function InlineContentEditor<TRow extends DataTableRowModel>({
   row,
   onCommit,
   onAutoSave,
-  restoredDraft,
-  onDraftChange,
   onCancel,
   initialText
 }: InlineContentEditorProps<TRow>): JSX.Element {
-  const initialDraftText = restoredDraft ?? initialText;
   const editorRef = useRef<HTMLDivElement | null>(null);
-  const initialTextRef = useRef(initialDraftText);
-  const draftRef = useRef(initialDraftText);
+  const initialTextRef = useRef(initialText);
+  const draftRef = useRef(initialText);
   const finalizedRef = useRef(false);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const columnRef = useRef(column);
-  const rowRef = useRef(row);
-  const onCommitRef = useRef(onCommit);
-  const onAutoSaveRef = useRef(onAutoSave);
-  const onDraftChangeRef = useRef(onDraftChange);
-  const onCancelRef = useRef(onCancel);
-
-  columnRef.current = column;
-  rowRef.current = row;
-  onCommitRef.current = onCommit;
-  onAutoSaveRef.current = onAutoSave;
-  onDraftChangeRef.current = onDraftChange;
-  onCancelRef.current = onCancel;
 
   useEffect(() => {
     const node = editorRef.current;
@@ -74,8 +58,8 @@ export function InlineContentEditor<TRow extends DataTableRowModel>({
     }
 
     finalizedRef.current = true;
-    const parsed = parseEditorValue(columnRef.current, draftRef.current, rowRef.current);
-    onCommitRef.current(parsed);
+    const parsed = parseEditorValue(column, draftRef.current, row);
+    onCommit(parsed);
   };
 
   const cancel = (): void => {
@@ -89,7 +73,7 @@ export function InlineContentEditor<TRow extends DataTableRowModel>({
     }
 
     finalizedRef.current = true;
-    onCancelRef.current();
+    onCancel();
   };
 
   return (
@@ -110,9 +94,8 @@ export function InlineContentEditor<TRow extends DataTableRowModel>({
         )}
         onInput={(event) => {
           draftRef.current = readEditableText(event.currentTarget);
-          onDraftChangeRef.current?.(draftRef.current);
 
-          if (!onAutoSaveRef.current || finalizedRef.current) {
+          if (!onAutoSave || finalizedRef.current) {
             return;
           }
 
@@ -126,8 +109,8 @@ export function InlineContentEditor<TRow extends DataTableRowModel>({
               return;
             }
 
-            const parsed = parseEditorValue(columnRef.current, draftRef.current, rowRef.current);
-            onAutoSaveRef.current?.(parsed);
+            const parsed = parseEditorValue(column, draftRef.current, row);
+            onAutoSave(parsed);
           }, AUTO_SAVE_DEBOUNCE_MS);
         }}
         onBlur={() => {

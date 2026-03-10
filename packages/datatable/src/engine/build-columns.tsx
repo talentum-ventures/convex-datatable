@@ -15,7 +15,7 @@ export type CellCommit<TRow extends DataTableRowModel> = (args: {
   rowId: RowId;
   column: DataTableColumn<TRow>;
   value: DataTableCellValue;
-}) => Promise<void>;
+}) => void;
 
 export type BuildColumnsArgs<TRow extends DataTableRowModel> = {
   columns: ReadonlyArray<DataTableColumn<TRow>>;
@@ -23,8 +23,6 @@ export type BuildColumnsArgs<TRow extends DataTableRowModel> = {
   onStartEdit: (rowId: RowId, columnId: string) => void;
   onCommit: CellCommit<TRow>;
   onAutoSave?: CellCommit<TRow>;
-  getEditingDraftValue?: (rowId: RowId, columnId: string) => DataTableCellValue | null;
-  onEditingDraftChange?: (rowId: RowId, columnId: string, value: DataTableCellValue) => void;
   onCancelEdit: () => void;
   onCellSelect: (coord: CellCoord) => void;
   onRangeSelect: (coord: CellCoord) => void;
@@ -37,8 +35,6 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
   onStartEdit,
   onCommit,
   onAutoSave,
-  getEditingDraftValue,
-  onEditingDraftChange,
   onCancelEdit,
   onCellSelect,
   onRangeSelect,
@@ -88,8 +84,6 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
           const rowId = getRowId(row);
           const value = context.getValue();
           const dynamicColumnIndex = visibleDataIndexById(context.table)[column.id] ?? 0;
-          const draftValue = getEditingDraftValue?.(rowId, column.id);
-          const restoredDraft = typeof draftValue === "string" ? draftValue : null;
 
           return (
             <DataCell
@@ -98,30 +92,14 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
               rowId={rowId}
               value={value}
               rowIndex={context.row.index}
-              columnIndex={Math.max(dynamicColumnIndex, 0)}
+              columnIndex={dynamicColumnIndex >= 0 ? dynamicColumnIndex : 0}
               enableEditing={enableEditing}
               onCommit={onCommit}
+              onAutoSave={onAutoSave}
               onCancelEdit={onCancelEdit}
               onStartEdit={onStartEdit}
               onCellSelect={onCellSelect}
               onRangeSelect={onRangeSelect}
-              {...(restoredDraft !== null ? { restoredDraft } : {})}
-              {...(onEditingDraftChange
-                ? {
-                    onDraftChange: ({
-                      rowId: nextRowId,
-                      columnId,
-                      value: nextValue
-                    }: {
-                      rowId: RowId;
-                      columnId: string;
-                      value: DataTableCellValue;
-                    }) => {
-                      onEditingDraftChange(nextRowId, columnId, nextValue);
-                    }
-                  }
-                : {})}
-              {...(onAutoSave ? { onAutoSave } : {})}
             />
           );
         }
@@ -142,13 +120,11 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
   }, [
     columns,
     enableEditing,
-    getEditingDraftValue,
     getRowId,
     onAutoSave,
     onCancelEdit,
     onCellSelect,
     onCommit,
-    onEditingDraftChange,
     onRangeSelect,
     onStartEdit
   ]);

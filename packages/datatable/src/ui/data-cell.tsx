@@ -18,7 +18,6 @@ import type {
   RowId
 } from "../core/types";
 import {
-  type CellCommit,
   renderColumnContent,
   renderColumnEditor,
   renderEditableIndicator,
@@ -30,15 +29,19 @@ export type DataCellProps<TRow extends DataTableRowModel> = {
   row: TRow;
   rowId: RowId;
   value: DataTableCellValue;
-  restoredDraft?: string | null;
   rowIndex: number;
   columnIndex: number;
   enableEditing: boolean;
-  onCommit: CellCommit<TRow>;
-  onAutoSave?: CellCommit<TRow>;
-  onDraftChange?: (args: {
+  onCommit: (args: {
+    row: TRow;
     rowId: RowId;
-    columnId: string;
+    column: DataTableColumn<TRow>;
+    value: DataTableCellValue;
+  }) => void;
+  onAutoSave?: (args: {
+    row: TRow;
+    rowId: RowId;
+    column: DataTableColumn<TRow>;
     value: DataTableCellValue;
   }) => void;
   onCancelEdit: () => void;
@@ -52,13 +55,11 @@ const DataCellInner = <TRow extends DataTableRowModel>({
   row,
   rowId,
   value,
-  restoredDraft,
   rowIndex,
   columnIndex,
   enableEditing,
   onCommit,
   onAutoSave,
-  onDraftChange,
   onCancelEdit,
   onStartEdit,
   onCellSelect,
@@ -89,22 +90,12 @@ const DataCellInner = <TRow extends DataTableRowModel>({
         onCommit: (nextValue) => {
           onCommit({ row, rowId, column, value: nextValue });
         },
-        ...(restoredDraft !== undefined ? { restoredDraft } : {}),
-        ...(onDraftChange
-          ? {
-              onDraftChange: (nextValue: DataTableCellValue) => {
-                onDraftChange({ rowId, columnId: column.id, value: nextValue });
-              }
+        onAutoSave: onAutoSave
+          ? (nextValue) => {
+              onAutoSave({ row, rowId, column, value: nextValue });
             }
-          : {}),
-        onCancel: onCancelEdit,
-        ...(onAutoSave
-          ? {
-              onAutoSave: (nextValue: DataTableCellValue) => {
-                onAutoSave({ row, rowId, column, value: nextValue });
-              }
-            }
-          : {})
+          : undefined,
+        onCancel: onCancelEdit
       })
     : renderColumnContent({
         column,

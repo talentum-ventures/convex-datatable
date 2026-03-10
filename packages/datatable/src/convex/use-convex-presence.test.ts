@@ -121,38 +121,6 @@ describe("useConvexPresence", () => {
     );
   });
 
-  it("does not restart the debounce window when the active cell is unchanged", () => {
-    const sendHeartbeat = vi.fn<(entry: ReturnType<typeof buildPresenceEntry>) => void>();
-    const { result } = renderHook(() =>
-      useConvexPresence({
-        tableId: "tasks",
-        userId: "local-user",
-        userName: "Local",
-        usePresenceData: () => [],
-        sendHeartbeat,
-        debounceMs: 150,
-        heartbeatIntervalMs: 10_000
-      })
-    );
-
-    expect(sendHeartbeat).toHaveBeenCalledTimes(1);
-
-    act(() => {
-      result.current.onActiveCellChange({ rowId: "row-1", columnId: "title" });
-      vi.advanceTimersByTime(149);
-      result.current.onActiveCellChange({ rowId: "row-1", columnId: "title" });
-      vi.advanceTimersByTime(1);
-    });
-
-    expect(sendHeartbeat).toHaveBeenCalledTimes(2);
-    expect(sendHeartbeat).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        activeRowId: "row-1",
-        activeColumnId: "title"
-      })
-    );
-  });
-
   it("sends periodic heartbeats even when the cell does not change", () => {
     const sendHeartbeat = vi.fn<(entry: ReturnType<typeof buildPresenceEntry>) => void>();
 

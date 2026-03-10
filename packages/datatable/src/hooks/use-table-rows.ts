@@ -65,8 +65,6 @@ export type UseTableRowsResult<TRow extends DataTableRowModel> = {
   draftRowRef: React.MutableRefObject<Partial<TRow>>;
   onStartEdit: (rowId: RowId, columnId: string) => void;
   onCancelEdit: () => void;
-  getEditingDraftValue: (rowId: RowId, columnId: string) => DataTableCellValue | null;
-  onEditingDraftChange: (rowId: RowId, columnId: string, value: DataTableCellValue) => void;
   commitCellEdit: CellCommit<TRow>;
   autoSaveCellEdit: CellCommit<TRow>;
   deleteRowsNow: (rowsToDelete: ReadonlyArray<TRow>) => Promise<void>;
@@ -89,21 +87,12 @@ export function useTableRows<TRow extends DataTableRowModel>({
   setEditingCell,
   undoStack
 }: UseTableRowsArgs<TRow>): UseTableRowsResult<TRow> {
-  type EditingSnapshot = {
-    row: TRow;
-    columnId: string;
-    draftValue: DataTableCellValue | null;
-  };
-
   const [optimisticRows, setOptimisticRows] = useState<Record<RowId, TRow>>({});
   const [deletedRows, setDeletedRows] = useState<Record<RowId, TRow>>({});
   const [rowActionMenuRowId, setRowActionMenuRowId] = useState<RowId | null>(null);
   const [draftRow, setDraftRow] = useState<Partial<TRow>>({});
   const [draftEditingColumnId, setDraftEditingColumnId] = useState<string | null>(null);
   const draftRowRef = useRef<Partial<TRow>>(draftRow);
-  const editingCellRef = useRef<EditingCellState>(null);
-  const editingSnapshotRef = useRef<Record<RowId, EditingSnapshot>>({});
-  const autoSaveVersionRef = useRef<Record<RowId, number>>({});
 
   draftRowRef.current = draftRow;
 
@@ -117,7 +106,7 @@ export function useTableRows<TRow extends DataTableRowModel>({
         continue;
       }
 
-      rows.push(optimisticRows[rowId] ?? editingSnapshotRef.current[rowId]?.row ?? sourceRow);
+      rows.push(optimisticRows[rowId] ?? sourceRow);
     }
     return rows;
   }, [deletedRowIds, getRowId, optimisticRows, sourceRows]);
@@ -155,48 +144,13 @@ export function useTableRows<TRow extends DataTableRowModel>({
   }, [rowActionMenuRowId]);
 
   const onStartEdit = useCallback((rowId: RowId, columnId: string) => {
-    const currentRow = mergedRows.find((candidateRow) => getRowId(candidateRow) === rowId);
-
-    if (currentRow) {
-      editingSnapshotRef.current[rowId] = {
-        row: currentRow,
-        columnId,
-        draftValue: null
-      };
-    }
-
-    editingCellRef.current = { rowId, columnId };
     setDraftEditingColumnId(null);
     setEditingCell({ rowId, columnId });
-  }, [getRowId, mergedRows, setEditingCell]);
-
-  const onCancelEdit = useCallback(() => {
-    const editingCell = editingCellRef.current;
-    if (editingCell) {
-      delete editingSnapshotRef.current[editingCell.rowId];
-    }
-
-    editingCellRef.current = null;
-    setEditingCell(null);
   }, [setEditingCell]);
 
-  const getEditingDraftValue = useCallback((rowId: RowId, columnId: string): DataTableCellValue | null => {
-    const snapshot = editingSnapshotRef.current[rowId];
-    if (snapshot?.columnId !== columnId) {
-      return null;
-    }
-
-    return snapshot.draftValue;
-  }, []);
-
-  const onEditingDraftChange = useCallback((rowId: RowId, columnId: string, value: DataTableCellValue) => {
-    const snapshot = editingSnapshotRef.current[rowId];
-    if (snapshot?.columnId !== columnId) {
-      return;
-    }
-
-    snapshot.draftValue = value;
-  }, []);
+  const onCancelEdit = useCallback(() => {
+    setEditingCell(null);
+  }, [setEditingCell]);
 
   const commitCellEdit = useCallback<CellCommit<TRow>>(async ({ row, rowId, column, value }) => {
     const cellValidation = validateCell(column, row, value);
@@ -232,8 +186,6 @@ export function useTableRows<TRow extends DataTableRowModel>({
       ...current,
       [rowId]: updateResult.nextRow
     }));
-    delete editingSnapshotRef.current[rowId];
-    editingCellRef.current = null;
     setEditingCell(null);
 
     if (!dataSource.updateRows) {
@@ -272,9 +224,6 @@ export function useTableRows<TRow extends DataTableRowModel>({
       [rowId]: updateResult.nextRow
     }));
 
-    const versionAtSave = (autoSaveVersionRef.current[rowId] ?? 0) + 1;
-    autoSaveVersionRef.current[rowId] = versionAtSave;
-
     if (!dataSource.updateRows) {
       return;
     }
@@ -282,13 +231,11 @@ export function useTableRows<TRow extends DataTableRowModel>({
     try {
       await dataSource.updateRows([updateResult.patch]);
     } catch (error) {
-      if (autoSaveVersionRef.current[rowId] === versionAtSave) {
-        setOptimisticRows((current) => {
-          const next = { ...current };
-          delete next[rowId];
-          return next;
-        });
-      }
+      setOptimisticRows((current) => {
+        const next = { ...current };
+        delete next[rowId];
+        return next;
+      });
       toast.error(`Failed to update row: ${String(error)}`);
     }
   }, [dataSource, rowSchema]);
@@ -421,8 +368,6 @@ export function useTableRows<TRow extends DataTableRowModel>({
     draftRowRef,
     onStartEdit,
     onCancelEdit,
-    getEditingDraftValue,
-    onEditingDraftChange,
     commitCellEdit,
     autoSaveCellEdit,
     deleteRowsNow,
