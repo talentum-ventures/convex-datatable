@@ -51,6 +51,9 @@ export type TableBodyProps<TRow extends DataTableRowModel> = {
   onBeginDraftEdit: (columnId: string) => void;
   onCommitDraftCell: (column: DataTableColumn<TRow>, value: DataTableCellValue) => void;
   onCancelDraftEdit: () => void;
+  onSubmitDraftRow: () => void;
+  onDiscardDraftRow: () => void;
+  collaboratorRowIds: ReadonlySet<RowId>;
   getRowId: (row: TRow) => RowId;
   rowActionMenuRowId: RowId | null;
   getRowRefHandler: (rowId: RowId) => (node: HTMLTableRowElement | null) => void;
@@ -81,6 +84,9 @@ function TableBodyInner<TRow extends DataTableRowModel>({
   onBeginDraftEdit,
   onCommitDraftCell,
   onCancelDraftEdit,
+  onSubmitDraftRow,
+  onDiscardDraftRow,
+  collaboratorRowIds,
   getRowId,
   rowActionMenuRowId,
   getRowRefHandler,
@@ -170,6 +176,8 @@ function TableBodyInner<TRow extends DataTableRowModel>({
               onBeginDraftEdit={onBeginDraftEdit}
               onCommitDraftCell={onCommitDraftCell}
               onCancelDraftEdit={onCancelDraftEdit}
+              onSubmitDraftRow={onSubmitDraftRow}
+              onDiscardDraftRow={onDiscardDraftRow}
               actionsColumnId={ACTIONS_COLUMN_ID}
             />
           );
@@ -183,6 +191,7 @@ function TableBodyInner<TRow extends DataTableRowModel>({
 
         const rowId = getRowId(row);
         const top = virtualRow.start;
+        const hasCollaborators = collaboratorRowIds.has(rowId);
         const isRowActionMenuOpen = rowActionMenuRowId === rowId;
 
         return (
@@ -192,6 +201,7 @@ function TableBodyInner<TRow extends DataTableRowModel>({
             rowId={rowId}
             rowIndex={rowIndex}
             top={top}
+            hasCollaborators={hasCollaborators}
             isRowActionMenuOpen={isRowActionMenuOpen}
             columnRenderLayout={columnRenderLayout}
             fixedTrackStyle={fixedTrackStyle}

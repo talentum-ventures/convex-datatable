@@ -14,6 +14,7 @@ export type MemoRowProps<TRow extends DataTableRowModel> = {
   rowId: RowId;
   rowIndex: number;
   top: number;
+  hasCollaborators: boolean;
   isRowActionMenuOpen: boolean;
   columnRenderLayout: ColumnLayoutResult;
   fixedTrackStyle: (width: number) => React.CSSProperties;
@@ -28,6 +29,7 @@ const MemoRowInner = <TRow extends DataTableRowModel>({
   rowId,
   rowIndex,
   top,
+  hasCollaborators,
   isRowActionMenuOpen,
   columnRenderLayout,
   fixedTrackStyle,
@@ -40,7 +42,7 @@ const MemoRowInner = <TRow extends DataTableRowModel>({
     ref={getRowRefHandler(rowId)}
     className={cn(
       "group absolute left-0 overflow-visible bg-[var(--dt-row-bg)] transition-colors hover:bg-[var(--dt-row-hover-bg)]",
-      isRowActionMenuOpen ? "z-50" : "z-0"
+      isRowActionMenuOpen ? "z-50" : hasCollaborators ? "z-20" : "z-0"
     )}
     style={{
       display: "flex",

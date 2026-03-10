@@ -70,6 +70,7 @@ export type UseTableRowsResult<TRow extends DataTableRowModel> = {
   commitDraftRow: (nextDraftRow?: Partial<TRow>) => Promise<void>;
   commitDraftCell: (column: DataTableColumn<TRow>, value: DataTableCellValue) => void;
   cancelDraftCellEdit: () => void;
+  clearDraftRow: () => void;
 };
 
 export function useTableRows<TRow extends DataTableRowModel>({
@@ -287,11 +288,6 @@ export function useTableRows<TRow extends DataTableRowModel>({
       }
     }
 
-    const rowValidation = validateRow(rowSchema, candidate);
-    if (!rowValidation.ok) {
-      return;
-    }
-
     try {
       await dataSource.createRow(currentDraftRow);
       draftRowRef.current = {};
@@ -302,7 +298,7 @@ export function useTableRows<TRow extends DataTableRowModel>({
     } catch (error) {
       toast.error(`Failed to create row: ${String(error)}`);
     }
-  }, [dataSource, orderedColumns, rowAddEnabled, rowSchema, rowsRefresh]);
+  }, [dataSource, orderedColumns, rowAddEnabled, rowsRefresh]);
 
   const commitDraftCell = useCallback((column: DataTableColumn<TRow>, value: DataTableCellValue) => {
     const nextDraftRow = {
@@ -316,6 +312,12 @@ export function useTableRows<TRow extends DataTableRowModel>({
   }, []);
 
   const cancelDraftCellEdit = useCallback(() => {
+    setDraftEditingColumnId(null);
+  }, []);
+
+  const clearDraftRow = useCallback(() => {
+    draftRowRef.current = {};
+    setDraftRow({});
     setDraftEditingColumnId(null);
   }, []);
 
@@ -336,6 +338,7 @@ export function useTableRows<TRow extends DataTableRowModel>({
     deleteRowsNow,
     commitDraftRow,
     commitDraftCell,
-    cancelDraftCellEdit
+    cancelDraftCellEdit,
+    clearDraftRow
   };
 }

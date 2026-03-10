@@ -1,4 +1,4 @@
-import { Check, Pencil } from "lucide-react";
+import { Check, Pencil, X } from "lucide-react";
 import type { Column } from "@tanstack/react-table";
 import { cn } from "../core/cn";
 import type {
@@ -8,6 +8,7 @@ import type {
 } from "../core/types";
 import { renderColumnContent, renderColumnEditor } from "../engine/column-def-builder";
 import type { ColumnLayoutResult } from "./column-layout";
+import { Button } from "./primitives";
 
 export type DraftRowProps<TRow extends DataTableRowModel> = {
   rowIndex: number;
@@ -25,6 +26,8 @@ export type DraftRowProps<TRow extends DataTableRowModel> = {
   onBeginDraftEdit: (columnId: string) => void;
   onCommitDraftCell: (column: DataTableColumn<TRow>, value: DataTableCellValue) => void;
   onCancelDraftEdit: () => void;
+  onSubmitDraftRow: () => void;
+  onDiscardDraftRow: () => void;
   actionsColumnId: string;
 };
 
@@ -44,9 +47,47 @@ export function DraftRow<TRow extends DataTableRowModel>({
   onBeginDraftEdit,
   onCommitDraftCell,
   onCancelDraftEdit,
+  onSubmitDraftRow,
+  onDiscardDraftRow,
   actionsColumnId
 }: DraftRowProps<TRow>): JSX.Element {
   const draftCandidateRow = draftRow as TRow;
+  const hasDraftValues = Object.values(draftRow).some((value) => isDraftValuePresent(value));
+  const hasActionsColumn = visibleLeafColumnsInUiOrder.some((column) => column.id === actionsColumnId);
+  const fallbackControlsColumnId =
+    hasActionsColumn ? null : visibleLeafColumnsInUiOrder.at(-1)?.id ?? null;
+
+  const actionButtons = (
+    <div className="flex items-center justify-center gap-1 px-1 py-1">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-7 w-7 px-0 text-slate-500 hover:bg-slate-200 hover:text-slate-700"
+        aria-label="Discard draft row"
+        disabled={!hasDraftValues}
+        onClick={(event) => {
+          event.stopPropagation();
+          onDiscardDraftRow();
+        }}
+      >
+        <X className="h-3.5 w-3.5" />
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        className="h-7 w-7 px-0"
+        aria-label="Create row"
+        disabled={!hasDraftValues}
+        onClick={(event) => {
+          event.stopPropagation();
+          onSubmitDraftRow();
+        }}
+      >
+        <Check className="h-3.5 w-3.5" />
+      </Button>
+    </div>
+  );
 
   return (
     <tr
@@ -62,6 +103,21 @@ export function DraftRow<TRow extends DataTableRowModel>({
       data-index={rowIndex}
     >
       {visibleLeafColumnsInUiOrder.map((column) => {
+        if (column.id === actionsColumnId) {
+          const renderWidth = columnRenderLayout.renderWidthsById[column.id] ?? column.getSize();
+          const widthStyle = fixedTrackStyle(renderWidth);
+
+          return (
+            <td
+              key={`draft-${column.id}`}
+              style={widthStyle}
+              className="border-b border-l border-r border-slate-200 bg-slate-50 p-0 align-top"
+            >
+              {actionButtons}
+            </td>
+          );
+        }
+
         const columnConfig = columnById.get(column.id);
         const renderWidth = columnRenderLayout.renderWidthsById[column.id] ?? column.getSize();
         const widthStyle = fixedTrackStyle(renderWidth);
@@ -83,6 +139,7 @@ export function DraftRow<TRow extends DataTableRowModel>({
         const isEditingDraftCell = draftEditingColumnId === columnConfig.id;
         const draftColumnIndex = visibleDataColumnIndexById[columnConfig.id] ?? 0;
         const showPlaceholder = !isDraftValuePresent(value);
+        const showInlineActionButtons = column.id === fallbackControlsColumnId;
         const content = isEditingDraftCell
           ? renderColumnEditor({
               column: columnConfig,
@@ -103,6 +160,19 @@ export function DraftRow<TRow extends DataTableRowModel>({
                 value,
                 isEditing: false
               });
+        const indicator = isEditingDraftCell
+          ? (
+              <span className="pointer-events-none absolute right-1 top-1 rounded bg-emerald-100 p-0.5 text-emerald-700">
+                <Check className="h-3 w-3" />
+              </span>
+            )
+          : showInlineActionButtons
+            ? null
+            : (
+                <span className="pointer-events-none absolute right-1 top-1 hidden rounded bg-white/80 p-0.5 text-slate-500 group-hover:block">
+                  <Pencil className="h-3 w-3" />
+                </span>
+              );
 
         return (
           <td
@@ -140,16 +210,16 @@ export function DraftRow<TRow extends DataTableRowModel>({
               }}
               tabIndex={0}
             >
-              {content}
-              {!isEditingDraftCell ? (
-                <span className="pointer-events-none absolute right-1 top-1 hidden rounded bg-white/80 p-0.5 text-slate-500 group-hover:block">
-                  <Pencil className="h-3 w-3" />
-                </span>
-              ) : (
-                <span className="pointer-events-none absolute right-1 top-1 rounded bg-emerald-100 p-0.5 text-emerald-700">
-                  <Check className="h-3 w-3" />
-                </span>
-              )}
+              <div
+                className={cn(
+                  "flex h-full min-w-0 items-start gap-2",
+                  showInlineActionButtons ? "justify-between" : ""
+                )}
+              >
+                <div className="min-w-0 flex-1">{content}</div>
+                {showInlineActionButtons ? actionButtons : null}
+              </div>
+              {indicator}
             </div>
           </td>
         );

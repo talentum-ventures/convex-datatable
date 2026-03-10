@@ -1057,6 +1057,8 @@ describe("DataTable component", () => {
   });
 
   it("renders collaborator outlines and stacked labels on matching cells", () => {
+    let statusCell: HTMLElement | null = null;
+
     cy.mount(<PresenceHarness tableId="cypress-table-collaborators" />);
 
     cy.get("tr[data-row-id='1'] [role='gridcell'][data-column-id='title']")
@@ -1085,9 +1087,39 @@ describe("DataTable component", () => {
       .should("have.text", "Rui");
 
     cy.get("tr[data-row-id='2'] [role='gridcell'][data-column-id='status']")
+      .as("statusCell")
       .should("have.attr", "data-has-collaborators", "true")
       .find("[data-dt-collaborator-label='ana']")
       .should("have.text", "Ana");
+
+    cy.get("@statusCell").should(($cell) => {
+      const cell = $cell[0];
+      if (!(cell instanceof HTMLElement)) {
+        throw new Error("Expected status collaborator cell to be an HTMLElement");
+      }
+
+      statusCell = cell;
+      expect(window.getComputedStyle(cell).overflow).to.equal("visible");
+    });
+
+    cy.get("[data-dt-collaborator-label='ana']").should(($label) => {
+      const label = $label[0];
+
+      if (!(label instanceof HTMLElement)) {
+        throw new Error("Expected collaborator label to be an HTMLElement");
+      }
+      if (!(statusCell instanceof HTMLElement)) {
+        throw new Error("Expected aliased status cell to resolve to an HTMLElement");
+      }
+
+      const labelRect = label.getBoundingClientRect();
+      const cellRect = statusCell.getBoundingClientRect();
+      expect(labelRect.top).to.be.lessThan(cellRect.top);
+
+      const hitTarget = document.elementFromPoint(labelRect.left + 4, labelRect.top + 4);
+      expect(hitTarget instanceof HTMLElement).to.equal(true);
+      expect(hitTarget?.closest("[data-dt-collaborator-label='ana']")).to.equal(label);
+    });
 
     cy.get("tr[data-row-id='2'] [role='gridcell'][data-column-id='amount']").should(
       "have.attr",
@@ -1647,6 +1679,16 @@ describe("DataTable component", () => {
     cy.findByLabelText("Select row 1").check({ force: true });
     cy.contains("Delete selected").click();
     cy.contains("Build UI").should("not.exist");
+  });
+
+  it("creates a row directly from the draft row controls", () => {
+    cy.mount(<Harness tableId="cypress-table-inline-draft-create" />);
+
+    cy.contains("Add row").click();
+    cy.findByLabelText("Edit Title").type("Inline submit{enter}");
+    cy.findByLabelText("Create row").click();
+
+    cy.contains("Inline submit").should("exist");
   });
 
   it("supports keyboard editing trigger", () => {

@@ -69,6 +69,10 @@ const DataCellInner = <TRow extends DataTableRowModel>({
     columnIndex
   };
   const canEdit = enableEditing && (column.isEditable ?? false);
+  const hasCollaborators = collaboratorsInCell.length > 0;
+  const shouldAllowOverflow = hasCollaborators || (
+    isEditing && (column.kind === "select" || column.kind === "multiselect" || column.kind === "date")
+  );
 
   const content = isEditing
     ? renderColumnEditor({
@@ -96,12 +100,14 @@ const DataCellInner = <TRow extends DataTableRowModel>({
       data-row-index={rowIndex}
       data-column-id={column.id}
       data-column-index={columnIndex}
-      data-has-collaborators={collaboratorsInCell.length > 0 ? "true" : "false"}
+      data-has-collaborators={hasCollaborators ? "true" : "false"}
       className={cn(
         "group relative box-border h-full min-h-10 w-full min-w-0 px-2 py-1 text-sm text-slate-800",
+        shouldAllowOverflow ? "overflow-visible" : "overflow-hidden",
+        hasCollaborators ? "z-20" : "",
         isEditing && (column.kind === "select" || column.kind === "multiselect" || column.kind === "date")
-          ? "z-20 overflow-visible"
-          : "overflow-hidden",
+          ? "z-20"
+          : "",
         isEditing ? "bg-white" : isRangeSelected ? "bg-[var(--dt-selection-bg)]" : "",
         isSelected ? "outline outline-2 outline-[var(--dt-active-cell-ring)] outline-offset-[-2px]" : ""
       )}
@@ -133,8 +139,8 @@ const DataCellInner = <TRow extends DataTableRowModel>({
           }
         />
       ))}
-      {collaboratorsInCell.length > 0 ? (
-        <span className="pointer-events-none absolute right-1 top-0 z-10 flex -translate-y-1/2 flex-col items-end gap-1">
+      {hasCollaborators ? (
+        <span className="absolute right-1 top-0 z-10 flex -translate-y-1/2 flex-col items-end gap-1">
           {collaboratorsInCell.map((collaborator) => (
             <span
               key={`${collaborator.userId}-label`}

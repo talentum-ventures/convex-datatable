@@ -209,6 +209,17 @@ const DataTableInner = <TRow extends DataTableRowModel>({
   const commitCounter = useRef(0);
   const commitWindow = useRef<number[]>([]);
   const interactionSequence = useRef(0);
+  const collaboratorRowIds = useMemo<ReadonlySet<RowId>>(() => {
+    const rowIds = new Set<RowId>();
+    for (const collaborator of collaborators ?? EMPTY_COLLABORATORS) {
+      const activeCell = collaborator.activeCell;
+      if (!activeCell) {
+        continue;
+      }
+      rowIds.add(activeCell.rowId);
+    }
+    return rowIds;
+  }, [collaborators]);
   const deleteEnabled = mergedFeatures.rowDelete && Boolean(dataSource.deleteRows);
   const customRowActionsEnabled = mergedFeatures.rowActions && (rowActions?.length ?? 0) > 0;
   const hasActionColumn = deleteEnabled || customRowActionsEnabled;
@@ -298,7 +309,8 @@ const DataTableInner = <TRow extends DataTableRowModel>({
     deleteRowsNow,
     commitDraftRow,
     commitDraftCell,
-    cancelDraftCellEdit
+    cancelDraftCellEdit,
+    clearDraftRow
   } = useTableRows({
     sourceRows: rowsResult.rows,
     getRowId,
@@ -1297,6 +1309,11 @@ const DataTableInner = <TRow extends DataTableRowModel>({
                   onBeginDraftEdit={handleBeginDraftEdit}
                   onCommitDraftCell={commitDraftCell}
                   onCancelDraftEdit={cancelDraftCellEdit}
+                  onSubmitDraftRow={() => {
+                    void commitDraftRow();
+                  }}
+                  onDiscardDraftRow={clearDraftRow}
+                  collaboratorRowIds={collaboratorRowIds}
                   getRowId={getRowId}
                   rowActionMenuRowId={rowActionMenuRowId}
                   getRowRefHandler={getRowRefHandler}
