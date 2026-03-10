@@ -15,7 +15,7 @@
     "typecheck": "bun run check:no-js-src && tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@rolha/datatable": "workspace:*",
+    "@talentum/convex-datatable": "workspace:*",
     "convex": "^1.32.0",
     "lucide-react": "^0.469.0",
     "react": "^18.3.1",

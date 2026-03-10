@@ -4,7 +4,7 @@ describe("demo app", () => {
   it("loads and performs key interactions", () => {
     cy.visit("/");
 
-    cy.contains("Rolha Grid").should("exist");
+    cy.contains("Convex DataTable").should("exist");
     cy.contains("In-memory example").should("exist");
     cy.contains("Project 1").should("exist");
 

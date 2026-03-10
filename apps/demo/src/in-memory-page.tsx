@@ -7,7 +7,7 @@ import {
   type DataTableDataSource,
   type DataTableRowAction,
   type DataTableQueryState
-} from "@rolha/datatable";
+} from "@talentum/convex-datatable";
 import { z } from "zod";
 import { applyServerQuery } from "./demo-query";
 
@@ -33,8 +33,8 @@ type DemoDebugEvent = {
 };
 
 const DEMO_DEBUG_PARAM = "dt_debug";
-const DEMO_DEBUG_FLAG_STORAGE = "rolha-grid:debug";
-const DEMO_DEBUG_EVENTS_STORAGE = "rolha-grid:debug:events";
+const DEMO_DEBUG_FLAG_STORAGE = "convex-datatable:debug";
+const DEMO_DEBUG_EVENTS_STORAGE = "convex-datatable:debug:events";
 const DEMO_DEBUG_MAX_EVENTS = 600;
 const demoThrottledEvents: Record<string, number> = {};
 
@@ -643,7 +643,7 @@ export function InMemoryPage(): JSX.Element {
       <section className="space-y-2">
         <h2 className="text-2xl font-semibold tracking-tight text-slate-900">In-memory example</h2>
         <p className="max-w-4xl text-sm text-slate-600">
-          Fully type-safe AG Grid-inspired datatable powered by TanStack internals, using an in-memory data source for rapid interaction and feature coverage.
+          Fully type-safe Airtable-inspired datatable powered by TanStack internals, using an in-memory data source for rapid interaction and feature coverage.
         </p>
         <p className="text-xs text-slate-500">Soft deleted rows in memory: {Object.keys(softDeleted).length}</p>
       </section>

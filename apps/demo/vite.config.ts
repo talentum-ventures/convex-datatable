@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@rolha/datatable": fileURLToPath(new URL("../../packages/datatable/src/index.ts", import.meta.url))
+      "@talentum/convex-datatable": fileURLToPath(new URL("../../packages/datatable/src/index.ts", import.meta.url))
     }
   },
   css: {

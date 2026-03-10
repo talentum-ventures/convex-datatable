@@ -1,15 +1,6 @@
-# Convex DataTable
+# `@talentum/convex-datatable`
 
-Convex DataTable is a production-focused React data table with an Airtable-style feature set and a clean library API. Consumers work with `DataTable`, typed columns, typed data sources, feature flags, theme tokens, and optional Convex helpers without importing TanStack state directly.
-
-## Why Use It
-
-- Strongly typed column kinds for `text`, `longText`, `number`, `currency`, `select`, `multiselect`, `link`, `date`, and `reactNode`
-- Spreadsheet-style editing, selection, clipboard copy and paste, row creation, row deletion, and undo
-- Column resize, reorder, visibility, filtering, sorting, and pinning
-- Infinite scroll and virtualization
-- URL and `localStorage` persistence
-- Optional Convex adapters for data loading and presence
+`@talentum/convex-datatable` is a production-focused React data table with an Airtable-style feature set and a library-shaped API. You work with typed columns, a typed data source, feature flags, theme tokens, and optional Convex helpers without importing TanStack state directly.
 
 ## Install
 
@@ -31,15 +22,15 @@ Recommended:
 import "@talentum/convex-datatable/styles.css";
 ```
 
-If your application already builds Tailwind CSS and you intentionally want Convex DataTable styles merged into your own stylesheet, add this path to your Tailwind content globs:
+If your app already runs Tailwind and you intentionally want Convex DataTable styles folded into your own generated stylesheet, add this scan path:
 
 ```txt
 node_modules/@talentum/convex-datatable/dist/**/*.js
 ```
 
-Content-scanning installed package files is toolchain-dependent, so the explicit CSS import remains the default recommendation.
+Scanning installed package files is toolchain-dependent, so the explicit CSS import remains the default recommendation.
 
-## Quick Start
+## Minimal Usage
 
 ```tsx
 import "@talentum/convex-datatable/styles.css";
@@ -130,38 +121,14 @@ export function InvoicesTable(): JSX.Element {
 }
 ```
 
-## Data Model
+## What You Get
 
-The core integration point is the typed data source:
-
-- `useRows(query)` returns rows, loading state, and pagination controls
-- `createRow`, `updateRows`, `deleteRows`, and `restoreRows` are optional mutators
-
-This keeps Convex DataTable decoupled from local state, fetch clients, or Convex.
-
-## Feature Flags
-
-Feature flags are independent and merged with safe defaults internally. Common toggles include:
-
-- `columnResize`
-- `rowResize`
-- `columnReorder`
-- `columnPinning`
-- `columnVisibility`
-- `columnFilter`
-- `columnSort`
-- `rowDelete`
-- `rowSelect`
-- `rowAdd`
-- `rowActions`
-- `editing`
-- `cellSelect`
-- `clipboardCopy`
-- `clipboardPaste`
-- `undo`
-- `autoSave`
-- `infiniteScroll`
-- `virtualization`
+- Typed column kinds for text, long text, number, currency, select, multiselect, link, date, and custom React node cells
+- Inline editing, row creation, row deletion, undo, clipboard copy and paste, and spreadsheet-style selection
+- Sorting, filtering, resizing, reordering, visibility, and pinning
+- Infinite scroll and virtualization
+- URL and `localStorage` persistence
+- Optional Convex data-source and presence adapters
 
 ## Convex
 
@@ -185,7 +152,7 @@ The root package still re-exports the client Convex hooks for compatibility, but
 
 ## Theming
 
-Convex DataTable exposes `DataTableThemeTokens` and `DEFAULT_THEME_TOKENS` as part of the public API:
+Use the public theme exports to start from the defaults and override only what you need:
 
 ```tsx
 import {
@@ -201,20 +168,12 @@ const theme: DataTableThemeTokens = {
   activeCellRing: "hsl(221 83% 53%)"
 };
 
-export function ThemedInvoicesTable(): JSX.Element {
-  return (
-    <DataTable
-      tableId="themed-invoices"
-      columns={columns}
-      getRowId={(row) => row.id}
-      dataSource={dataSource}
-      theme={theme}
-    />
-  );
+export function ThemedTable(): JSX.Element {
+  return <DataTable tableId="themed" columns={columns} getRowId={(row) => row.id} dataSource={dataSource} theme={theme} />;
 }
 ```
 
-You can also pass a partial `theme` prop if you only want to override a few tokens.
+You can also pass a partial `theme` prop if you only want to change a few tokens.
 
 ## Package Exports
 
@@ -222,21 +181,3 @@ You can also pass a partial `theme` prop if you only want to override a few toke
 - `@talentum/convex-datatable/styles.css`
 - `@talentum/convex-datatable/convex`
 - `@talentum/convex-datatable/convex-server`
-
-## Repository Layout
-
-- `packages/datatable`: publishable library package
-- `apps/demo`: Vite demo app
-- `tests/types`: compile-time public API tests
-- `cypress`: component and e2e coverage
-
-## Development
-
-```bash
-bun install
-bun run typecheck
-bun run lint
-bun run test:unit
-bun run test:types
-bun run build
-```

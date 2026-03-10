@@ -3,7 +3,7 @@ import type {
   DataTableFilter,
   DataTableQueryState,
   DataTableRowModel
-} from "@rolha/datatable";
+} from "@talentum/convex-datatable";
 
 function compareValues(left: string | number | boolean | null, right: string | number | boolean | null): number {
   if (left === right) {

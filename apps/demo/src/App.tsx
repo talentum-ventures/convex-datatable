@@ -52,7 +52,7 @@ export function App(): JSX.Element {
     <main className="mx-auto flex min-h-screen max-w-[1400px] flex-col gap-6 p-6">
       <header className="shrink-0 space-y-4">
         <div className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Rolha Grid</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Convex DataTable</h1>
           <p className="max-w-4xl text-sm text-slate-600">
             Two dedicated demo pages: one for the in-memory data source and one for the Convex adapter flow.
           </p>

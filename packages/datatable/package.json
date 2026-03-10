@@ -1,18 +1,45 @@
 {
-  "name": "@rolha/datatable",
+  "name": "@talentum/convex-datatable",
   "version": "0.1.0",
   "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "react",
+    "datatable",
+    "data-grid",
+    "tanstack-table",
+    "convex",
+    "typescript"
+  ],
+  "homepage": "https://github.com/talentum-ventures/convex-datatable/tree/main/packages/datatable",
+  "bugs": {
+    "url": "https://github.com/talentum-ventures/convex-datatable/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/talentum-ventures/convex-datatable.git",
+    "directory": "packages/datatable"
+  },
   "engines": {
-    "node": ">=22.12.0 <23"
+    "node": ">=18"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": [
+    "./dist/styles.css"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./styles.css": "./dist/styles.css",
     "./convex": {
       "types": "./dist/convex/index.d.ts",
       "import": "./dist/convex/index.js"
@@ -23,8 +50,14 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build:ts": "tsc -p tsconfig.build.json",
+    "build:css": "tailwindcss -c tailwind.config.ts -i ./src/styles.css -o ./dist/styles.css --minify",
+    "build": "bun run clean && bun run build:ts && bun run build:css",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "peerDependencies": {
     "convex": "^1.32.0",

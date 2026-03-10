@@ -1,5 +1,5 @@
 {
-  "name": "rolha-grid",
+  "name": "convex-datatable",
   "version": "0.0.0",
   "private": true,
   "engines": {
@@ -14,7 +14,7 @@
   "scripts": {
     "check:demo-src-no-js": "if rg --files apps/demo/src -g '*.js' -g '*.jsx' > /dev/null; then echo 'Error: JavaScript source files are not allowed in apps/demo/src'; rg --files apps/demo/src -g '*.js' -g '*.jsx'; exit 1; fi",
     "dev": "bun --filter @rolha/demo dev",
-    "build": "bun run check:demo-src-no-js && bun --filter @rolha/datatable build && bun --filter @rolha/demo build",
+    "build": "bun run check:demo-src-no-js && bun --filter @talentum/convex-datatable build && bun --filter @rolha/demo build",
     "typecheck": "tsgo --build --pretty false",
     "typecheck:datatable": "tsgo --project packages/datatable/tsconfig.json --noEmit --pretty false",
     "typecheck:demo": "tsgo --project apps/demo/tsconfig.json --noEmit --pretty false",

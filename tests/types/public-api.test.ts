@@ -10,14 +10,14 @@ import type {
   DataTableFeatureFlags,
   DataTableProps,
   DataTableRowAction
-} from "@rolha/datatable";
-import { useConvexPresence } from "@rolha/datatable";
+} from "@talentum/convex-datatable";
+import { useConvexPresence } from "@talentum/convex-datatable";
 import {
   clearStalePresenceHandler,
   getPresenceHandler,
   heartbeatHandler,
   presenceFields
-} from "@rolha/datatable/convex-server";
+} from "@talentum/convex-datatable/convex-server";
 
 type InvoiceRow = {
   id: string;

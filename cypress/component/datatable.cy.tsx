@@ -8,7 +8,7 @@ import {
   type DataTableDataSource,
   type DataTableFeatureFlags,
   type DataTableRowAction
-} from "@rolha/datatable";
+} from "@talentum/convex-datatable";
 import { Toaster, toast } from "sonner";
 import { applyServerQuery } from "../../apps/demo/src/demo-query";
 

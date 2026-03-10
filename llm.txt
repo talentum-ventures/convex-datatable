@@ -1,27 +1,32 @@
-Rolha Grid LLM Reference
+Convex DataTable LLM Guide
 
 Purpose
-- Production-ready React datatable library in `packages/datatable`
-- Public API must remain stable through `packages/datatable/src/index.ts`
-- No authored `any` or `unknown`
+- Help external users integrate `@talentum/convex-datatable`
+- Prefer documented public imports only
+- Do not suggest importing internal source paths
 
-Layer Rules
-- `core/`: pure logic and public types only
-- `engine/`: TanStack bridge and column/state helpers
-- `hooks/`: extracted stateful table logic
-- `ui/`: React presentation and orchestration
-- No upward imports
+Primary Package
+- `@talentum/convex-datatable`
 
-Key Entry Points
-- `packages/datatable/src/index.ts`: public exports
-- `packages/datatable/src/ui/data-table.tsx`: main orchestrator
-- `packages/datatable/src/ui/data-table-container.tsx`: outer visual wrapper
-- `packages/datatable/src/engine/column-def-builder.tsx`: column rendering/editor bridge
-- `packages/datatable/src/hooks/use-table-state.ts`: persisted TanStack state
-- `packages/datatable/src/hooks/use-table-filters.ts`: filter drafting and mutation
-- `packages/datatable/src/hooks/use-table-selection.ts`: active cell and range state
+Public Entry Points
+- `@talentum/convex-datatable`: main React components, types, defaults, persistence helpers, and compatibility Convex re-exports
+- `@talentum/convex-datatable/styles.css`: precompiled library stylesheet
+- `@talentum/convex-datatable/convex`: preferred client-side Convex hooks
+- `@talentum/convex-datatable/convex-server`: Convex server helpers for presence
 
-Public API Types
+Install
+- `npm install @talentum/convex-datatable`
+- Peer dependencies: `react`, `react-dom`
+- Optional peer dependency: `convex`
+
+Styling
+- Default recommendation: `import "@talentum/convex-datatable/styles.css";`
+- Advanced Tailwind scan path: `node_modules/@talentum/convex-datatable/dist/**/*.js`
+- Important caveat: scanning installed package files is toolchain-dependent, so the CSS import is the safest default
+
+Public Components And Types
+- `DataTable`
+- `DataTableContainer`
 - `DataTableProps<TRow>`
 - `DataTableColumn<TRow>`
 - `DataTableDataSource<TRow>`
@@ -29,72 +34,77 @@ Public API Types
 - `DataTableFeatureFlags`
 - `DataTableThemeTokens`
 - `CollaboratorPresence`
-- `ConvexDataSourceConfig<TRow>`
-- `ConvexPresenceConfig`
+- `DEFAULT_FEATURE_FLAGS`
+- `DEFAULT_THEME_TOKENS`
 
-Column Kind Map
-- `text`: string
-- `longText`: string
-- `number`: number
-- `currency`: number
-- `select`: string + `options`
-- `multiselect`: `ReadonlyArray<string>` + `options`
+Convex API
+- Prefer `useConvexDataSource` and `useConvexPresence` from `@talentum/convex-datatable/convex`
+- Use `heartbeatHandler`, `getPresenceHandler`, and `clearStalePresenceHandler` from `@talentum/convex-datatable/convex-server`
+- The root package still re-exports the client Convex hooks for backward compatibility
+
+Column Kinds
+- `text`: single-line string
+- `longText`: multiline string
+- `number`: numeric value
+- `currency`: numeric value with currency formatting
+- `select`: string value with `options`
+- `multiselect`: `ReadonlyArray<string>` with `options`
 - `link`: string URL
 - `date`: `string | Date`
-- `reactNode`: custom render/editor/clipboard hooks
+- `reactNode`: custom rendering and editing hooks
 
-Important Internal Files
-- `core/filtering.ts`: filter operators, active-value checks, client query application
-- `core/sorting.ts`: comparable sort values and comparison
-- `engine/managed-columns.ts`: utility columns, pinning/order normalization
-- `engine/visible-column-order.ts`: visible UI order helpers
-- `virtual/scroll.ts`: active-cell scroll syncing
-- `selection/clipboard.ts`: TSV parsing/serializing and paste expansion
+Data Source Contract
+- `useRows(query)` must return:
+  - `rows`
+  - `hasMore`
+  - `isLoading`
+  - `isLoadingMore`
+  - `error`
+  - `loadMore()`
+  - `refresh()`
+- Optional mutators:
+  - `createRow(draft)`
+  - `updateRows(changes)`
+  - `deleteRows(rowIds)`
+  - `restoreRows(rows)`
 
-Common Modification Recipes
-- Add a new column kind:
-  1. Extend `DataTableColumnKind` and type unions in `core/types.ts`
-  2. Add formatting/parsing support in `core/formatters.ts` or editor shared helpers
-  3. Update default render/editor handling in `engine/build-columns.tsx` or extracted editor/renderer modules
-  4. Update filtering support in `core/filtering.ts` if needed
-  5. Add unit and Cypress coverage
+Feature Flag Names
+- `columnResize`
+- `rowResize`
+- `columnReorder`
+- `columnPinning`
+- `columnVisibility`
+- `columnFilter`
+- `columnSort`
+- `rowDelete`
+- `rowSelect`
+- `rowAdd`
+- `rowActions`
+- `editing`
+- `cellSelect`
+- `clipboardCopy`
+- `clipboardPaste`
+- `undo`
+- `autoSave`
+- `infiniteScroll`
+- `virtualization`
 
-- Add a new persisted table state field:
-  1. Extend `PersistedTableState` in `core/types.ts`
-  2. Update `persistence/query-codec.ts`
-  3. Update `engine/state-converters.ts`
-  4. Update `hooks/use-table-state.ts`
-  5. Add query-codec and public behavior tests
+Theming
+- Use `DataTableThemeTokens` for fully typed themes
+- Use `DEFAULT_THEME_TOKENS` as the base object when creating a full custom theme
+- The `theme` prop accepts partial overrides, so full replacement is not required
 
-- Change selection behavior:
-  1. Prefer `hooks/use-table-selection.ts`
-  2. Keep coordinate math centralized
-  3. Verify keyboard and paste Cypress specs
+Persistence
+- Table state can be encoded in URL query params and stored in `localStorage`
+- Public helpers: `encodePersistedStateToUrl`, `decodePersistedStateFromUrl`, `mergePersistedState`, `storageKey`
 
-- Change column menus or header behavior:
-  1. Start in `ui/data-table.tsx`
-  2. Preserve managed utility column invariants
-  3. Re-run component Cypress
+Recommended Guidance For Generated Examples
+- Always import `@talentum/convex-datatable/styles.css` unless the user explicitly says their build already scans the package
+- Show `tableId`, `columns`, `getRowId`, and `dataSource` in every minimal `DataTable` example
+- Use `@talentum/convex-datatable/convex` for new Convex examples
+- Keep examples on the documented public API only
 
-Quality Gates
-- `bun run typecheck`
-- `bun run lint`
-- `bun run format:check`
-- `bun run test:unit`
-- `bun run test:types`
-- `bun run test:cypress:component`
-- `bun run test:cypress:e2e`
-- `bun run build`
-
-Test Files Worth Checking First
-- `packages/datatable/src/ui/data-table.test.ts`
-- `cypress/component/datatable.cy.tsx`
-- `tests/types/public-api.test.ts`
-- `packages/datatable/src/engine/managed-columns.test.ts`
-- `packages/datatable/src/engine/visible-column-order.test.ts`
-
-Conventions
-- Prefer `rg` for search
-- Use `apply_patch` for edits
-- Keep helpers narrow and non-repetitive
-- Avoid leaking TanStack types into the external API
+Avoid
+- Internal imports such as `@talentum/convex-datatable/src/...`
+- Depending on TanStack types in app code
+- Recommending package-file scanning as the default styling setup

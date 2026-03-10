@@ -1,0 +1,9 @@
+staticSites:
+  - name: convex-datatable-demo
+    buildCommand: curl -fsSL https://bun.sh/install | bash && export BUN_INSTALL="$HOME/.bun" && export PATH="$BUN_INSTALL/bin:$PATH" && bun install --frozen-lockfile && bun --filter @rolha/demo build
+    publishPath: apps/demo/dist
+    pullRequestPreviewsEnabled: true
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

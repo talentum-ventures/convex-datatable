@@ -45,7 +45,7 @@ export default defineConfig({
         },
         resolve: {
           alias: {
-            "@rolha/datatable": `${workspaceRoot}/packages/datatable/src/index.ts`,
+            "@talentum/convex-datatable": `${workspaceRoot}/packages/datatable/src/index.ts`,
             react: `${workspaceRoot}/packages/datatable/node_modules/react`,
             "react-dom": `${workspaceRoot}/packages/datatable/node_modules/react-dom`,
             "react-dom/client": `${workspaceRoot}/packages/datatable/node_modules/react-dom/client.js`

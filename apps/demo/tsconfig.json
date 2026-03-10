@@ -5,7 +5,7 @@
     "noEmit": true,
     "types": ["vite/client", "node"],
     "paths": {
-      "@rolha/datatable": ["../../packages/datatable/src/index.ts"]
+      "@talentum/convex-datatable": ["../../packages/datatable/src/index.ts"]
     }
   },
   "include": ["src", "convex", "vite.config.ts", "../../packages/datatable/src"]
