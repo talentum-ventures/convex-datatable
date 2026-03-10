@@ -168,6 +168,10 @@ export function useConvexPresence(
 
   const onActiveCellChange = useCallback(
     (cell: CollaboratorCellCoord | null) => {
+      if (isSameActiveCell(activeCellRef.current, cell)) {
+        return;
+      }
+
       activeCellRef.current = cell;
 
       if (debounceTimerRef.current !== null) {

@@ -122,6 +122,7 @@ const props: DataTableProps<InvoiceRow> = {
     createdAt: z.string()
   }),
   rowActions: [rowAction],
+  surface: "plain",
   collaborators: [
     {
       userId: "remote-user",

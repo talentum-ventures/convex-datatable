@@ -122,6 +122,13 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
+function isSameCollaboratorCellCoord(
+  left: CollaboratorCellCoord | null,
+  right: CollaboratorCellCoord | null
+): boolean {
+  return left?.rowId === right?.rowId && left?.columnId === right?.columnId;
+}
+
 function tableStyle(theme: DataTableThemeTokens): CssVarsStyle {
   const style: CssVarsStyle = {
     "--dt-font-family": theme.fontFamily,
@@ -179,6 +186,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
   minRowHeight,
   pageSize,
   theme,
+  surface = "default",
   className,
   collaborators,
   onActiveCellChange,
@@ -619,6 +627,9 @@ const DataTableInner = <TRow extends DataTableRowModel>({
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
   const tableBodyRef = useRef<TableBodyHandle | null>(null);
   const previousEditingCellRef = useRef<EditingCellState>(cellStore.getEditingCell());
+  const latestOnActiveCellChangeRef = useRef(onActiveCellChange);
+  const latestResolveActiveCellRef = useRef(resolveActiveCell);
+  const lastBroadcastActiveCellRef = useRef<CollaboratorCellCoord | null>(null);
   const rowElementsRef = useRef<Record<RowId, HTMLTableRowElement | null>>({});
   const [containerWidth, setContainerWidth] = useState(0);
 
@@ -656,17 +667,29 @@ const DataTableInner = <TRow extends DataTableRowModel>({
   }, [collaboratorStore, collaborators]);
 
   useEffect(() => {
-    if (!onActiveCellChange) {
+    latestOnActiveCellChangeRef.current = onActiveCellChange;
+    latestResolveActiveCellRef.current = resolveActiveCell;
+  }, [onActiveCellChange, resolveActiveCell]);
+
+  useEffect(() => {
+    if (!latestOnActiveCellChangeRef.current) {
+      lastBroadcastActiveCellRef.current = null;
       return;
     }
 
     const notify = (): void => {
-      onActiveCellChange(resolveActiveCell(cellStore.getActiveCell()));
+      const nextActiveCell = latestResolveActiveCellRef.current(cellStore.getActiveCell());
+      if (isSameCollaboratorCellCoord(lastBroadcastActiveCellRef.current, nextActiveCell)) {
+        return;
+      }
+
+      lastBroadcastActiveCellRef.current = nextActiveCell;
+      latestOnActiveCellChangeRef.current?.(nextActiveCell);
     };
 
     notify();
     return cellStore.subscribe(notify);
-  }, [cellStore, onActiveCellChange, resolveActiveCell]);
+  }, [cellStore, onActiveCellChange]);
 
   useEffect(() => {
     const syncFocus = (): void => {
@@ -1165,36 +1188,46 @@ const DataTableInner = <TRow extends DataTableRowModel>({
     });
   }, [rowHeights]);
   const rootStyle = tableStyle(mergedTheme);
+  const isPlainSurface = surface === "plain";
 
   return (
     <CellStoreContext.Provider value={cellStore}>
       <CollaboratorStoreContext.Provider value={collaboratorStore}>
         <div
           className={cn(
-            "relative rounded-[var(--dt-radius)] border border-[var(--dt-border-color)] bg-white/90 p-3 shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]",
+            "relative w-full",
+            isPlainSurface
+              ? "rounded-none border-0 bg-transparent p-0 shadow-none"
+              : "rounded-[var(--dt-radius)] border border-[var(--dt-border-color)] bg-white/90 p-3 shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]",
             className
           )}
           style={rootStyle}
         >
-          <TableToolbar
-            canAddRow={mergedFeatures.rowAdd && Boolean(dataSource.createRow)}
-            canDeleteRows={mergedFeatures.rowDelete && Boolean(dataSource.deleteRows)}
-            canCopySelection={mergedFeatures.clipboardCopy}
-            canManageVisibility={mergedFeatures.columnVisibility}
-            isLoadingRows={rowsResult.isLoading}
-            hiddenColumns={hiddenColumns}
-            orderedColumns={orderedColumns}
-            table={table}
-            rowSelection={rowSelection}
-            mergedRows={mergedRows}
-            getRowId={getRowId}
-            onAddRow={handleAddRow}
-            onDeleteSelected={handleDeleteSelected}
-            onCopy={handleCopySelection}
-          />
+          <div className="mb-3">
+            <TableToolbar
+              canAddRow={mergedFeatures.rowAdd && Boolean(dataSource.createRow)}
+              canDeleteRows={mergedFeatures.rowDelete && Boolean(dataSource.deleteRows)}
+              canCopySelection={mergedFeatures.clipboardCopy}
+              canManageVisibility={mergedFeatures.columnVisibility}
+              isLoadingRows={rowsResult.isLoading}
+              hiddenColumns={hiddenColumns}
+              orderedColumns={orderedColumns}
+              table={table}
+              rowSelection={rowSelection}
+              mergedRows={mergedRows}
+              getRowId={getRowId}
+              onAddRow={handleAddRow}
+              onDeleteSelected={handleDeleteSelected}
+              onCopy={handleCopySelection}
+            />
+          </div>
 
           <div
-            className="rounded-md border border-slate-200 bg-[linear-gradient(180deg,hsl(210_50%_98%),hsl(210_35%_97%))]"
+            className={cn(
+              isPlainSurface
+                ? "rounded-none border-0 bg-transparent"
+                : "rounded-md border border-slate-200 bg-[linear-gradient(180deg,hsl(210_50%_98%),hsl(210_35%_97%))]"
+            )}
             onPointerDownCapture={(event) => {
               logInteractionCapture("pointerdown", event.target, {
                 shift: event.shiftKey,

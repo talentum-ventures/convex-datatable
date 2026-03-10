@@ -41,7 +41,7 @@ function TableToolbarInner<TRow extends DataTableRowModel>({
   const selectedRowCount = Object.keys(rowSelection).length;
 
   return (
-    <div className="mb-3 grid gap-3 md:grid-cols-[1fr_auto]">
+    <div className="grid gap-3 md:grid-cols-[1fr_auto]">
       <div className="flex flex-wrap items-center gap-2">
         {canAddRow ? (
           <Button size="sm" onClick={onAddRow}>

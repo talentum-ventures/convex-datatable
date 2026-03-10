@@ -370,6 +370,7 @@ export type DataTableProps<TRow extends DataTableRowModel> = {
   minRowHeight?: number;
   pageSize?: number;
   theme?: Partial<DataTableThemeTokens>;
+  surface?: "default" | "plain";
   className?: string;
   collaborators?: ReadonlyArray<CollaboratorPresence>;
   onActiveCellChange?: (cell: CollaboratorCellCoord | null) => void;
