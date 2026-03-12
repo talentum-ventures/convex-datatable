@@ -5,7 +5,9 @@
     "noEmit": true,
     "types": ["vite/client", "node"],
     "paths": {
-      "@talentum-ventures/convex-datatable": ["../../packages/datatable/src/index.ts"]
+      "@talentum-ventures/convex-datatable": ["../../packages/datatable/src/index.ts"],
+      "@talentum-ventures/convex-datatable/convex": ["../../packages/datatable/src/convex/index.ts"],
+      "@talentum-ventures/convex-datatable/convex-server": ["../../packages/datatable/src/convex/server.ts"]
     }
   },
   "include": ["src", "convex", "vite.config.ts", "../../packages/datatable/src"]
