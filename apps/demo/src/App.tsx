@@ -49,43 +49,43 @@ export function App(): JSX.Element {
   }, []);
 
   return (
-    <main className="mx-auto flex h-screen max-w-[1400px] flex-col gap-6 overflow-hidden p-6">
-      <header className="shrink-0 space-y-4">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Convex DataTable</h1>
-          <p className="max-w-4xl text-sm text-slate-600">
+    <main className="mx-auto flex h-[100dvh] max-w-[1400px] flex-col gap-3 overflow-hidden p-3 sm:gap-6 sm:p-6">
+      <header className="shrink-0 space-y-2 sm:space-y-4">
+        <div className="space-y-1 sm:space-y-2">
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Convex DataTable</h1>
+          <p className="hidden max-w-4xl text-sm text-slate-600 sm:block">
             Two dedicated demo pages: one for the in-memory data source and one for the Convex adapter flow.
           </p>
         </div>
-        <nav className="flex flex-wrap gap-3" aria-label="Demo pages">
+        <nav className="flex flex-wrap gap-2 sm:gap-3" aria-label="Demo pages">
           <a
             href="#/in-memory"
             aria-current={page === "in-memory" ? "page" : undefined}
-            className={`inline-flex min-w-56 items-start gap-3 rounded-2xl border px-4 py-3 shadow-sm transition ${
+            className={`inline-flex w-full items-center gap-3 rounded-2xl border px-4 py-2 shadow-sm transition sm:w-auto sm:min-w-56 sm:items-start sm:py-3 ${
               page === "in-memory"
                 ? "border-sky-300 bg-white text-slate-900"
                 : "border-slate-200 bg-white/70 text-slate-700"
             }`}
           >
-            <Layers className="mt-0.5 h-4 w-4 shrink-0" />
+            <Layers className="h-4 w-4 shrink-0 sm:mt-0.5" />
             <span>
               <span className="block text-sm font-medium">{PAGE_COPY["in-memory"].title}</span>
-              <span className="block text-xs text-slate-500">{PAGE_COPY["in-memory"].description}</span>
+              <span className="hidden text-xs text-slate-500 sm:block">{PAGE_COPY["in-memory"].description}</span>
             </span>
           </a>
           <a
             href="#/convex"
             aria-current={page === "convex" ? "page" : undefined}
-            className={`inline-flex min-w-56 items-start gap-3 rounded-2xl border px-4 py-3 shadow-sm transition ${
+            className={`inline-flex w-full items-center gap-3 rounded-2xl border px-4 py-2 shadow-sm transition sm:w-auto sm:min-w-56 sm:items-start sm:py-3 ${
               page === "convex"
                 ? "border-teal-300 bg-white text-slate-900"
                 : "border-slate-200 bg-white/70 text-slate-700"
             }`}
           >
-            <Globe className="mt-0.5 h-4 w-4 shrink-0" />
+            <Globe className="h-4 w-4 shrink-0 sm:mt-0.5" />
             <span>
               <span className="block text-sm font-medium">{PAGE_COPY.convex.title}</span>
-              <span className="block text-xs text-slate-500">{PAGE_COPY.convex.description}</span>
+              <span className="hidden text-xs text-slate-500 sm:block">{PAGE_COPY.convex.description}</span>
             </span>
           </a>
         </nav>

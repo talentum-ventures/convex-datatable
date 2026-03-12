@@ -639,10 +639,10 @@ export function InMemoryPage(): JSX.Element {
   );
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col gap-5 overflow-hidden">
-      <section className="space-y-2">
-        <h2 className="text-2xl font-semibold tracking-tight text-slate-900">In-memory example</h2>
-        <p className="max-w-4xl text-sm text-slate-600">
+    <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-hidden sm:gap-5">
+      <section className="space-y-1 sm:space-y-2">
+        <h2 className="text-lg font-semibold tracking-tight text-slate-900 sm:text-2xl">In-memory example</h2>
+        <p className="hidden max-w-4xl text-sm text-slate-600 sm:block">
           Fully type-safe Airtable-inspired datatable powered by TanStack internals, using an in-memory data source for rapid interaction and feature coverage.
         </p>
         <p className="text-xs text-slate-500">Soft deleted rows in memory: {Object.keys(softDeleted).length}</p>

@@ -405,42 +405,45 @@ export function ConvexPage(): JSX.Element {
   });
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col gap-5 overflow-hidden">
-      <section className="space-y-3">
+    <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-hidden sm:gap-5">
+      <section className="space-y-2 sm:space-y-3">
         <div className="space-y-1">
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900 sm:text-2xl">
             Convex adapter example
           </h2>
-          <p className="max-w-4xl text-sm text-slate-600">
+          <p className="hidden max-w-4xl text-sm text-slate-600 sm:block">
             This page is backed by a real Convex deployment for row paging, edits, soft deletes, and collaborative presence.
           </p>
         </div>
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <Activity className="h-4 w-4 text-cyan-600" />
-              Live rows
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          <div className="rounded-xl border border-slate-200 bg-white/80 p-2 shadow-sm sm:rounded-2xl sm:p-4">
+            <div className="flex items-center gap-2 text-xs font-medium text-slate-700 sm:text-sm">
+              <Activity className="h-3.5 w-3.5 shrink-0 text-cyan-600 sm:h-4 sm:w-4" />
+              <span className="truncate">Live rows</span>
             </div>
-            <p className="mt-2 text-sm text-slate-600">
-              {summary.activeCount} active deployment rows are loaded from Convex.
+            <p className="mt-1 text-xs text-slate-600 sm:mt-2 sm:text-sm">
+              <span className="font-semibold text-slate-900">{summary.activeCount}</span>
+              <span className="hidden sm:inline"> active deployment rows are loaded from Convex.</span>
             </p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <Globe className="h-4 w-4 text-emerald-600" />
-              Presence
+          <div className="rounded-xl border border-slate-200 bg-white/80 p-2 shadow-sm sm:rounded-2xl sm:p-4">
+            <div className="flex items-center gap-2 text-xs font-medium text-slate-700 sm:text-sm">
+              <Globe className="h-3.5 w-3.5 shrink-0 text-emerald-600 sm:h-4 sm:w-4" />
+              <span className="truncate">Presence</span>
             </div>
-            <p className="mt-2 text-sm text-slate-600">
-              {presence.collaborators.length} collaborators are currently active. Open a second tab to see live cell presence.
+            <p className="mt-1 text-xs text-slate-600 sm:mt-2 sm:text-sm">
+              <span className="font-semibold text-slate-900">{presence.collaborators.length}</span>
+              <span className="hidden sm:inline"> collaborators are currently active. Open a second tab to see live cell presence.</span>
             </p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <DollarSign className="h-4 w-4 text-amber-600" />
-              Deleted rows
+          <div className="rounded-xl border border-slate-200 bg-white/80 p-2 shadow-sm sm:rounded-2xl sm:p-4">
+            <div className="flex items-center gap-2 text-xs font-medium text-slate-700 sm:text-sm">
+              <DollarSign className="h-3.5 w-3.5 shrink-0 text-amber-600 sm:h-4 sm:w-4" />
+              <span className="truncate">Deleted</span>
             </div>
-            <p className="mt-2 text-sm text-slate-600">
-              {summary.deletedCount} soft-deleted rows remain restorable in Convex.
+            <p className="mt-1 text-xs text-slate-600 sm:mt-2 sm:text-sm">
+              <span className="font-semibold text-slate-900">{summary.deletedCount}</span>
+              <span className="hidden sm:inline"> soft-deleted rows remain restorable in Convex.</span>
             </p>
           </div>
         </div>
