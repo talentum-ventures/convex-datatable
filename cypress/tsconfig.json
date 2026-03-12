@@ -5,7 +5,7 @@
     "types": ["cypress", "node"],
     "jsx": "react-jsx",
     "paths": {
-      "@talentum/convex-datatable": ["packages/datatable/src/index.ts"]
+      "@talentum-ventures/convex-datatable": ["packages/datatable/src/index.ts"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", "../cypress.config.ts"]

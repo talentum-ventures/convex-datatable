@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Convex DataTable (`@talentum/convex-datatable`) is a production-ready React data-grid library with an Airtable-style feature set. It is built on TanStack Table internally but exposes a clean public API with **zero TanStack types leaked**. The library is published on npm and designed for use by external consumers.
+Convex DataTable (`@talentum-ventures/convex-datatable`) is a production-ready React data-grid library with an Airtable-style feature set. It is built on TanStack Table internally but exposes a clean public API with **zero TanStack types leaked**. The library is published on npm and designed for use by external consumers.
 
 Key capabilities: 9 typed column kinds, spreadsheet-style editing, cell/range selection, clipboard copy/paste, undo/redo, column resize/reorder/pin/filter/sort/hide, infinite scroll, virtualization, URL and localStorage state persistence, row CRUD with optimistic updates, row schema validation, theming via CSS custom properties, per-row action menus, and optional Convex adapters for paginated data loading and real-time collaborative presence.
 
@@ -10,7 +10,7 @@ Key capabilities: 9 typed column kinds, spreadsheet-style editing, cell/range se
 
 ```
 rolha-grid/
-├── packages/datatable/    # Publishable library package (@talentum/convex-datatable)
+├── packages/datatable/    # Publishable library package (@talentum-ventures/convex-datatable)
 │   └── src/
 │       ├── core/          # Public types, defaults, formatting, validation, filtering, sorting
 │       ├── engine/        # TanStack state converters, column definition mapping, column order
@@ -78,10 +78,10 @@ All public exports are defined in `packages/datatable/src/index.ts`. This is the
 
 | Path | Maps to |
 |------|---------|
-| `@talentum/convex-datatable` | `dist/index.js` |
-| `@talentum/convex-datatable/styles.css` | `dist/styles.css` |
-| `@talentum/convex-datatable/convex` | `dist/convex/index.js` |
-| `@talentum/convex-datatable/convex-server` | `dist/convex/server.js` |
+| `@talentum-ventures/convex-datatable` | `dist/index.js` |
+| `@talentum-ventures/convex-datatable/styles.css` | `dist/styles.css` |
+| `@talentum-ventures/convex-datatable/convex` | `dist/convex/index.js` |
+| `@talentum-ventures/convex-datatable/convex-server` | `dist/convex/server.js` |
 
 ### Core Types (`packages/datatable/src/core/types.ts`)
 

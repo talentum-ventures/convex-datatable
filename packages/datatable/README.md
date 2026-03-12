@@ -1,11 +1,11 @@
-# `@talentum/convex-datatable`
+# `@talentum-ventures/convex-datatable`
 
-`@talentum/convex-datatable` is a production-focused React data table with an Airtable-style feature set and a library-shaped API. You work with typed columns, a typed data source, feature flags, theme tokens, and optional Convex helpers without importing TanStack state directly.
+`@talentum-ventures/convex-datatable` is a production-focused React data table with an Airtable-style feature set and a library-shaped API. You work with typed columns, a typed data source, feature flags, theme tokens, and optional Convex helpers without importing TanStack state directly.
 
 ## Install
 
 ```bash
-npm install @talentum/convex-datatable
+npm install @talentum-ventures/convex-datatable
 ```
 
 Peer dependencies:
@@ -19,13 +19,13 @@ Peer dependencies:
 Recommended:
 
 ```ts
-import "@talentum/convex-datatable/styles.css";
+import "@talentum-ventures/convex-datatable/styles.css";
 ```
 
 If your app already runs Tailwind and you intentionally want Convex DataTable styles folded into your own generated stylesheet, add this scan path:
 
 ```txt
-node_modules/@talentum/convex-datatable/dist/**/*.js
+node_modules/@talentum-ventures/convex-datatable/dist/**/*.js
 ```
 
 Scanning installed package files is toolchain-dependent, so the explicit CSS import remains the default recommendation.
@@ -33,12 +33,12 @@ Scanning installed package files is toolchain-dependent, so the explicit CSS imp
 ## Minimal Usage
 
 ```tsx
-import "@talentum/convex-datatable/styles.css";
+import "@talentum-ventures/convex-datatable/styles.css";
 import {
   DataTable,
   type DataTableColumn,
   type DataTableDataSource
-} from "@talentum/convex-datatable";
+} from "@talentum-ventures/convex-datatable";
 
 type InvoiceRow = {
   id: string;
@@ -135,7 +135,7 @@ export function InvoicesTable(): JSX.Element {
 Preferred client imports:
 
 ```ts
-import { useConvexDataSource, useConvexPresence } from "@talentum/convex-datatable/convex";
+import { useConvexDataSource, useConvexPresence } from "@talentum-ventures/convex-datatable/convex";
 ```
 
 Server helpers:
@@ -145,10 +145,10 @@ import {
   clearStalePresenceHandler,
   getPresenceHandler,
   heartbeatHandler
-} from "@talentum/convex-datatable/convex-server";
+} from "@talentum-ventures/convex-datatable/convex-server";
 ```
 
-The root package still re-exports the client Convex hooks for compatibility, but `@talentum/convex-datatable/convex` is the preferred path for new code.
+The root package still re-exports the client Convex hooks for compatibility, but `@talentum-ventures/convex-datatable/convex` is the preferred path for new code.
 
 ## Theming
 
@@ -159,7 +159,7 @@ import {
   DEFAULT_THEME_TOKENS,
   DataTable,
   type DataTableThemeTokens
-} from "@talentum/convex-datatable";
+} from "@talentum-ventures/convex-datatable";
 
 const theme: DataTableThemeTokens = {
   ...DEFAULT_THEME_TOKENS,
@@ -177,7 +177,7 @@ You can also pass a partial `theme` prop if you only want to change a few tokens
 
 ## Package Exports
 
-- `@talentum/convex-datatable`
-- `@talentum/convex-datatable/styles.css`
-- `@talentum/convex-datatable/convex`
-- `@talentum/convex-datatable/convex-server`
+- `@talentum-ventures/convex-datatable`
+- `@talentum-ventures/convex-datatable/styles.css`
+- `@talentum-ventures/convex-datatable/convex`
+- `@talentum-ventures/convex-datatable/convex-server`

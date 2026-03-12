@@ -12,7 +12,7 @@ import {
   type DataTableFeatureFlags,
   type DataTableQueryState,
   type DataTableRowAction
-} from "@talentum/convex-datatable";
+} from "@talentum-ventures/convex-datatable";
 import { z } from "zod";
 import { getStoredConvexUser } from "./convex-user";
 import { type ConvexDemoRow } from "./convex-data";

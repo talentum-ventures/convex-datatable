@@ -2,7 +2,7 @@
 
 > A production-ready, fully typed React data-grid component with Airtable-style editing, selection, clipboard, state persistence, and optional Convex real-time adapters.
 
-Package name: `@talentum/convex-datatable`
+Package name: `@talentum-ventures/convex-datatable`
 License: MIT
 Framework: React 18+
 Language: TypeScript (strict mode)
@@ -10,22 +10,22 @@ Internal engine: TanStack Table (not exposed in public API)
 
 ## Package Exports
 
-- `@talentum/convex-datatable` — main entry point with all components, types, defaults, persistence utils, debug utils
-- `@talentum/convex-datatable/styles.css` — bundled CSS stylesheet (must be imported)
-- `@talentum/convex-datatable/convex` — Convex client adapter hooks (`useConvexDataSource`, `useConvexPresence`)
-- `@talentum/convex-datatable/convex-server` — Convex server-side helpers (`presenceFields`, `heartbeatHandler`, `getPresenceHandler`, `clearStalePresenceHandler`)
+- `@talentum-ventures/convex-datatable` — main entry point with all components, types, defaults, persistence utils, debug utils
+- `@talentum-ventures/convex-datatable/styles.css` — bundled CSS stylesheet (must be imported)
+- `@talentum-ventures/convex-datatable/convex` — Convex client adapter hooks (`useConvexDataSource`, `useConvexPresence`)
+- `@talentum-ventures/convex-datatable/convex-server` — Convex server-side helpers (`presenceFields`, `heartbeatHandler`, `getPresenceHandler`, `clearStalePresenceHandler`)
 
 ## Installation
 
 ```bash
-npm install @talentum/convex-datatable
+npm install @talentum-ventures/convex-datatable
 ```
 
 Peer dependencies: `react` ^18.3.1, `react-dom` ^18.3.1, `convex` ^1.32.0 (optional, only for Convex adapter).
 
 Import the CSS in your app entry:
 ```ts
-import "@talentum/convex-datatable/styles.css";
+import "@talentum-ventures/convex-datatable/styles.css";
 ```
 
 ## Components
@@ -189,7 +189,7 @@ Exported utilities: `encodePersistedStateToUrl`, `decodePersistedStateFromUrl`, 
 
 ### Client — useConvexDataSource
 
-Import from `@talentum/convex-datatable/convex`.
+Import from `@talentum-ventures/convex-datatable/convex`.
 
 ```ts
 function useConvexDataSource<TRow>(config: ConvexDataSourceConfig<TRow>): DataTableDataSource<TRow>;
@@ -201,7 +201,7 @@ ConvexDataSourceConfig: `{ tableId, pageSize?, usePageQuery, createRow?, updateR
 
 ### Client — useConvexPresence
 
-Import from `@talentum/convex-datatable/convex`.
+Import from `@talentum-ventures/convex-datatable/convex`.
 
 ```ts
 function useConvexPresence(config: ConvexPresenceConfig): {
@@ -216,7 +216,7 @@ Pass `collaborators` and `onActiveCellChange` to the DataTable component.
 
 ### Server Helpers
 
-Import from `@talentum/convex-datatable/convex-server`.
+Import from `@talentum-ventures/convex-datatable/convex-server`.
 
 - `presenceFields` — Convex validator for the presence document schema
 - `heartbeatHandler(tableName)` — mutation handler to upsert presence entries
@@ -226,14 +226,14 @@ Import from `@talentum/convex-datatable/convex-server`.
 Usage in Convex schema:
 ```ts
 import { defineSchema, defineTable } from "convex/server";
-import { presenceFields } from "@talentum/convex-datatable/convex-server";
+import { presenceFields } from "@talentum-ventures/convex-datatable/convex-server";
 export default defineSchema({ presence: defineTable(presenceFields) });
 ```
 
 Usage in Convex functions:
 ```ts
 import { mutation, query } from "./_generated/server";
-import { heartbeatHandler, getPresenceHandler, clearStalePresenceHandler } from "@talentum/convex-datatable/convex-server";
+import { heartbeatHandler, getPresenceHandler, clearStalePresenceHandler } from "@talentum-ventures/convex-datatable/convex-server";
 export const heartbeat = mutation(heartbeatHandler("presence"));
 export const getPresence = query(getPresenceHandler("presence"));
 export const clearStale = mutation(clearStalePresenceHandler("presence"));
@@ -275,8 +275,8 @@ Persistence: encodePersistedStateToUrl, decodePersistedStateFromUrl, mergePersis
 ## Quick Start Example
 
 ```tsx
-import "@talentum/convex-datatable/styles.css";
-import { DataTable, DataTableContainer, type DataTableColumn, type DataTableDataSource } from "@talentum/convex-datatable";
+import "@talentum-ventures/convex-datatable/styles.css";
+import { DataTable, DataTableContainer, type DataTableColumn, type DataTableDataSource } from "@talentum-ventures/convex-datatable";
 
 type Invoice = { id: string; customer: string; amount: number; status: string };
 
@@ -309,9 +309,9 @@ function App() {
 ## Convex Full Example
 
 ```tsx
-import "@talentum/convex-datatable/styles.css";
-import { DataTable, DataTableContainer, type DataTableColumn } from "@talentum/convex-datatable";
-import { useConvexDataSource, useConvexPresence } from "@talentum/convex-datatable/convex";
+import "@talentum-ventures/convex-datatable/styles.css";
+import { DataTable, DataTableContainer, type DataTableColumn } from "@talentum-ventures/convex-datatable";
+import { useConvexDataSource, useConvexPresence } from "@talentum-ventures/convex-datatable/convex";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../convex/_generated/api";
 

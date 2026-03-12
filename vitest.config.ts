@@ -5,13 +5,13 @@ export default defineConfig({
   resolve: {
     alias: [
       {
-        find: "@talentum/convex-datatable/convex-server",
+        find: "@talentum-ventures/convex-datatable/convex-server",
         replacement: fileURLToPath(
           new URL("./packages/datatable/src/convex/server.ts", import.meta.url)
         )
       },
       {
-        find: "@talentum/convex-datatable/convex",
+        find: "@talentum-ventures/convex-datatable/convex",
         replacement: fileURLToPath(
           new URL("./packages/datatable/src/convex/index.ts", import.meta.url)
         )

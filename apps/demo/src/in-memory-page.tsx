@@ -7,7 +7,7 @@ import {
   type DataTableDataSource,
   type DataTableRowAction,
   type DataTableQueryState
-} from "@talentum/convex-datatable";
+} from "@talentum-ventures/convex-datatable";
 import { z } from "zod";
 import { applyServerQuery } from "./demo-query";
 

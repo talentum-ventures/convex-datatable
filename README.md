@@ -2,8 +2,8 @@
 
 A production-ready, fully typed React data-grid component with Airtable-style editing, selection, clipboard, persistence, and optional Convex real-time adapters. Built on [TanStack Table](https://tanstack.com/table) internally, but exposes a clean public API with **zero TanStack types leaked**.
 
-[![npm](https://img.shields.io/npm/v/@talentum/convex-datatable)](https://www.npmjs.com/package/@talentum/convex-datatable)
-[![license](https://img.shields.io/npm/l/@talentum/convex-datatable)](./LICENSE)
+[![npm](https://img.shields.io/npm/v/@talentum-ventures/convex-datatable)](https://www.npmjs.com/package/@talentum-ventures/convex-datatable)
+[![license](https://img.shields.io/npm/l/@talentum-ventures/convex-datatable)](./LICENSE)
 
 ---
 
@@ -90,7 +90,7 @@ A production-ready, fully typed React data-grid component with Airtable-style ed
 ## Installation
 
 ```bash
-npm install @talentum/convex-datatable
+npm install @talentum-ventures/convex-datatable
 ```
 
 Peer dependencies:
@@ -106,7 +106,7 @@ Peer dependencies:
 Import the bundled stylesheet in your app entry point:
 
 ```ts
-import "@talentum/convex-datatable/styles.css";
+import "@talentum-ventures/convex-datatable/styles.css";
 ```
 
 The stylesheet includes all Tailwind utility classes used by the component. If your app already builds Tailwind and you prefer to merge the DataTable classes into your own build, add the dist path to your Tailwind `content` globs instead:
@@ -116,7 +116,7 @@ The stylesheet includes all Tailwind utility classes used by the component. If y
 export default {
   content: [
     "./src/**/*.{ts,tsx}",
-    "./node_modules/@talentum/convex-datatable/dist/**/*.js"
+    "./node_modules/@talentum-ventures/convex-datatable/dist/**/*.js"
   ]
 };
 ```
@@ -128,13 +128,13 @@ export default {
 ## Quick Start
 
 ```tsx
-import "@talentum/convex-datatable/styles.css";
+import "@talentum-ventures/convex-datatable/styles.css";
 import {
   DataTable,
   DataTableContainer,
   type DataTableColumn,
   type DataTableDataSource
-} from "@talentum/convex-datatable";
+} from "@talentum-ventures/convex-datatable";
 
 type Invoice = {
   id: string;
@@ -680,7 +680,7 @@ type RowSchemaIssue = {
 Pass a partial `theme` prop to override any subset of tokens. Unspecified tokens use the defaults.
 
 ```tsx
-import { DEFAULT_THEME_TOKENS } from "@talentum/convex-datatable";
+import { DEFAULT_THEME_TOKENS } from "@talentum-ventures/convex-datatable";
 
 <DataTable
   theme={{
@@ -776,7 +776,7 @@ import {
   decodePersistedStateFromUrl,
   mergePersistedState,
   storageKey
-} from "@talentum/convex-datatable";
+} from "@talentum-ventures/convex-datatable";
 ```
 
 | Function | Description |
@@ -793,7 +793,7 @@ import {
 The Convex adapter provides two hooks for building a real-time, paginated data source backed by [Convex](https://convex.dev). Import from the dedicated subpath:
 
 ```ts
-import { useConvexDataSource, useConvexPresence } from "@talentum/convex-datatable/convex";
+import { useConvexDataSource, useConvexPresence } from "@talentum-ventures/convex-datatable/convex";
 ```
 
 ### useConvexDataSource
@@ -801,7 +801,7 @@ import { useConvexDataSource, useConvexPresence } from "@talentum/convex-datatab
 Converts a Convex page query into a `DataTableDataSource`:
 
 ```tsx
-import { useConvexDataSource } from "@talentum/convex-datatable/convex";
+import { useConvexDataSource } from "@talentum-ventures/convex-datatable/convex";
 
 function useMyPageQuery(args: {
   cursor: string | null;
@@ -850,7 +850,7 @@ const dataSource = useConvexDataSource({
 Adds real-time collaborative presence — colored outlines and name labels on the cells other users are currently viewing:
 
 ```tsx
-import { useConvexPresence } from "@talentum/convex-datatable/convex";
+import { useConvexPresence } from "@talentum-ventures/convex-datatable/convex";
 
 const presence = useConvexPresence({
   tableId: "my-table",
@@ -904,7 +904,7 @@ import {
   heartbeatHandler,
   getPresenceHandler,
   clearStalePresenceHandler
-} from "@talentum/convex-datatable/convex-server";
+} from "@talentum-ventures/convex-datatable/convex-server";
 ```
 
 #### Schema Setup
@@ -914,7 +914,7 @@ Use `presenceFields` in your Convex schema:
 ```ts
 // convex/schema.ts
 import { defineSchema, defineTable } from "convex/server";
-import { presenceFields } from "@talentum/convex-datatable/convex-server";
+import { presenceFields } from "@talentum-ventures/convex-datatable/convex-server";
 
 export default defineSchema({
   presence: defineTable(presenceFields)
@@ -932,7 +932,7 @@ import {
   heartbeatHandler,
   getPresenceHandler,
   clearStalePresenceHandler
-} from "@talentum/convex-datatable/convex-server";
+} from "@talentum-ventures/convex-datatable/convex-server";
 
 export const heartbeat = mutation(heartbeatHandler("presence"));
 export const getPresence = query(getPresenceHandler("presence"));
@@ -979,7 +979,7 @@ When `cellSelect` is enabled:
 The `applyClientQuery` utility is re-exported from the DataTable component for use in in-memory data sources:
 
 ```ts
-import { DataTable } from "@talentum/convex-datatable";
+import { DataTable } from "@talentum-ventures/convex-datatable";
 
 // DataTable.applyClientQuery is available as a static export
 const filtered = applyClientQuery(rows, { sorting, filters }, columnByIdMap);
@@ -993,10 +993,10 @@ This applies the same filter operators and sort logic that the table uses intern
 
 | Import Path | Contents |
 |-------------|----------|
-| `@talentum/convex-datatable` | `DataTable`, `DataTableContainer`, all types, defaults, persistence utilities |
-| `@talentum/convex-datatable/styles.css` | Bundled CSS stylesheet |
-| `@talentum/convex-datatable/convex` | `useConvexDataSource`, `useConvexPresence` |
-| `@talentum/convex-datatable/convex-server` | `presenceFields`, `heartbeatHandler`, `getPresenceHandler`, `clearStalePresenceHandler` |
+| `@talentum-ventures/convex-datatable` | `DataTable`, `DataTableContainer`, all types, defaults, persistence utilities |
+| `@talentum-ventures/convex-datatable/styles.css` | Bundled CSS stylesheet |
+| `@talentum-ventures/convex-datatable/convex` | `useConvexDataSource`, `useConvexPresence` |
+| `@talentum-ventures/convex-datatable/convex-server` | `presenceFields`, `heartbeatHandler`, `getPresenceHandler`, `clearStalePresenceHandler` |
 
 ---
 

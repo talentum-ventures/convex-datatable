@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DataTableFilter, DataTableQueryState } from "@talentum/convex-datatable";
+import type { DataTableFilter, DataTableQueryState } from "@talentum-ventures/convex-datatable";
 import { applyServerQuery, filterRow } from "./demo-query";
 
 type DemoQueryRow = {

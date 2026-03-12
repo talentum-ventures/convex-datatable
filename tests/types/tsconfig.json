@@ -4,9 +4,9 @@
     "noEmit": true,
     "types": ["vitest/globals", "node"],
     "paths": {
-      "@talentum/convex-datatable": ["../../packages/datatable/src/index.ts"],
-      "@talentum/convex-datatable/convex": ["../../packages/datatable/src/convex/index.ts"],
-      "@talentum/convex-datatable/convex-server": ["../../packages/datatable/src/convex/server.ts"]
+      "@talentum-ventures/convex-datatable": ["../../packages/datatable/src/index.ts"],
+      "@talentum-ventures/convex-datatable/convex": ["../../packages/datatable/src/convex/index.ts"],
+      "@talentum-ventures/convex-datatable/convex-server": ["../../packages/datatable/src/convex/server.ts"]
     }
   },
   "include": ["./**/*.ts"]
