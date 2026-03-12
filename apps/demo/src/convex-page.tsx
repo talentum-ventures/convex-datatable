@@ -5,14 +5,13 @@ import { useMutation, useQuery } from "convex/react";
 import {
   DataTable,
   DataTableContainer,
-  useConvexDataSource,
-  useConvexPresence,
   type ConvexPresenceEntry,
   type DataTableColumn,
   type DataTableFeatureFlags,
   type DataTableQueryState,
   type DataTableRowAction
 } from "@talentum-ventures/convex-datatable";
+import { useConvexDataSource, useConvexPresence } from "@talentum-ventures/convex-datatable/convex";
 import { z } from "zod";
 import { getStoredConvexUser } from "./convex-user";
 import { type ConvexDemoRow } from "./convex-data";

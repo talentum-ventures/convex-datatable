@@ -148,8 +148,6 @@ import {
 } from "@talentum-ventures/convex-datatable/convex-server";
 ```
 
-The root package still re-exports the client Convex hooks for compatibility, but `@talentum-ventures/convex-datatable/convex` is the preferred path for new code.
-
 ## Theming
 
 Use the public theme exports to start from the defaults and override only what you need:

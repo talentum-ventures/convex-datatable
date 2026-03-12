@@ -11,7 +11,7 @@ import type {
   DataTableProps,
   DataTableRowAction
 } from "@talentum-ventures/convex-datatable";
-import { useConvexPresence } from "@talentum-ventures/convex-datatable";
+import { useConvexPresence } from "@talentum-ventures/convex-datatable/convex";
 import {
   clearStalePresenceHandler,
   getPresenceHandler,
