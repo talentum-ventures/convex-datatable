@@ -42,7 +42,6 @@ A production-ready, fully typed React data-grid component with Airtable-style ed
 - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [Clipboard](#clipboard)
 - [Client-Side Filtering](#client-side-filtering)
-- [Debug Mode](#debug-mode)
 - [Package Exports](#package-exports)
 - [API Reference](#api-reference)
   - [DataTableProps](#datatableprops)
@@ -990,29 +989,11 @@ This applies the same filter operators and sort logic that the table uses intern
 
 ---
 
-## Debug Mode
-
-Enable debug logging by adding `?dt_debug=1` to the URL. This persists a flag in `localStorage` and logs events (up to 600) including frame stalls, long tasks, and DataTable internal events.
-
-Disable with `?dt_debug=0`.
-
-```ts
-import {
-  debugEnabled,
-  readDebugEvents,
-  clearDebugEvents,
-  pushDebugEvent,
-  DEBUG_EVENTS_STORAGE_KEY
-} from "@talentum/convex-datatable";
-```
-
----
-
 ## Package Exports
 
 | Import Path | Contents |
 |-------------|----------|
-| `@talentum/convex-datatable` | `DataTable`, `DataTableContainer`, all types, defaults, persistence utilities, debug utilities |
+| `@talentum/convex-datatable` | `DataTable`, `DataTableContainer`, all types, defaults, persistence utilities |
 | `@talentum/convex-datatable/styles.css` | Bundled CSS stylesheet |
 | `@talentum/convex-datatable/convex` | `useConvexDataSource`, `useConvexPresence` |
 | `@talentum/convex-datatable/convex-server` | `presenceFields`, `heartbeatHandler`, `getPresenceHandler`, `clearStalePresenceHandler` |
@@ -1045,7 +1026,7 @@ type DataTableProps<TRow extends DataTableRowModel> = {
 
 | Prop | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `tableId` | `string` | Yes | — | Unique ID used for persistence keys and debug scoping. |
+| `tableId` | `string` | Yes | — | Unique ID used for persistence keys. |
 | `columns` | `DataTableColumn<TRow>[]` | Yes | — | Column definitions. |
 | `getRowId` | `(row: TRow) => string` | Yes | — | Extract a unique ID from each row. |
 | `dataSource` | `DataTableDataSource<TRow>` | Yes | — | Data fetching and mutation interface. |

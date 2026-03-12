@@ -20,7 +20,6 @@ rolha-grid/
 │       ├── virtual/       # Row height and virtualization helpers
 │       ├── ui/            # DataTable component, DataTableContainer, header, body, cells, toolbar
 │       ├── convex/        # Convex adapter hooks and server helpers
-│       ├── debug/         # Debug event logging
 │       └── index.ts       # Public API entry point (all exports)
 ├── apps/demo/             # Vite demo app (in-memory + Convex examples)
 │   └── src/
@@ -75,8 +74,6 @@ All public exports are defined in `packages/datatable/src/index.ts`. This is the
 **Types:** All types from `core/types.ts` (50+ exported types)
 **Constants:** `DEFAULT_FEATURE_FLAGS`, `DEFAULT_THEME_TOKENS`, `DEFAULT_PAGE_SIZE`
 **Persistence utilities:** `encodePersistedStateToUrl`, `decodePersistedStateFromUrl`, `mergePersistedState`, `storageKey`
-**Debug utilities:** `debugEnabled`, `readDebugEvents`, `clearDebugEvents`, `pushDebugEvent`, `pushDebugEventThrottled`, `DEBUG_EVENTS_STORAGE_KEY`
-
 ### Package Exports (package.json)
 
 | Path | Maps to |

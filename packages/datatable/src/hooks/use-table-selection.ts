@@ -1,7 +1,6 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
 import type { CellStore } from "../core/cell-store";
 import type { CellCoord } from "../core/types";
-import { pushDebugEventThrottled } from "../debug";
 
 export function cellRange(
   start: CellCoord | null,
@@ -27,8 +26,6 @@ export function cellRange(
 
 export type UseTableSelectionArgs = {
   cellStore: CellStore;
-  isDebugMode: boolean;
-  debugScope: string;
 };
 
 export type UseTableSelectionResult = {
@@ -41,9 +38,7 @@ export type UseTableSelectionResult = {
 };
 
 export function useTableSelection({
-  cellStore,
-  isDebugMode,
-  debugScope
+  cellStore
 }: UseTableSelectionArgs): UseTableSelectionResult {
   const activeCell = cellStore.getActiveCell();
   const rangeStart = cellStore.getRangeStart();
@@ -51,26 +46,14 @@ export function useTableSelection({
   const setRangeStart = cellStore.setRangeStart;
 
   const onCellSelect = useCallback((coord: CellCoord) => {
-    if (isDebugMode) {
-      pushDebugEventThrottled(debugScope, "cell-select", 120, "cell selected", {
-        row: coord.rowIndex,
-        column: coord.columnIndex
-      });
-    }
     setActiveCell(coord);
     setRangeStart(coord);
-  }, [debugScope, isDebugMode, setActiveCell, setRangeStart]);
+  }, [setActiveCell, setRangeStart]);
 
   const onRangeSelect = useCallback((coord: CellCoord) => {
-    if (isDebugMode) {
-      pushDebugEventThrottled(debugScope, "range-select", 120, "range anchor updated", {
-        row: coord.rowIndex,
-        column: coord.columnIndex
-      });
-    }
     setActiveCell(coord);
     setRangeStart((current) => current ?? coord);
-  }, [debugScope, isDebugMode, setActiveCell, setRangeStart]);
+  }, [setActiveCell, setRangeStart]);
 
   return {
     activeCell,

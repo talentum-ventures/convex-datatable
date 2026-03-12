@@ -55,11 +55,6 @@ import {
   fromTanStackFilters,
   fromTanStackSorting
 } from "../engine/state-converters";
-import {
-  debugEnabled,
-  pushDebugEvent,
-  pushDebugEventThrottled
-} from "../debug";
 import { useColumnDefs } from "../hooks/use-column-defs";
 import { canHandleGridPaste, useTableClipboard } from "../hooks/use-table-clipboard";
 import { useTableKeyboard } from "../hooks/use-table-keyboard";
@@ -197,8 +192,6 @@ const DataTableInner = <TRow extends DataTableRowModel>({
     () => resolveThemeTokens(theme),
     [theme]
   );
-  const isDebugMode = useMemo(() => debugEnabled(), []);
-  const debugScope = useMemo(() => `table:${tableId}`, [tableId]);
   const dataColumnIds = useMemo(() => columns.map((column) => column.id), [columns]);
   const minHeight = minRowHeight ?? DEFAULT_MIN_ROW_HEIGHT;
   const effectivePageSize = pageSize ?? DEFAULT_PAGE_SIZE;
@@ -214,9 +207,6 @@ const DataTableInner = <TRow extends DataTableRowModel>({
   const collaboratorStore = collaboratorStoreRef.current;
   const setEditingCell = cellStore.setEditingCell;
   const undoStack = useUndoStack<TRow>();
-  const commitCounter = useRef(0);
-  const commitWindow = useRef<number[]>([]);
-  const interactionSequence = useRef(0);
   const collaboratorRowIds = useMemo<ReadonlySet<RowId>>(() => {
     const rowIds = new Set<RowId>();
     for (const collaborator of collaborators ?? EMPTY_COLLABORATORS) {
@@ -281,9 +271,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
     onCellSelect,
     onRangeSelect
   } = useTableSelection({
-    cellStore,
-    isDebugMode,
-    debugScope
+    cellStore
   });
 
   const orderedColumns = useMemo(
@@ -902,15 +890,9 @@ const DataTableInner = <TRow extends DataTableRowModel>({
 
     const distanceToEnd = node.scrollHeight - (node.scrollTop + node.clientHeight);
     if (distanceToEnd < 220) {
-      if (isDebugMode) {
-        pushDebugEventThrottled(debugScope, "load-more", 300, "infinite scroll loadMore triggered", {
-          distanceToEnd: Math.round(distanceToEnd),
-          rowCount: displayedRows.length
-        });
-      }
       rowsResult.loadMore();
     }
-  }, [debugScope, displayedRows.length, isDebugMode, mergedFeatures.infiniteScroll, rowsResult]);
+  }, [mergedFeatures.infiniteScroll, rowsResult]);
 
   useEffect(() => {
     return () => {
@@ -919,65 +901,6 @@ const DataTableInner = <TRow extends DataTableRowModel>({
       rowElementsRef.current = {};
     };
   }, [rowObservers]);
-
-  useEffect(() => {
-    if (!isDebugMode) {
-      return;
-    }
-
-    pushDebugEvent(debugScope, "table mounted", {
-      columns: columns.length,
-      pageSize: effectivePageSize,
-      virtualization: mergedFeatures.virtualization,
-      cellSelect: mergedFeatures.cellSelect
-    });
-
-    return () => {
-      pushDebugEvent(debugScope, "table unmounted", {
-        commits: commitCounter.current
-      });
-    };
-  }, [
-    columns.length,
-    debugScope,
-    effectivePageSize,
-    isDebugMode,
-    mergedFeatures.cellSelect,
-    mergedFeatures.virtualization
-  ]);
-
-  useEffect(() => {
-    if (!isDebugMode) {
-      return;
-    }
-
-    const now = performance.now();
-    commitCounter.current += 1;
-    commitWindow.current.push(now);
-
-    while (commitWindow.current.length > 0 && now - (commitWindow.current[0] ?? now) > 2000) {
-      commitWindow.current.shift();
-    }
-
-    if (commitWindow.current.length > 60) {
-      const editingCell = cellStore.getEditingCell();
-      pushDebugEventThrottled(debugScope, "render-storm", 1000, "high commit frequency", {
-        commits2s: commitWindow.current.length,
-        mergedRows: displayedRows.length,
-        virtualItems: mergedFeatures.virtualization ? -1 : totalRows,
-        selectedRows: Object.keys(rowSelection).length,
-        editing: editingCell ? 1 : 0
-      });
-    }
-
-    if (commitCounter.current % 50 === 0) {
-      pushDebugEventThrottled(debugScope, "render-checkpoint", 1500, "render checkpoint", {
-        commits: commitCounter.current,
-        mergedRows: displayedRows.length,
-        virtualItems: mergedFeatures.virtualization ? -1 : totalRows
-      });
-    }
-  }, [cellStore, debugScope, displayedRows.length, isDebugMode, mergedFeatures.virtualization, rowSelection, totalRows]);
 
   const moveActiveCell = useCallback(
     (rowDelta: number, columnDelta: number, expandSelection: boolean) => {
@@ -1065,71 +988,6 @@ const DataTableInner = <TRow extends DataTableRowModel>({
       window.removeEventListener("pointerup", onPointerUp);
     };
   }, [resizingRow, rowHeights]);
-
-  const logInteractionCapture = useCallback(
-    (
-      interaction: "pointerdown" | "click",
-      target: EventTarget | null,
-      modifiers: {
-        shift: boolean;
-        ctrl: boolean;
-        alt: boolean;
-        meta: boolean;
-        button: number;
-      }
-    ): void => {
-      if (!isDebugMode) {
-        return;
-      }
-
-      const sequence = interactionSequence.current + 1;
-      interactionSequence.current = sequence;
-
-      if (!(target instanceof Element)) {
-        pushDebugEvent(debugScope, "interaction captured", {
-          sequence,
-          kind: interaction,
-          tag: "non-element",
-          role: "",
-          rowId: "",
-          rowIndex: "",
-          columnId: "",
-          button: modifiers.button,
-          shift: modifiers.shift ? 1 : 0,
-          ctrl: modifiers.ctrl ? 1 : 0,
-          alt: modifiers.alt ? 1 : 0,
-          meta: modifiers.meta ? 1 : 0
-        });
-        return;
-      }
-
-      const rowNode = target.closest("tr[data-row-id]");
-      const cellNode = target.closest("[role='gridcell']");
-      const headerNode = target.closest("th");
-      const buttonNode = target.closest("button");
-      const rowId = rowNode?.getAttribute("data-row-id") ?? "";
-      const rowIndex = rowNode?.getAttribute("data-index") ?? "";
-      const columnId = cellNode?.getAttribute("data-column-id") ?? "";
-
-      pushDebugEvent(debugScope, "interaction captured", {
-        sequence,
-        kind: interaction,
-        tag: target.tagName.toLowerCase(),
-        role: target.getAttribute("role") ?? "",
-        rowId,
-        rowIndex,
-        columnId,
-        inHeader: headerNode ? 1 : 0,
-        inButton: buttonNode ? 1 : 0,
-        button: modifiers.button,
-        shift: modifiers.shift ? 1 : 0,
-        ctrl: modifiers.ctrl ? 1 : 0,
-        alt: modifiers.alt ? 1 : 0,
-        meta: modifiers.meta ? 1 : 0
-      });
-    },
-    [debugScope, isDebugMode]
-  );
 
   const headerFeatures = useMemo(
     () => ({
@@ -1233,24 +1091,6 @@ const DataTableInner = <TRow extends DataTableRowModel>({
                 ? "rounded-none border-0 bg-transparent"
                 : "rounded-md border border-slate-200 bg-[linear-gradient(180deg,hsl(210_50%_98%),hsl(210_35%_97%))]"
             )}
-            onPointerDownCapture={(event) => {
-              logInteractionCapture("pointerdown", event.target, {
-                shift: event.shiftKey,
-                ctrl: event.ctrlKey,
-                alt: event.altKey,
-                meta: event.metaKey,
-                button: event.button
-              });
-            }}
-            onClickCapture={(event) => {
-              logInteractionCapture("click", event.target, {
-                shift: event.shiftKey,
-                ctrl: event.ctrlKey,
-                alt: event.altKey,
-                meta: event.metaKey,
-                button: event.button
-              });
-            }}
             onPaste={(event) => {
               const editingCell = cellStore.getEditingCell();
               if (

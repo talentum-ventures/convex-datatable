@@ -53,14 +53,3 @@ export {
   mergePersistedState,
   storageKey
 } from "./persistence/query-codec";
-export {
-  DEBUG_EVENTS_STORAGE_KEY,
-  clearDebugEvents,
-  debugEnabled,
-  pushDebugEvent,
-  pushDebugEventThrottled,
-  readDebugEvents,
-  type DebugDetails,
-  type DebugEventEntry,
-  type DebugScalar
-} from "./debug";

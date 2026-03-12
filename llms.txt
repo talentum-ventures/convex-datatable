@@ -261,11 +261,6 @@ Copy serializes selected cells as TSV text. Paste parses TSV and writes values s
 
 `eq`, `neq`, `contains`, `startsWith`, `endsWith`, `gt`, `gte`, `lt`, `lte`, `in`.
 
-## Debug Mode
-
-Enable: `?dt_debug=1` (persisted in localStorage). Disable: `?dt_debug=0`.
-Exported: `debugEnabled()`, `readDebugEvents()`, `clearDebugEvents()`, `pushDebugEvent()`, `pushDebugEventThrottled()`, `DEBUG_EVENTS_STORAGE_KEY`.
-
 ## Exported Types
 
 CellCoord, CellRange, CollaboratorCellCoord, CollaboratorPresence, ColumnId, ConvexDataSourceConfig, ConvexPresenceConfig, ConvexPresenceEntry, DataTableCellEditorContext, DataTableCellRenderContext, DataTableColumn, DataTableColumnKind, DataTableDataSource, DataTableFeatureFlags, DataTableFilter, DataTableFilterValue, DataTableOnError, DataTableProps, DataTableQueryState, DataTableRowAction, DataTableRowActionContext, DataTableThemeTokens, DataTableRowModel, DataTableCellValue, DateColumn, FilterOperator, LinkColumn, LongTextColumn, MultiSelectColumn, NumberColumn, CurrencyColumn, ReactNodeColumn, RowSchema, RowSchemaIssue, RowSchemaResult, RowPatch, RowId, SelectColumn, SelectOption, SortDirection, StringKey, TextColumn.
@@ -276,7 +271,6 @@ Components: DataTable, DataTableContainer.
 Hooks: useConvexDataSource, useConvexPresence.
 Constants: DEFAULT_FEATURE_FLAGS, DEFAULT_THEME_TOKENS, DEFAULT_PAGE_SIZE.
 Persistence: encodePersistedStateToUrl, decodePersistedStateFromUrl, mergePersistedState, storageKey.
-Debug: debugEnabled, readDebugEvents, clearDebugEvents, pushDebugEvent, pushDebugEventThrottled, DEBUG_EVENTS_STORAGE_KEY.
 
 ## Quick Start Example
 

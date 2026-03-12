@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { toast } from "sonner";
 import { useUndoStack } from "./use-undo-stack";
 import { useTableRows } from "./use-table-rows";
 import type {

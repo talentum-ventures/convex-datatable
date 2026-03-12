@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Flag, Globe, Layers } from "lucide-react";
 import {
   DataTable,
@@ -22,147 +22,6 @@ type DemoRow = {
   createdAt: string;
   meta: string;
 };
-
-type DemoDebugScalar = string | number | boolean | null;
-
-type DemoDebugEvent = {
-  ts: string;
-  scope: string;
-  message: string;
-  details: Readonly<Record<string, DemoDebugScalar>>;
-};
-
-const DEMO_DEBUG_PARAM = "dt_debug";
-const DEMO_DEBUG_FLAG_STORAGE = "convex-datatable:debug";
-const DEMO_DEBUG_EVENTS_STORAGE = "convex-datatable:debug:events";
-const DEMO_DEBUG_MAX_EVENTS = 600;
-const demoThrottledEvents: Record<string, number> = {};
-
-function isDemoDebugEnabled(): boolean {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  const params = new URLSearchParams(window.location.search);
-  const queryFlag = params.get(DEMO_DEBUG_PARAM);
-
-  if (queryFlag === "1") {
-    try {
-      window.localStorage.setItem(DEMO_DEBUG_FLAG_STORAGE, "1");
-    } catch {
-      // ignore storage failures when enabling debug
-    }
-    return true;
-  }
-
-  if (queryFlag === "0") {
-    try {
-      window.localStorage.removeItem(DEMO_DEBUG_FLAG_STORAGE);
-    } catch {
-      // ignore storage failures when disabling debug
-    }
-    return false;
-  }
-
-  try {
-    return window.localStorage.getItem(DEMO_DEBUG_FLAG_STORAGE) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function readDemoDebugEvents(): ReadonlyArray<DemoDebugEvent> {
-  if (typeof window === "undefined") {
-    return [];
-  }
-
-  let raw = "";
-  try {
-    raw = window.localStorage.getItem(DEMO_DEBUG_EVENTS_STORAGE) ?? "";
-  } catch {
-    return [];
-  }
-
-  if (!raw) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as ReadonlyArray<DemoDebugEvent>;
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeDemoDebugEvents(events: ReadonlyArray<DemoDebugEvent>): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    window.localStorage.setItem(DEMO_DEBUG_EVENTS_STORAGE, JSON.stringify(events));
-  } catch {
-    // ignore storage failures during debug writes
-  }
-}
-
-function clearDemoDebugEvents(): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    window.localStorage.removeItem(DEMO_DEBUG_EVENTS_STORAGE);
-  } catch {
-    // ignore storage failures while clearing debug events
-  }
-}
-
-function pushDemoDebugEvent(
-  scope: string,
-  message: string,
-  details: Readonly<Record<string, DemoDebugScalar>> = {}
-): void {
-  if (!isDemoDebugEnabled()) {
-    return;
-  }
-
-  const nextEvent: DemoDebugEvent = {
-    ts: new Date().toISOString(),
-    scope,
-    message,
-    details
-  };
-
-  const events = [...readDemoDebugEvents(), nextEvent];
-  if (events.length > DEMO_DEBUG_MAX_EVENTS) {
-    events.splice(0, events.length - DEMO_DEBUG_MAX_EVENTS);
-  }
-  writeDemoDebugEvents(events);
-}
-
-function pushDemoDebugEventThrottled(
-  scope: string,
-  key: string,
-  minIntervalMs: number,
-  message: string,
-  details: Readonly<Record<string, DemoDebugScalar>> = {}
-): void {
-  if (!isDemoDebugEnabled()) {
-    return;
-  }
-
-  const composite = `${scope}:${key}`;
-  const now = Date.now();
-  const last = demoThrottledEvents[composite] ?? 0;
-  if (now - last < minIntervalMs) {
-    return;
-  }
-
-  demoThrottledEvents[composite] = now;
-  pushDemoDebugEvent(scope, message, details);
-}
 
 function generateRows(): ReadonlyArray<DemoRow> {
   const statuses = ["todo", "in_progress", "done"] as const;
@@ -208,19 +67,10 @@ function queryCacheKey(state: DataTableQueryState): string {
   return `${sortingPart}::${filtersPart}::${state.pageSize}::${state.cursor ?? ""}`;
 }
 
-function formatDebugEvent(entry: DemoDebugEvent): string {
-  const details = Object.entries(entry.details)
-    .map(([key, value]) => `${key}=${String(value)}`)
-    .join(" ");
-  return `${entry.ts} [${entry.scope}] ${entry.message}${details.length > 0 ? ` ${details}` : ""}`;
-}
-
 export function InMemoryPage(): JSX.Element {
-  const isDebugMode = useMemo(() => isDemoDebugEnabled(), []);
   const [rows, setRows] = useState<ReadonlyArray<DemoRow>>(generateRows());
   const [softDeleted, setSoftDeleted] = useState<Record<string, DemoRow>>({});
   const [limit, setLimit] = useState(50);
-  const [debugEvents, setDebugEvents] = useState<ReadonlyArray<DemoDebugEvent>>([]);
   const queryCacheRef = useRef<{
     queryKey: string;
     rowsRef: ReadonlyArray<DemoRow>;
@@ -241,91 +91,6 @@ export function InMemoryPage(): JSX.Element {
       refresh: () => void;
     };
   } | null>(null);
-
-  useEffect(() => {
-    if (!isDebugMode) {
-      return;
-    }
-
-    pushDemoDebugEvent("demo", "debug mode enabled", {
-      rows: rows.length,
-      limit
-    });
-
-    const onError = (event: ErrorEvent): void => {
-      pushDemoDebugEvent("demo", "window error", {
-        message: event.message,
-        source: event.filename || "unknown",
-        line: event.lineno,
-        column: event.colno
-      });
-    };
-
-    const onUnhandledRejection = (event: PromiseRejectionEvent): void => {
-      pushDemoDebugEvent("demo", "unhandled rejection", {
-        reason: String(event.reason)
-      });
-    };
-
-    window.addEventListener("error", onError);
-    window.addEventListener("unhandledrejection", onUnhandledRejection);
-
-    let rafId = 0;
-    let lastFrameTime = performance.now();
-    const frameProbe = (now: number): void => {
-      const delta = now - lastFrameTime;
-      if (delta > 900) {
-        pushDemoDebugEventThrottled("demo", "frame-stall", 1000, "main thread frame stall", {
-          stallMs: Math.round(delta)
-        });
-      }
-      lastFrameTime = now;
-      rafId = window.requestAnimationFrame(frameProbe);
-    };
-    rafId = window.requestAnimationFrame(frameProbe);
-
-    let longTaskObserver: PerformanceObserver | null = null;
-    if (typeof window.PerformanceObserver !== "undefined") {
-      try {
-        longTaskObserver = new PerformanceObserver((list) => {
-          for (const entry of list.getEntries()) {
-            if (entry.duration < 100) {
-              continue;
-            }
-            pushDemoDebugEventThrottled("demo", "long-task", 300, "long task detected", {
-              durationMs: Math.round(entry.duration),
-              name: entry.name || "task"
-            });
-          }
-        });
-        longTaskObserver.observe({ entryTypes: ["longtask"] });
-      } catch {
-        longTaskObserver = null;
-      }
-    }
-
-    return () => {
-      window.removeEventListener("error", onError);
-      window.removeEventListener("unhandledrejection", onUnhandledRejection);
-      window.cancelAnimationFrame(rafId);
-      longTaskObserver?.disconnect();
-    };
-  }, [isDebugMode, limit, rows.length]);
-
-  useEffect(() => {
-    if (!isDebugMode) {
-      return;
-    }
-
-    setDebugEvents(readDemoDebugEvents());
-    const intervalId = window.setInterval(() => {
-      setDebugEvents(readDemoDebugEvents());
-    }, 600);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, [isDebugMode]);
 
   const columns = useMemo<ReadonlyArray<DataTableColumn<DemoRow>>>(
     () => [
@@ -660,51 +425,6 @@ export function InMemoryPage(): JSX.Element {
           theme={theme}
         />
       </DataTableContainer>
-      {isDebugMode ? (
-        <section className="rounded-xl border border-slate-300 bg-white/80 p-3">
-          <div className="mb-2 flex items-center gap-2">
-            <button
-              type="button"
-              className="rounded border border-slate-300 px-2 py-1 text-xs"
-              onClick={() => {
-                setDebugEvents(readDemoDebugEvents());
-              }}
-            >
-              Refresh logs
-            </button>
-            <button
-              type="button"
-              className="rounded border border-slate-300 px-2 py-1 text-xs"
-              onClick={() => {
-                clearDemoDebugEvents();
-                setDebugEvents([]);
-              }}
-            >
-              Clear logs
-            </button>
-            <button
-              type="button"
-              className="rounded border border-slate-300 px-2 py-1 text-xs"
-              onClick={() => {
-                pushDemoDebugEvent("demo", "manual marker", {
-                  rows: rows.length,
-                  limit
-                });
-                setDebugEvents(readDemoDebugEvents());
-              }}
-            >
-              Add marker
-            </button>
-            <span className="text-xs text-slate-500">events: {debugEvents.length}</span>
-          </div>
-          <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded border border-slate-200 bg-slate-50 p-2 text-[11px] leading-4 text-slate-700">
-            {debugEvents.slice(-160).map(formatDebugEvent).join("\n")}
-          </pre>
-          <p className="mt-2 text-xs text-slate-500">
-            Debug mode is enabled. Use <code>?dt_debug=0</code> to disable.
-          </p>
-        </section>
-      ) : null}
     </div>
   );
 }
