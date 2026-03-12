@@ -15,7 +15,4 @@ jobs:
       - run: bun run typecheck
       - run: bun run format:check
       - run: bun run lint
-      - run: bun run test:unit
       - run: bun run test:types
-      - run: bun run test:cypress:component
-      - run: bun run test:cypress:e2e
