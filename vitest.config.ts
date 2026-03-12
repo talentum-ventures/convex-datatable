@@ -17,7 +17,7 @@ export default defineConfig({
         )
       },
       {
-        find: /^@talentum\/convex-datatable$/,
+        find: /^@talentum-ventures\/convex-datatable$/,
         replacement: fileURLToPath(
           new URL("./packages/datatable/src/index.ts", import.meta.url)
         )
