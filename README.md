@@ -593,7 +593,6 @@ Feature flags are independent toggles merged with defaults. Pass only the flags 
 | `clipboardCopy` | `true` | Enable Ctrl+C to copy selected cells. |
 | `clipboardPaste` | `true` | Enable Ctrl+V to paste into cells. Requires `editing` and `dataSource.updateRows`. |
 | `undo` | `false` | Enable Ctrl+Z / Ctrl+Shift+Z undo/redo for edits and pastes. |
-| `autoSave` | `true` | Auto-save cell edits on blur (when `editing` is enabled). |
 | `infiniteScroll` | `true` | Automatically call `loadMore` when the user scrolls near the bottom. |
 | `virtualization` | `true` | Only render visible rows for large datasets (via `@tanstack/react-virtual`). |
 
@@ -1111,7 +1110,6 @@ type DataTableFeatureFlags = {
   clipboardCopy?: boolean;
   clipboardPaste?: boolean;
   undo?: boolean;
-  autoSave?: boolean;
   infiniteScroll?: boolean;
   virtualization?: boolean;
 };

@@ -27,7 +27,6 @@ export type SharedCellEditorArgs<TRow extends DataTableRowModel> = {
   rowId: RowId;
   value: DataTableCellValue;
   onCommit: (nextValue: DataTableCellValue) => void;
-  onAutoSave?: (nextValue: DataTableCellValue) => void;
   restoredDraft?: string | null;
   onDraftChange?: (nextValue: DataTableCellValue) => void;
   onCancel: () => void;
@@ -117,7 +116,6 @@ export function renderColumnEditor<TRow extends DataTableRowModel>({
   rowId,
   value,
   onCommit,
-  onAutoSave,
   restoredDraft,
   onDraftChange,
   onCancel
@@ -155,7 +153,6 @@ export function renderColumnEditor<TRow extends DataTableRowModel>({
       onCancel={onCancel}
       {...(restoredDraft !== undefined ? { restoredDraft } : {})}
       {...(onDraftChange ? { onDraftChange } : {})}
-      {...(onAutoSave ? { onAutoSave } : {})}
     />
   );
 }

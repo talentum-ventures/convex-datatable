@@ -13,13 +13,10 @@ export type InlineContentEditorProps<TRow extends DataTableRowModel> = DefaultEd
   initialText: string;
 };
 
-const AUTO_SAVE_DEBOUNCE_MS = 300;
-
 export function InlineContentEditor<TRow extends DataTableRowModel>({
   column,
   row,
   onCommit,
-  onAutoSave,
   restoredDraft,
   onDraftChange,
   onCancel,
@@ -30,18 +27,15 @@ export function InlineContentEditor<TRow extends DataTableRowModel>({
   const initialTextRef = useRef(initialDraftText);
   const draftRef = useRef(initialDraftText);
   const finalizedRef = useRef(false);
-  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const columnRef = useRef(column);
   const rowRef = useRef(row);
   const onCommitRef = useRef(onCommit);
-  const onAutoSaveRef = useRef(onAutoSave);
   const onDraftChangeRef = useRef(onDraftChange);
   const onCancelRef = useRef(onCancel);
 
   columnRef.current = column;
   rowRef.current = row;
   onCommitRef.current = onCommit;
-  onAutoSaveRef.current = onAutoSave;
   onDraftChangeRef.current = onDraftChange;
   onCancelRef.current = onCancel;
 
@@ -55,22 +49,9 @@ export function InlineContentEditor<TRow extends DataTableRowModel>({
     focusEditableAtEnd(node);
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (autoSaveTimerRef.current !== null) {
-        clearTimeout(autoSaveTimerRef.current);
-      }
-    };
-  }, []);
-
   const commit = (): void => {
     if (finalizedRef.current) {
       return;
-    }
-
-    if (autoSaveTimerRef.current !== null) {
-      clearTimeout(autoSaveTimerRef.current);
-      autoSaveTimerRef.current = null;
     }
 
     finalizedRef.current = true;
@@ -81,11 +62,6 @@ export function InlineContentEditor<TRow extends DataTableRowModel>({
   const cancel = (): void => {
     if (finalizedRef.current) {
       return;
-    }
-
-    if (autoSaveTimerRef.current !== null) {
-      clearTimeout(autoSaveTimerRef.current);
-      autoSaveTimerRef.current = null;
     }
 
     finalizedRef.current = true;
@@ -111,24 +87,6 @@ export function InlineContentEditor<TRow extends DataTableRowModel>({
         onInput={(event) => {
           draftRef.current = readEditableText(event.currentTarget);
           onDraftChangeRef.current?.(draftRef.current);
-
-          if (!onAutoSaveRef.current || finalizedRef.current) {
-            return;
-          }
-
-          if (autoSaveTimerRef.current !== null) {
-            clearTimeout(autoSaveTimerRef.current);
-          }
-
-          autoSaveTimerRef.current = setTimeout(() => {
-            autoSaveTimerRef.current = null;
-            if (finalizedRef.current) {
-              return;
-            }
-
-            const parsed = parseEditorValue(columnRef.current, draftRef.current, rowRef.current);
-            onAutoSaveRef.current?.(parsed);
-          }, AUTO_SAVE_DEBOUNCE_MS);
         }}
         onBlur={() => {
           commit();

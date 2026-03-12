@@ -109,7 +109,10 @@ const dataSource: DataTableDataSource<InvoiceRow> = {
   })
 };
 
-const featureFlags: DataTableFeatureFlags = {
+const featureFlags: DataTableFeatureFlags = {};
+
+const invalidFeatureFlags: DataTableFeatureFlags = {
+  // @ts-expect-error autoSave was removed from the public feature flags
   autoSave: false
 };
 
@@ -149,6 +152,7 @@ describe("public api", () => {
   it("keeps DataTableProps fully typed", () => {
     expectTypeOf(props.getRowId).returns.toEqualTypeOf<string>();
     expectTypeOf(props.columns).toEqualTypeOf<ReadonlyArray<DataTableColumn<InvoiceRow>>>();
+    expectTypeOf(invalidFeatureFlags).toEqualTypeOf<DataTableFeatureFlags>();
   });
 
   it("keeps Convex adapter config typed", () => {

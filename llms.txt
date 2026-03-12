@@ -129,7 +129,6 @@ All flags are optional booleans. Unspecified flags use these defaults:
 | clipboardCopy | true | Ctrl+C copy selected cells |
 | clipboardPaste | true | Ctrl+V paste into cells |
 | undo | false | Ctrl+Z/Ctrl+Shift+Z undo/redo |
-| autoSave | true | Auto-save edits on blur |
 | infiniteScroll | true | Auto load more on scroll |
 | virtualization | true | Only render visible rows |
 

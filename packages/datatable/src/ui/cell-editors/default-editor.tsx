@@ -10,7 +10,6 @@ export function DefaultEditor<TRow extends DataTableRowModel>({
   row,
   value,
   onCommit,
-  onAutoSave,
   restoredDraft,
   onDraftChange,
   onCancel
@@ -64,7 +63,6 @@ export function DefaultEditor<TRow extends DataTableRowModel>({
       onCancel={onCancel}
       {...(restoredDraft !== undefined ? { restoredDraft } : {})}
       {...(onDraftChange ? { onDraftChange } : {})}
-      {...(onAutoSave ? { onAutoSave } : {})}
     />
   );
 }

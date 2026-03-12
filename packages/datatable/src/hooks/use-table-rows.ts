@@ -68,7 +68,6 @@ export type UseTableRowsResult<TRow extends DataTableRowModel> = {
   getEditingDraftValue: (rowId: RowId, columnId: string) => DataTableCellValue | null;
   onEditingDraftChange: (rowId: RowId, columnId: string, value: DataTableCellValue) => void;
   commitCellEdit: CellCommit<TRow>;
-  autoSaveCellEdit: CellCommit<TRow>;
   deleteRowsNow: (rowsToDelete: ReadonlyArray<TRow>) => Promise<void>;
   commitDraftRow: (nextDraftRow?: Partial<TRow>) => Promise<void>;
   commitDraftCell: (column: DataTableColumn<TRow>, value: DataTableCellValue) => void;
@@ -103,7 +102,6 @@ export function useTableRows<TRow extends DataTableRowModel>({
   const draftRowRef = useRef<Partial<TRow>>(draftRow);
   const editingCellRef = useRef<EditingCellState>(null);
   const editingSnapshotRef = useRef<Record<RowId, EditingSnapshot>>({});
-  const autoSaveVersionRef = useRef<Record<RowId, number>>({});
 
   draftRowRef.current = draftRow;
 
@@ -255,44 +253,6 @@ export function useTableRows<TRow extends DataTableRowModel>({
     }
   }, [dataSource, rowSchema, setEditingCell, undoEnabled, undoStack]);
 
-  const autoSaveCellEdit = useCallback<CellCommit<TRow>>(async ({ row, rowId, column, value }) => {
-    const cellValidation = validateCell(column, row, value);
-    if (!cellValidation.ok) {
-      return;
-    }
-
-    const updateResult = setColumnValue(row, rowId, column, value);
-    const rowValidation = validateRow(rowSchema, updateResult.nextRow);
-    if (!rowValidation.ok) {
-      return;
-    }
-
-    setOptimisticRows((current) => ({
-      ...current,
-      [rowId]: updateResult.nextRow
-    }));
-
-    const versionAtSave = (autoSaveVersionRef.current[rowId] ?? 0) + 1;
-    autoSaveVersionRef.current[rowId] = versionAtSave;
-
-    if (!dataSource.updateRows) {
-      return;
-    }
-
-    try {
-      await dataSource.updateRows([updateResult.patch]);
-    } catch (error) {
-      if (autoSaveVersionRef.current[rowId] === versionAtSave) {
-        setOptimisticRows((current) => {
-          const next = { ...current };
-          delete next[rowId];
-          return next;
-        });
-      }
-      toast.error(`Failed to update row: ${String(error)}`);
-    }
-  }, [dataSource, rowSchema]);
-
   const deleteRowsNow = useCallback(async (rowsToDelete: ReadonlyArray<TRow>) => {
     if (!rowDeleteEnabled || !dataSource.deleteRows || rowsToDelete.length === 0) {
       return;
@@ -424,7 +384,6 @@ export function useTableRows<TRow extends DataTableRowModel>({
     getEditingDraftValue,
     onEditingDraftChange,
     commitCellEdit,
-    autoSaveCellEdit,
     deleteRowsNow,
     commitDraftRow,
     commitDraftCell,
