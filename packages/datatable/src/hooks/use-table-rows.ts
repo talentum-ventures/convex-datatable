@@ -44,6 +44,49 @@ function cloneDraftRow<TRow extends DataTableRowModel>(
   return draftRow ? { ...draftRow } : {};
 }
 
+function areCellValuesEqual(left: DataTableCellValue, right: DataTableCellValue): boolean {
+  if (Object.is(left, right)) {
+    return true;
+  }
+
+  if (left instanceof Date && right instanceof Date) {
+    return left.getTime() === right.getTime();
+  }
+
+  if (Array.isArray(left) && Array.isArray(right)) {
+    return (
+      left.length === right.length &&
+      left.every((value, index) => areCellValuesEqual(value, right[index]))
+    );
+  }
+
+  return false;
+}
+
+function areDraftRowsEqual<TRow extends DataTableRowModel>(
+  left: Partial<TRow>,
+  right: Partial<TRow>
+): boolean {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  for (const key of leftKeys) {
+    if (!Object.hasOwn(right, key)) {
+      return false;
+    }
+
+    if (!areCellValuesEqual(left[key], right[key])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export type UseTableRowsArgs<TRow extends DataTableRowModel> = {
   sourceRows: ReadonlyArray<TRow>;
   getRowId: (row: TRow) => RowId;
@@ -119,6 +162,10 @@ export function useTableRows<TRow extends DataTableRowModel>({
   useEffect(() => {
     const nextDefaultDraftRow = cloneDraftRow(defaultDraftRow);
     const previousDefaultDraftRow = previousDefaultDraftRowRef.current;
+    if (areDraftRowsEqual(previousDefaultDraftRow, nextDefaultDraftRow)) {
+      return;
+    }
+
     previousDefaultDraftRowRef.current = nextDefaultDraftRow;
 
     setDraftRow((currentDraftRow) => {

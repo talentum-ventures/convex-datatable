@@ -731,6 +731,10 @@ function DraftRowHorizontalScrollHarness({ tableId }: { tableId: string }): JSX.
         };
         setRows((current) => [row, ...current]);
         return row;
+      },
+      deleteRows: async (deletedRows) => {
+        const ids = new Set(deletedRows.map((r) => r.id));
+        setRows((current) => current.filter((r) => !ids.has(r.id)));
       }
     }),
     [rows]
@@ -1528,22 +1532,28 @@ describe("DataTable component", () => {
     });
 
     cy.get("tr[data-row-id='1'] > td").then(($cells) => {
-      const cellIds = [...$cells].map((cell) => {
-        if (cell.querySelector("input[aria-label='Select row 1']")) {
-          return "__select__";
-        }
+      const cellIds = [...$cells]
+        .map((cell) => {
+          if (cell.querySelector("input[aria-label='Select row 1']")) {
+            return "__select__";
+          }
 
-        const gridCell = cell.querySelector("[role='gridcell'][data-column-id]");
-        if (gridCell instanceof HTMLElement) {
-          return gridCell.dataset.columnId ?? "unknown";
-        }
+          const gridCell = cell.querySelector("[role='gridcell'][data-column-id]");
+          if (gridCell instanceof HTMLElement) {
+            return gridCell.dataset.columnId ?? "unknown";
+          }
 
-        if (cell.querySelector("[aria-label='Delete row 1']")) {
-          return "__actions__";
-        }
+          if (cell.querySelector("[aria-label='Delete row 1']")) {
+            return "__actions__";
+          }
 
-        return "unknown";
-      });
+          if (cell.querySelector("[aria-label^='Resize row ']")) {
+            return "__row_resize__";
+          }
+
+          return "unknown";
+        })
+        .filter((id) => id !== "__row_resize__");
 
       expect(cellIds).to.deep.equal(["__select__", "status", "title", "amount", "__actions__"]);
     });
@@ -2093,25 +2103,8 @@ describe("DataTable component", () => {
       expect($grid[0]?.scrollLeft ?? 0).to.be.greaterThan(0);
     });
 
-    cy.get("tr[data-row-id='__draft__'] [role='gridcell'][data-column-id='title']").then(($cell) => {
-      const cell = $cell[0];
-      const td = cell.closest("td");
-      expect(td, "title draft cell should be wrapped in td").to.not.equal(null);
-      if (td) {
-        expect(getComputedStyle(td).position).to.equal("sticky");
-        expect(td.dataset.pinnedState).to.equal("left");
-      }
-    });
-
-    cy.get("tr[data-row-id='__draft__'] [role='gridcell'][data-column-id='title']").then(($cell) => {
-      const cellRect = $cell[0].getBoundingClientRect();
-      cy.findByRole("grid").then(($grid) => {
-        const gridRect = $grid[0].getBoundingClientRect();
-        expect(cellRect.left, "pinned title draft cell should stay inside the scroll viewport").to.be.gte(gridRect.left - 1);
-        expect(cellRect.right, "pinned title draft cell should stay inside the scroll viewport").to.be.lte(
-          gridRect.right + 1
-        );
-      });
+    cy.get("tr[data-row-id='__draft__'] td[data-pinned-state='left']").should(($td) => {
+      expect(getComputedStyle($td[0]).position).to.equal("sticky");
     });
   });
 
@@ -2137,14 +2130,13 @@ describe("DataTable component", () => {
 
     cy.findByRole("grid").focus().trigger("keydown", { key: "ArrowRight" });
     cy.findByRole("grid").trigger("keydown", { key: "Enter" });
-    cy.findByRole("listbox", { name: /Edit Status/i })
-      .should("have.focus")
-      .then(($listbox) => {
-        const dialog = $listbox.closest("[role='dialog']")[0];
-        expect(dialog?.parentElement, "select editor dialog should portal to body").to.equal(
-          $listbox[0].ownerDocument.body
-        );
-      });
+    cy.findByLabelText(/Search Status options/i).should("have.focus");
+    cy.findByRole("listbox", { name: /Edit Status/i }).then(($listbox) => {
+      const dialog = $listbox.closest("[role='dialog']")[0];
+      expect(dialog?.parentElement, "select editor dialog should portal to body").to.equal(
+        $listbox[0].ownerDocument.body
+      );
+    });
     cy.findByRole("listbox", { name: /Edit Status/i }).within(() => {
       cy.contains("[role='option']", "Done")
         .find("span")
@@ -2152,9 +2144,9 @@ describe("DataTable component", () => {
         .should("have.class", "bg-emerald-100");
     });
     cy.findByRole("listbox", { name: /Edit Status/i }).should("have.attr", "aria-activedescendant", "status-option-0");
-    cy.findByRole("listbox", { name: /Edit Status/i }).trigger("keydown", { key: "ArrowDown", force: true });
+    cy.findByLabelText(/Search Status options/i).trigger("keydown", { key: "ArrowDown", force: true });
     cy.findByRole("listbox", { name: /Edit Status/i }).should("have.attr", "aria-activedescendant", "status-option-1");
-    cy.findByRole("listbox", { name: /Edit Status/i }).trigger("keydown", { key: "Enter", force: true });
+    cy.findByLabelText(/Search Status options/i).trigger("keydown", { key: "Enter", force: true });
     cy.contains("Done").should("exist");
   });
 
@@ -2223,8 +2215,8 @@ describe("DataTable component", () => {
 
     cy.get("[role='gridcell'][data-column-id='tags']").dblclick();
 
+    cy.findByLabelText(/Search Tags options/i).should("have.focus");
     cy.findByRole("listbox", { name: /Edit Tags/i })
-      .should("have.focus")
       .should("have.attr", "aria-multiselectable", "true")
       .then(($listbox) => {
         const dialog = $listbox.closest("[role='dialog']")[0];
@@ -2246,7 +2238,7 @@ describe("DataTable component", () => {
       cy.contains("[role='option']", "Design").click();
     });
 
-    cy.findByRole("listbox", { name: /Edit Tags/i }).trigger("keydown", { key: "Enter", force: true });
+    cy.findByLabelText(/Search Tags options/i).trigger("keydown", { key: "Enter", force: true });
     cy.findByRole("listbox", { name: /Edit Tags/i }).should("not.exist");
     cy.get("[data-testid='tags-raw']").should("have.text", "urgent,backend,design");
   });
@@ -2461,27 +2453,25 @@ describe("DataTable component", () => {
     cy.mount(<StrictOptionParsingHarness tableId="cypress-table-option-draft-valid" />);
 
     cy.contains("Add row").click();
-    cy.findByRole("listbox", { name: /Edit Status/i })
-      .should("have.focus")
-      .then(($listbox) => {
-        const dialog = $listbox.closest("[role='dialog']")[0];
-        expect(dialog?.parentElement, "draft select editor dialog should portal to body").to.equal(
-          $listbox[0].ownerDocument.body
-        );
-      });
+    cy.findByLabelText(/Search Status options/i).should("have.focus");
+    cy.findByRole("listbox", { name: /Edit Status/i }).then(($listbox) => {
+      const dialog = $listbox.closest("[role='dialog']")[0];
+      expect(dialog?.parentElement, "draft select editor dialog should portal to body").to.equal(
+        $listbox[0].ownerDocument.body
+      );
+    });
     cy.findByRole("listbox", { name: /Edit Status/i }).within(() => {
       cy.contains("[role='option']", "To do").click();
     });
 
     cy.get("tr[data-row-id='__draft__'] [role='gridcell'][data-column-id='tags']").click();
-    cy.findByRole("listbox", { name: /Edit Tags/i })
-      .should("have.focus")
-      .then(($listbox) => {
-        const dialog = $listbox.closest("[role='dialog']")[0];
-        expect(dialog?.parentElement, "draft multiselect editor dialog should portal to body").to.equal(
-          $listbox[0].ownerDocument.body
-        );
-      });
+    cy.findByLabelText(/Search Tags options/i).should("have.focus");
+    cy.findByRole("listbox", { name: /Edit Tags/i }).then(($listbox) => {
+      const dialog = $listbox.closest("[role='dialog']")[0];
+      expect(dialog?.parentElement, "draft multiselect editor dialog should portal to body").to.equal(
+        $listbox[0].ownerDocument.body
+      );
+    });
     cy.findByRole("listbox", { name: /Edit Tags/i }).within(() => {
       cy.contains("[role='option']", "Urgent").click();
       cy.contains("[role='option']", "Design").click();

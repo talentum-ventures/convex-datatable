@@ -125,7 +125,9 @@ export function DraftRow<TRow extends DataTableRowModel>({
       className="group absolute left-0 overflow-visible bg-slate-50"
       style={{
         display: "flex",
-        transform: `translateY(${top}px)`,
+        // Use `top` (not `translateY`) so `position: sticky` on cells resolves against the grid
+        // scrollport; transforms on the row break horizontal sticky pinning for body cells.
+        top: `${top}px`,
         height: `${size}px`,
         width: `${columnRenderLayout.tableRenderWidth}px`
       }}
@@ -226,7 +228,8 @@ export function DraftRow<TRow extends DataTableRowModel>({
             className={cn(
               "border-r border-b border-slate-200 p-0 align-top",
               isFirstRightPinned ? "border-l border-l-slate-200" : "",
-              pinnedSurfaceClass
+              pinnedSurfaceClass,
+              isEditingDraftCell && "!z-30"
             )}
           >
             <div
@@ -237,12 +240,7 @@ export function DraftRow<TRow extends DataTableRowModel>({
               data-column-index={draftColumnIndex}
               className={cn(
                 "group relative box-border h-full min-h-10 w-full min-w-0 px-2 py-1 text-sm text-slate-800",
-                isEditingDraftCell &&
-                  (columnConfig.kind === "select" ||
-                    columnConfig.kind === "multiselect" ||
-                    columnConfig.kind === "date")
-                  ? "z-20 overflow-visible bg-white"
-                  : "overflow-hidden",
+                isEditingDraftCell ? "z-20 overflow-visible bg-white" : "overflow-hidden",
                 isEditingDraftCell ? "outline outline-2 outline-[var(--dt-active-cell-ring)] outline-offset-[-2px]" : ""
               )}
               onClick={() => {

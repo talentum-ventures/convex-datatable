@@ -46,7 +46,9 @@ const MemoRowInner = <TRow extends DataTableRowModel>({
     )}
     style={{
       display: "flex",
-      transform: `translateY(${top}px)`,
+      // Use `top` (not `translateY`) so `position: sticky` on cells resolves against the grid
+      // scrollport; transforms on the row break horizontal sticky pinning for body cells.
+      top: `${top}px`,
       minHeight: `${rowHeights.getFinalHeight(rowId)}px`,
       width: `${columnRenderLayout.tableRenderWidth}px`
     }}
@@ -89,15 +91,20 @@ const MemoRowInner = <TRow extends DataTableRowModel>({
     })}
 
     {rowResizeEnabled ? (
-      <button
-        type="button"
-        className="absolute bottom-0 left-0 z-10 h-1 w-full cursor-row-resize bg-transparent hover:bg-sky-200"
-        aria-label={`Resize row ${rowId}`}
-        onPointerDown={(event) => {
-          event.preventDefault();
-          onStartRowResize(rowId, event.clientY);
-        }}
-      />
+      <td
+        className="absolute bottom-0 left-0 z-10 h-1 w-full border-0 p-0"
+        colSpan={rowModel.getVisibleCells().length}
+      >
+        <button
+          type="button"
+          className="block h-full w-full cursor-row-resize bg-transparent hover:bg-sky-200"
+          aria-label={`Resize row ${rowId}`}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            onStartRowResize(rowId, event.clientY);
+          }}
+        />
+      </td>
     ) : null}
   </tr>
 );

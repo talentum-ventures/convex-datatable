@@ -258,6 +258,22 @@ describe("DataTable surfaces", () => {
     expect(grid.classList.contains("min-h-0")).toBe(true);
     expect(grid.classList.contains("max-h-[560px]")).toBe(false);
   });
+
+  it("keeps row resize handles inside table cells", () => {
+    render(
+      createElement(DataTable<TestRow>, {
+        tableId: "row-resize-markup",
+        columns,
+        getRowId: (row: TestRow) => row.id,
+        dataSource: createDataSource([{ id: "row-1", name: "Alpha" }]),
+        features: { virtualization: false }
+      })
+    );
+
+    const resizeHandle = screen.getByRole("button", { name: "Resize row row-1" });
+
+    expect(resizeHandle.parentElement?.tagName).toBe("TD");
+  });
 });
 
 describe("DataTable active-cell broadcasts", () => {
