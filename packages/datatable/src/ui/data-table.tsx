@@ -727,7 +727,11 @@ const DataTableInner = <TRow extends DataTableRowModel>({
         return;
       }
 
-      if (activeElement instanceof Node && containerNode.contains(activeElement)) {
+      if (
+        activeElement instanceof Element &&
+        (containerNode.contains(activeElement) ||
+          activeElement.closest("[data-dt-editor-dialog]") !== null)
+      ) {
         containerNode.focus({ preventScroll: true });
       }
     };

@@ -688,6 +688,73 @@ function HorizontalScrollHarness({ tableId }: { tableId: string }): JSX.Element 
   );
 }
 
+function DraftRowHorizontalScrollHarness({ tableId }: { tableId: string }): JSX.Element {
+  const wideColumns = useMemo<ReadonlyArray<DataTableColumn<TaskRow>>>(
+    () =>
+      columns.map((column) => {
+        if (column.id === "title") {
+          return { ...column, width: 240 };
+        }
+        if (column.id === "status") {
+          return { ...column, width: 220 };
+        }
+        if (column.id === "amount") {
+          return { ...column, width: 200 };
+        }
+        return column;
+      }),
+    []
+  );
+
+  const [rows, setRows] = useState<ReadonlyArray<TaskRow>>([
+    { id: "1", title: "Build UI", status: "todo", amount: 10 },
+    { id: "2", title: "Ship", status: "done", amount: 20 }
+  ]);
+
+  const dataSource = useMemo<DataTableDataSource<TaskRow>>(
+    () => ({
+      useRows: () => ({
+        rows,
+        hasMore: false,
+        isLoading: false,
+        isLoadingMore: false,
+        error: null,
+        loadMore: () => undefined,
+        refresh: () => undefined
+      }),
+      createRow: async (draft) => {
+        const row: TaskRow = {
+          id: crypto.randomUUID(),
+          title: String(draft.title ?? ""),
+          status: String(draft.status ?? "todo"),
+          amount: Number(draft.amount ?? 0)
+        };
+        setRows((current) => [row, ...current]);
+        return row;
+      }
+    }),
+    [rows]
+  );
+
+  return (
+    <div className="w-[220px] p-4">
+      <DataTable
+        tableId={tableId}
+        columns={wideColumns}
+        dataSource={dataSource}
+        getRowId={(row) => row.id}
+        features={{
+          editing: true,
+          rowDelete: true,
+          rowAdd: true,
+          infiniteScroll: false,
+          virtualization: false
+        }}
+      />
+    </div>
+  );
+}
+
 function LinkOverflowHarness({ tableId }: { tableId: string }): JSX.Element {
   const rows = useMemo<ReadonlyArray<TaskRow>>(
     () => [
@@ -1974,6 +2041,78 @@ describe("DataTable component", () => {
     cy.findByLabelText("Create row").click();
 
     cy.contains("Inline submit").should("exist");
+  });
+
+  it("pins draft row create and discard controls to the right when the grid is scrolled horizontally", () => {
+    cy.mount(<DraftRowHorizontalScrollHarness tableId="cypress-table-draft-row-pinned-actions" />);
+
+    cy.findByRole("grid").scrollTo("bottom");
+    cy.contains("Add row").click();
+    cy.findByLabelText("Edit Title").type("Draft pinned{enter}");
+
+    cy.findByRole("grid").then(($grid) => {
+      const grid = $grid[0];
+      grid.scrollLeft = grid.scrollWidth - grid.clientWidth;
+    });
+
+    cy.findByRole("grid").should(($grid) => {
+      expect($grid[0]?.scrollLeft ?? 0).to.be.greaterThan(0);
+    });
+
+    cy.get("tr[data-row-id='__draft__'] td[data-pinned-state='right']").then(($td) => {
+      expect(getComputedStyle($td[0]).position).to.equal("sticky");
+    });
+
+    cy.findByLabelText("Create row").then(($btn) => {
+      const buttonRect = $btn[0].getBoundingClientRect();
+      cy.findByRole("grid").then(($grid) => {
+        const gridRect = $grid[0].getBoundingClientRect();
+        expect(buttonRect.right, "create control should stay inside the scroll viewport").to.be.lte(gridRect.right + 1);
+        expect(buttonRect.left, "create control should stay inside the scroll viewport").to.be.gte(gridRect.left - 1);
+      });
+    });
+  });
+
+  it("pins draft row data cells to the left when the column is pinned left and the grid is scrolled horizontally", () => {
+    cy.mount(<DraftRowHorizontalScrollHarness tableId="cypress-table-draft-row-pinned-left" />);
+
+    cy.get("[data-column-menu-trigger='title']").first().click({ force: true });
+    cy.contains("button", "Left").click({ force: true });
+    cy.get("body").click(0, 0);
+
+    cy.findByRole("grid").scrollTo("bottom");
+    cy.contains("Add row").click();
+    cy.findByLabelText("Edit Title").type("Left pin draft{enter}");
+
+    cy.findByRole("grid").then(($grid) => {
+      const grid = $grid[0];
+      grid.scrollLeft = grid.scrollWidth - grid.clientWidth;
+    });
+
+    cy.findByRole("grid").should(($grid) => {
+      expect($grid[0]?.scrollLeft ?? 0).to.be.greaterThan(0);
+    });
+
+    cy.get("tr[data-row-id='__draft__'] [role='gridcell'][data-column-id='title']").then(($cell) => {
+      const cell = $cell[0];
+      const td = cell.closest("td");
+      expect(td, "title draft cell should be wrapped in td").to.not.equal(null);
+      if (td) {
+        expect(getComputedStyle(td).position).to.equal("sticky");
+        expect(td.dataset.pinnedState).to.equal("left");
+      }
+    });
+
+    cy.get("tr[data-row-id='__draft__'] [role='gridcell'][data-column-id='title']").then(($cell) => {
+      const cellRect = $cell[0].getBoundingClientRect();
+      cy.findByRole("grid").then(($grid) => {
+        const gridRect = $grid[0].getBoundingClientRect();
+        expect(cellRect.left, "pinned title draft cell should stay inside the scroll viewport").to.be.gte(gridRect.left - 1);
+        expect(cellRect.right, "pinned title draft cell should stay inside the scroll viewport").to.be.lte(
+          gridRect.right + 1
+        );
+      });
+    });
   });
 
   it("prefills and resets draft rows from defaultDraftRow", () => {

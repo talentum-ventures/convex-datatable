@@ -42,6 +42,18 @@ export type ResolvedMultiSelectTokens =
       invalidToken: string;
     };
 
+export function filterSelectOptionsBySearch(
+  options: ReadonlyArray<SelectOption>,
+  search: string
+): ReadonlyArray<SelectOption> {
+  const normalized = search.trim().toLowerCase();
+  if (normalized.length === 0) {
+    return options;
+  }
+
+  return options.filter((option) => option.label.toLowerCase().includes(normalized));
+}
+
 export function findOptionByValue(
   options: ReadonlyArray<SelectOption>,
   value: string

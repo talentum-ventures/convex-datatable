@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getStaticOptions, resolveOptions } from "./select-options";
+import { filterSelectOptionsBySearch, getStaticOptions, resolveOptions } from "./select-options";
 import type { DataTableColumn } from "./types";
 
 type Row = {
@@ -15,6 +15,20 @@ const row: Row = {
 };
 
 describe("select option helpers", () => {
+  it("filters options by label search case-insensitively and returns all when search is empty", () => {
+    const options = [
+      { value: "a", label: "Alpha", colorClass: "bg-slate-100 text-slate-700" },
+      { value: "b", label: "Beta", colorClass: "bg-slate-100 text-slate-700" },
+      { value: "c", label: "gamma", colorClass: "bg-slate-100 text-slate-700" }
+    ] as const;
+
+    expect(filterSelectOptionsBySearch(options, "")).toEqual(options);
+    expect(filterSelectOptionsBySearch(options, "   ")).toEqual(options);
+    expect(filterSelectOptionsBySearch(options, "alp")).toEqual([options[0]]);
+    expect(filterSelectOptionsBySearch(options, "GAM")).toEqual([options[2]]);
+    expect(filterSelectOptionsBySearch(options, "z")).toEqual([]);
+  });
+
   it("resolves static and row-aware options", () => {
     const staticColumn: DataTableColumn<Row> = {
       id: "goal",

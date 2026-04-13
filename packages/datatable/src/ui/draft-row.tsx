@@ -1,5 +1,6 @@
 import { Check, Pencil, X } from "lucide-react";
 import type { Column } from "@tanstack/react-table";
+import type { CSSProperties } from "react";
 import { cn } from "../core/cn";
 import type {
   DataTableCellValue,
@@ -9,6 +10,35 @@ import type {
 import { renderColumnContent, renderColumnEditor } from "../engine/column-def-builder";
 import type { ColumnLayoutResult } from "./column-layout";
 import { Button } from "./primitives";
+
+function draftRowPinnedCellLayout<TRow extends DataTableRowModel>(
+  column: Column<TRow, DataTableCellValue>,
+  columnRenderLayout: ColumnLayoutResult,
+  renderWidth: number,
+  fixedTrackStyle: (width: number) => CSSProperties
+): {
+  dataPinnedState: string;
+  combinedStyle: CSSProperties;
+  isFirstRightPinned: boolean;
+  pinnedSurfaceClass: string;
+} {
+  const pinned = column.getIsPinned();
+  const leftOffset = columnRenderLayout.leftPinnedOffsetById[column.id];
+  const rightOffset = columnRenderLayout.rightPinnedOffsetById[column.id];
+  const isFirstRightPinned = columnRenderLayout.firstRightPinnedColumnId === column.id;
+  return {
+    dataPinnedState: pinned || "center",
+    combinedStyle: {
+      ...fixedTrackStyle(renderWidth),
+      left: pinned === "left" ? `${leftOffset ?? 0}px` : undefined,
+      right: pinned === "right" ? `${rightOffset ?? 0}px` : undefined
+    },
+    isFirstRightPinned,
+    pinnedSurfaceClass: pinned
+      ? "sticky z-10 shadow-[var(--dt-pinned-shadow)] [background:var(--dt-pinned-row-bg)] group-hover:[background:var(--dt-pinned-row-hover-bg)]"
+      : "bg-slate-50"
+  };
+}
 
 export type DraftRowProps<TRow extends DataTableRowModel> = {
   rowIndex: number;
@@ -92,7 +122,7 @@ export function DraftRow<TRow extends DataTableRowModel>({
   return (
     <tr
       key={draftRowId}
-      className="absolute left-0 bg-slate-50"
+      className="group absolute left-0 overflow-visible bg-slate-50"
       style={{
         display: "flex",
         transform: `translateY(${top}px)`,
@@ -105,13 +135,20 @@ export function DraftRow<TRow extends DataTableRowModel>({
       {visibleLeafColumnsInUiOrder.map((column) => {
         if (column.id === actionsColumnId) {
           const renderWidth = columnRenderLayout.renderWidthsById[column.id] ?? column.getSize();
-          const widthStyle = fixedTrackStyle(renderWidth);
+          const { dataPinnedState, combinedStyle, isFirstRightPinned, pinnedSurfaceClass } =
+            draftRowPinnedCellLayout(column, columnRenderLayout, renderWidth, fixedTrackStyle);
 
           return (
             <td
               key={`draft-${column.id}`}
-              style={widthStyle}
-              className="border-b border-l border-r border-slate-200 bg-slate-50 p-0 align-top"
+              data-pinned-state={dataPinnedState}
+              style={combinedStyle}
+              className={cn(
+                "border-b border-l border-r border-slate-200 p-0 align-top",
+                isFirstRightPinned ? "border-l border-l-slate-200" : "",
+                "relative overflow-visible border-l border-l-slate-200",
+                pinnedSurfaceClass
+              )}
             >
               {actionButtons}
             </td>
@@ -120,16 +157,20 @@ export function DraftRow<TRow extends DataTableRowModel>({
 
         const columnConfig = columnById.get(column.id);
         const renderWidth = columnRenderLayout.renderWidthsById[column.id] ?? column.getSize();
-        const widthStyle = fixedTrackStyle(renderWidth);
 
         if (!columnConfig) {
+          const { dataPinnedState, combinedStyle, isFirstRightPinned, pinnedSurfaceClass } =
+            draftRowPinnedCellLayout(column, columnRenderLayout, renderWidth, fixedTrackStyle);
+
           return (
             <td
               key={`draft-${column.id}`}
-              style={widthStyle}
+              data-pinned-state={dataPinnedState}
+              style={combinedStyle}
               className={cn(
-                "border-r border-b border-slate-200 bg-slate-50",
-                column.id === actionsColumnId ? "border-l border-l-slate-200" : ""
+                "border-r border-b border-slate-200",
+                isFirstRightPinned ? "border-l border-l-slate-200" : "",
+                pinnedSurfaceClass
               )}
             />
           );
@@ -174,11 +215,19 @@ export function DraftRow<TRow extends DataTableRowModel>({
                 </span>
               );
 
+        const { dataPinnedState, combinedStyle, isFirstRightPinned, pinnedSurfaceClass } =
+          draftRowPinnedCellLayout(column, columnRenderLayout, renderWidth, fixedTrackStyle);
+
         return (
           <td
             key={`draft-${column.id}`}
-            style={widthStyle}
-            className="border-r border-b border-slate-200 bg-slate-50 p-0 align-top"
+            data-pinned-state={dataPinnedState}
+            style={combinedStyle}
+            className={cn(
+              "border-r border-b border-slate-200 p-0 align-top",
+              isFirstRightPinned ? "border-l border-l-slate-200" : "",
+              pinnedSurfaceClass
+            )}
           >
             <div
               role="gridcell"

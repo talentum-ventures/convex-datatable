@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check } from "lucide-react";
 import { cn } from "../../core/cn";
-import { resolveOptions } from "../../core/select-options";
+import { filterSelectOptionsBySearch, resolveOptions } from "../../core/select-options";
 import type { DataTableColumn, DataTableRowModel } from "../../core/types";
 import { useDropdownPosition } from "../../hooks/use-dropdown-position";
 import { usePortaledListboxFocus } from "../../hooks/use-portaled-listbox-focus";
@@ -23,10 +23,17 @@ export function MultiSelectMenuEditor<TRow extends DataTableRowModel>({
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
+  const searchEffectPrimedRef = useRef(false);
   const portalRoot = typeof document === "undefined" ? null : document.body;
   const dropdownStyle = useDropdownPosition(wrapperRef);
   const finalizedRef = useRef(false);
   const options = resolveOptions(column, row);
+  const [search, setSearch] = useState("");
+  const filteredOptions = useMemo(
+    () => filterSelectOptionsBySearch(options, search),
+    [options, search]
+  );
   const [draftValues, setDraftValues] = useState(() => multiSelectValues(value));
   const [activeIndex, setActiveIndex] = useState(() => {
     const selectedValues = multiSelectValues(value);
@@ -34,12 +41,29 @@ export function MultiSelectMenuEditor<TRow extends DataTableRowModel>({
     return selectedIndex >= 0 ? selectedIndex : 0;
   });
 
-  usePortaledListboxFocus(listRef);
+  usePortaledListboxFocus(searchRef);
+
+  useEffect(() => {
+    if (!searchEffectPrimedRef.current) {
+      searchEffectPrimedRef.current = true;
+      return;
+    }
+    setActiveIndex(0);
+  }, [search]);
+
+  useEffect(() => {
+    setActiveIndex((current) => {
+      if (filteredOptions.length === 0) {
+        return 0;
+      }
+      return Math.min(current, filteredOptions.length - 1);
+    });
+  }, [filteredOptions.length]);
 
   useEffect(() => {
     const activeNode = listRef.current?.querySelector<HTMLElement>("[data-select-option-active='true']");
     activeNode?.scrollIntoView({ block: "nearest" });
-  }, [activeIndex]);
+  }, [activeIndex, filteredOptions]);
 
   const commit = (nextValues = draftValues): void => {
     if (finalizedRef.current) {
@@ -62,11 +86,11 @@ export function MultiSelectMenuEditor<TRow extends DataTableRowModel>({
   };
 
   const moveActive = (delta: number): void => {
-    if (options.length === 0) {
+    if (filteredOptions.length === 0) {
       return;
     }
 
-    const lastIndex = options.length - 1;
+    const lastIndex = filteredOptions.length - 1;
     setActiveIndex((current) => Math.min(lastIndex, Math.max(0, current + delta)));
   };
 
@@ -101,14 +125,16 @@ export function MultiSelectMenuEditor<TRow extends DataTableRowModel>({
               className="fixed z-30 min-w-[220px] max-w-[320px] rounded-xl border border-slate-200 bg-white p-2 shadow-xl"
               style={dropdownStyle}
             >
-              <div
-                ref={listRef}
-                role="listbox"
-                tabIndex={0}
-                aria-label={`Edit ${column.header}`}
-                aria-activedescendant={`${column.id}-option-${activeIndex}`}
-                aria-multiselectable="true"
-                className="flex max-h-56 flex-col gap-1 overflow-auto rounded-lg outline-none"
+              <input
+                ref={searchRef}
+                type="search"
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                }}
+                placeholder="Search..."
+                aria-label={`Search ${column.header} options`}
+                className="mb-2 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none placeholder:text-slate-400"
                 onKeyDown={(event) => {
                   event.stopPropagation();
 
@@ -138,13 +164,13 @@ export function MultiSelectMenuEditor<TRow extends DataTableRowModel>({
 
                   if (event.key === "End") {
                     event.preventDefault();
-                    setActiveIndex(Math.max(0, options.length - 1));
+                    setActiveIndex(Math.max(0, filteredOptions.length - 1));
                     return;
                   }
 
                   if (event.key === " " && !event.metaKey && !event.ctrlKey && !event.altKey) {
                     event.preventDefault();
-                    const option = options[activeIndex];
+                    const option = filteredOptions[activeIndex];
                     if (option) {
                       toggleValue(option.value);
                     }
@@ -156,8 +182,17 @@ export function MultiSelectMenuEditor<TRow extends DataTableRowModel>({
                     commit();
                   }
                 }}
+              />
+              <div
+                ref={listRef}
+                role="listbox"
+                tabIndex={-1}
+                aria-label={`Edit ${column.header}`}
+                aria-activedescendant={`${column.id}-option-${activeIndex}`}
+                aria-multiselectable="true"
+                className="flex max-h-56 flex-col gap-1 overflow-auto rounded-lg outline-none"
               >
-                {options.map((option, index) => {
+                {filteredOptions.map((option, index) => {
                   const isSelected = draftValues.includes(option.value);
                   const isActive = index === activeIndex;
 
@@ -181,7 +216,7 @@ export function MultiSelectMenuEditor<TRow extends DataTableRowModel>({
                       }}
                       onClick={() => {
                         toggleValue(option.value);
-                        listRef.current?.focus({ preventScroll: true });
+                        searchRef.current?.focus({ preventScroll: true });
                       }}
                     >
                       <OptionBadge option={option} isSelected={isSelected} isActive={isActive} />
