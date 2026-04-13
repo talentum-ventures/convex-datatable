@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check } from "lucide-react";
 import { cn } from "../../core/cn";
+import { resolveOptions } from "../../core/select-options";
 import type { DataTableColumn, DataTableRowModel } from "../../core/types";
 import { useDropdownPosition } from "../../hooks/use-dropdown-position";
 import { usePortaledListboxFocus } from "../../hooks/use-portaled-listbox-focus";
@@ -14,6 +15,7 @@ export type MultiSelectMenuEditorProps<TRow extends DataTableRowModel> = Default
 
 export function MultiSelectMenuEditor<TRow extends DataTableRowModel>({
   column,
+  row,
   value,
   onCommit,
   onCancel
@@ -24,10 +26,11 @@ export function MultiSelectMenuEditor<TRow extends DataTableRowModel>({
   const portalRoot = typeof document === "undefined" ? null : document.body;
   const dropdownStyle = useDropdownPosition(wrapperRef);
   const finalizedRef = useRef(false);
+  const options = resolveOptions(column, row);
   const [draftValues, setDraftValues] = useState(() => multiSelectValues(value));
   const [activeIndex, setActiveIndex] = useState(() => {
     const selectedValues = multiSelectValues(value);
-    const selectedIndex = column.options.findIndex((option) => selectedValues.includes(option.value));
+    const selectedIndex = options.findIndex((option) => selectedValues.includes(option.value));
     return selectedIndex >= 0 ? selectedIndex : 0;
   });
 
@@ -59,11 +62,11 @@ export function MultiSelectMenuEditor<TRow extends DataTableRowModel>({
   };
 
   const moveActive = (delta: number): void => {
-    if (column.options.length === 0) {
+    if (options.length === 0) {
       return;
     }
 
-    const lastIndex = column.options.length - 1;
+    const lastIndex = options.length - 1;
     setActiveIndex((current) => Math.min(lastIndex, Math.max(0, current + delta)));
   };
 
@@ -82,7 +85,7 @@ export function MultiSelectMenuEditor<TRow extends DataTableRowModel>({
     >
       <div className="flex h-full w-full items-center">
         {draftValues.length > 0 ? (
-          <MultiSelectBadges columnId={column.id} options={column.options} values={draftValues} />
+          <MultiSelectBadges columnId={column.id} options={options} values={draftValues} />
         ) : (
           <span className="text-sm text-slate-400">Select values</span>
         )}
@@ -135,13 +138,13 @@ export function MultiSelectMenuEditor<TRow extends DataTableRowModel>({
 
                   if (event.key === "End") {
                     event.preventDefault();
-                    setActiveIndex(Math.max(0, column.options.length - 1));
+                    setActiveIndex(Math.max(0, options.length - 1));
                     return;
                   }
 
                   if (event.key === " " && !event.metaKey && !event.ctrlKey && !event.altKey) {
                     event.preventDefault();
-                    const option = column.options[activeIndex];
+                    const option = options[activeIndex];
                     if (option) {
                       toggleValue(option.value);
                     }
@@ -154,7 +157,7 @@ export function MultiSelectMenuEditor<TRow extends DataTableRowModel>({
                   }
                 }}
               >
-                {column.options.map((option, index) => {
+                {options.map((option, index) => {
                   const isSelected = draftValues.includes(option.value);
                   const isActive = index === activeIndex;
 

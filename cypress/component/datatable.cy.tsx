@@ -43,6 +43,13 @@ type OptionParsingRow = {
   tags: ReadonlyArray<string>;
 };
 
+type DynamicOptionRow = {
+  id: string;
+  area: string;
+  goal: string;
+  owners: ReadonlyArray<string>;
+};
+
 const columns: ReadonlyArray<DataTableColumn<TaskRow>> = [
   {
     id: "title",
@@ -230,6 +237,88 @@ const optionParsingColumns: ReadonlyArray<DataTableColumn<OptionParsingRow>> = [
       { value: "design", label: "Design", colorClass: "bg-violet-100 text-violet-700" },
       { value: "backend", label: "Backend", colorClass: "bg-slate-100 text-slate-700" }
     ]
+  }
+];
+
+const dynamicOptionColumns: ReadonlyArray<DataTableColumn<DynamicOptionRow>> = [
+  {
+    id: "area",
+    field: "area",
+    header: "Area",
+    kind: "text",
+    width: 140
+  },
+  {
+    id: "goal",
+    field: "goal",
+    header: "Goal",
+    kind: "select",
+    isEditable: true,
+    width: 180,
+    getOptions: (row) =>
+      row.area === "Product"
+        ? [
+            {
+              value: "ship",
+              label: "Ship roadmap",
+              colorStyle: {
+                backgroundColor: "rgb(254, 240, 138)",
+                color: "rgb(113, 63, 18)"
+              }
+            },
+            {
+              value: "plan",
+              label: "Plan sprint",
+              colorClass: "bg-slate-100 text-slate-700"
+            }
+          ]
+        : [
+            {
+              value: "close",
+              label: "Close deals",
+              colorStyle: {
+                backgroundColor: "rgb(191, 219, 254)",
+                color: "rgb(30, 64, 175)"
+              }
+            },
+            {
+              value: "expand",
+              label: "Expand accounts",
+              colorClass: "bg-emerald-100 text-emerald-700"
+            }
+          ]
+  },
+  {
+    id: "owners",
+    field: "owners",
+    header: "Owners",
+    kind: "multiselect",
+    isEditable: true,
+    width: 220,
+    getOptions: (row) =>
+      row.area === "Product"
+        ? [
+            {
+              value: "maya",
+              label: "Maya",
+              colorStyle: {
+                backgroundColor: "rgb(254, 226, 226)",
+                color: "rgb(153, 27, 27)",
+                borderColor: "rgb(248, 113, 113)"
+              }
+            }
+          ]
+        : [
+            {
+              value: "rui",
+              label: "Rui",
+              colorStyle: {
+                backgroundColor: "rgb(219, 234, 254)",
+                color: "rgb(30, 64, 175)",
+                borderColor: "rgb(96, 165, 250)"
+              }
+            }
+          ]
   }
 ];
 
@@ -979,6 +1068,182 @@ function StrictOptionParsingHarness({ tableId }: { tableId: string }): JSX.Eleme
   );
 }
 
+function CustomToolbarHarness({ tableId }: { tableId: string }): JSX.Element {
+  const [rows, setRows] = useState<ReadonlyArray<TaskRow>>([
+    { id: "1", title: "Build UI", status: "todo", amount: 10 },
+    { id: "2", title: "Ship", status: "done", amount: 20 }
+  ]);
+
+  const dataSource = useMemo<DataTableDataSource<TaskRow>>(
+    () => ({
+      useRows: () => ({
+        rows,
+        hasMore: false,
+        isLoading: false,
+        isLoadingMore: false,
+        error: null,
+        loadMore: () => undefined,
+        refresh: () => undefined
+      }),
+      deleteRows: async (rowIds) => {
+        setRows((current) => current.filter((row) => !rowIds.includes(row.id)));
+      },
+      createRow: async (draft) => {
+        const nextRow: TaskRow = {
+          id: crypto.randomUUID(),
+          title: String(draft.title ?? ""),
+          status: String(draft.status ?? "todo"),
+          amount: Number(draft.amount ?? 0)
+        };
+        setRows((current) => [nextRow, ...current]);
+        return nextRow;
+      }
+    }),
+    [rows]
+  );
+
+  return (
+    <div className="p-4">
+      <DataTable
+        tableId={tableId}
+        columns={columns}
+        dataSource={dataSource}
+        getRowId={(row) => row.id}
+        features={{
+          editing: true,
+          rowAdd: true,
+          rowDelete: true,
+          columnVisibility: true,
+          virtualization: false
+        }}
+        renderToolbar={(state) => (
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => state.deleteSelected()}>
+              Delete from custom toolbar
+            </button>
+            <output data-testid="custom-selected-count">{String(state.selectedRowCount)}</output>
+            <output data-testid="custom-hidden-count">{String(state.hiddenColumns.length)}</output>
+            {state.hiddenColumns.map((column) => (
+              <button key={column.id} type="button" onClick={() => state.showColumn(column.id)}>
+                {`Show ${column.header}`}
+              </button>
+            ))}
+          </div>
+        )}
+      />
+    </div>
+  );
+}
+
+function DynamicOptionHarness({ tableId }: { tableId: string }): JSX.Element {
+  const [rows, setRows] = useState<ReadonlyArray<DynamicOptionRow>>([
+    { id: "1", area: "Product", goal: "ship", owners: ["maya"] },
+    { id: "2", area: "Sales", goal: "close", owners: ["rui"] }
+  ]);
+
+  const dataSource = useMemo<DataTableDataSource<DynamicOptionRow>>(
+    () => ({
+      useRows: () => ({
+        rows,
+        hasMore: false,
+        isLoading: false,
+        isLoadingMore: false,
+        error: null,
+        loadMore: () => undefined,
+        refresh: () => undefined
+      }),
+      updateRows: async (changes) => {
+        setRows((current) =>
+          current.map((row) => {
+            const patch = changes.find((entry) => entry.rowId === row.id)?.patch;
+            return patch
+              ? {
+                  ...row,
+                  ...patch
+                }
+              : row;
+          })
+        );
+      }
+    }),
+    [rows]
+  );
+
+  return (
+    <div className="w-[520px] p-4">
+      <DataTable
+        tableId={tableId}
+        columns={dynamicOptionColumns}
+        dataSource={dataSource}
+        getRowId={(row) => row.id}
+        features={{
+          editing: true,
+          rowSelect: false,
+          rowActions: false,
+          infiniteScroll: false,
+          virtualization: false
+        }}
+      />
+      <output data-testid="goal-1-raw">{rows.find((row) => row.id === "1")?.goal ?? ""}</output>
+    </div>
+  );
+}
+
+function DefaultDraftRowHarness({ tableId }: { tableId: string }): JSX.Element {
+  const [rows, setRows] = useState<ReadonlyArray<TaskRow>>([{ id: "1", title: "Build UI", status: "todo", amount: 10 }]);
+
+  const dataSource = useMemo<DataTableDataSource<TaskRow>>(
+    () => ({
+      useRows: () => ({
+        rows,
+        hasMore: false,
+        isLoading: false,
+        isLoadingMore: false,
+        error: null,
+        loadMore: () => undefined,
+        refresh: () => undefined
+      }),
+      createRow: async (draft) => {
+        const nextRow: TaskRow = {
+          id: crypto.randomUUID(),
+          title: String(draft.title ?? ""),
+          status: String(draft.status ?? "todo"),
+          amount: Number(draft.amount ?? 0)
+        };
+        setRows((current) => [nextRow, ...current]);
+        return nextRow;
+      }
+    }),
+    [rows]
+  );
+
+  return (
+    <div className="p-4">
+      <DataTable
+        tableId={tableId}
+        columns={columns}
+        dataSource={dataSource}
+        getRowId={(row) => row.id}
+        defaultDraftRow={{
+          status: "done",
+          amount: 42
+        }}
+        features={{
+          editing: true,
+          rowAdd: true,
+          rowSelect: false,
+          rowActions: false,
+          infiniteScroll: false,
+          virtualization: false
+        }}
+      />
+      <output data-testid="drafted-title-raw">{rows[0]?.title ?? ""}</output>
+      <output data-testid="drafted-status-raw">{rows[0]?.status ?? ""}</output>
+      <output data-testid="drafted-amount-raw">{String(rows[0]?.amount ?? "")}</output>
+    </div>
+  );
+}
+
 describe("DataTable component", () => {
   it("edits a text cell", () => {
     cy.mount(<Harness tableId="cypress-table-edit" />);
@@ -1141,6 +1406,26 @@ describe("DataTable component", () => {
     cy.contains("Hidden columns (1)").click();
     cy.get("[data-hidden-column-row='amount']").contains("button", "Show").click();
     cy.findByRole("columnheader", { name: /Amount/i }).should("exist");
+  });
+
+  it("uses a custom toolbar render prop to drive selection and hidden-column actions", () => {
+    cy.mount(<CustomToolbarHarness tableId="cypress-table-custom-toolbar" />);
+
+    cy.contains("button", "Add row").should("not.exist");
+    cy.findByTestId("custom-selected-count").should("have.text", "0");
+
+    cy.findByLabelText("Select row 1").check({ force: true });
+    cy.findByTestId("custom-selected-count").should("have.text", "1");
+
+    cy.get("[data-column-menu-trigger='amount']").first().click({ force: true });
+    cy.contains("button", "Hide").click();
+    cy.findByTestId("custom-hidden-count").should("have.text", "1");
+    cy.contains("button", "Show Amount").click();
+    cy.findByRole("columnheader", { name: /Amount/i }).should("exist");
+    cy.findByTestId("custom-hidden-count").should("have.text", "0");
+
+    cy.contains("button", "Delete from custom toolbar").click();
+    cy.contains("Build UI").should("not.exist");
   });
 
   it("keeps managed utility columns around pinned data columns", () => {
@@ -1691,6 +1976,23 @@ describe("DataTable component", () => {
     cy.contains("Inline submit").should("exist");
   });
 
+  it("prefills and resets draft rows from defaultDraftRow", () => {
+    cy.mount(<DefaultDraftRowHarness tableId="cypress-table-default-draft-row" />);
+
+    cy.get("tr[data-row-id='__draft__'] [role='gridcell'][data-column-id='status']").contains("Done");
+    cy.get("tr[data-row-id='__draft__'] [role='gridcell'][data-column-id='amount']").contains("42");
+
+    cy.contains("Add row").click();
+    cy.findByLabelText("Edit Title").type("Prefilled task{enter}");
+    cy.contains("Add row").click();
+
+    cy.findByTestId("drafted-title-raw").should("have.text", "Prefilled task");
+    cy.findByTestId("drafted-status-raw").should("have.text", "done");
+    cy.findByTestId("drafted-amount-raw").should("have.text", "42");
+    cy.get("tr[data-row-id='__draft__'] [role='gridcell'][data-column-id='status']").contains("Done");
+    cy.get("tr[data-row-id='__draft__'] [role='gridcell'][data-column-id='amount']").contains("42");
+  });
+
   it("supports keyboard editing trigger", () => {
     cy.mount(<Harness tableId="cypress-table-keyboard" />);
 
@@ -1808,6 +2110,27 @@ describe("DataTable component", () => {
     cy.findByRole("listbox", { name: /Edit Tags/i }).trigger("keydown", { key: "Enter", force: true });
     cy.findByRole("listbox", { name: /Edit Tags/i }).should("not.exist");
     cy.get("[data-testid='tags-raw']").should("have.text", "urgent,backend,design");
+  });
+
+  it("shows row-aware select options and renders inline option styles", () => {
+    cy.mount(<DynamicOptionHarness tableId="cypress-table-dynamic-options" />);
+
+    cy.get("tr[data-row-id='1'] [role='gridcell'][data-column-id='goal']").dblclick();
+    cy.findByRole("listbox", { name: /Edit Goal/i }).within(() => {
+      cy.contains("[role='option']", "Ship roadmap").should("exist");
+      cy.contains("[role='option']", "Plan sprint").click();
+      cy.contains("[role='option']", "Close deals").should("not.exist");
+    });
+    cy.findByTestId("goal-1-raw").should("have.text", "plan");
+
+    cy.get("tr[data-row-id='1'] [role='gridcell'][data-column-id='owners']")
+      .contains("span", "Maya")
+      .then(($badge) => {
+        const style = getComputedStyle($badge[0]);
+        expect(style.backgroundColor).to.equal("rgb(254, 226, 226)");
+        expect(style.color).to.equal("rgb(153, 27, 27)");
+        expect(style.borderColor).to.equal("rgb(248, 113, 113)");
+      });
   });
 
   it("navigates selected cells by visual order when a column is pinned left", () => {

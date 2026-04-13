@@ -18,10 +18,11 @@ export function OptionBadge({
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-        option.colorClass,
+        option.colorClass ?? "",
         isActive ? "ring-2 ring-slate-900/10 ring-offset-1 ring-offset-white" : "",
         isSelected ? "shadow-[inset_0_0_0_1px_rgba(15,23,42,0.12)]" : ""
       )}
+      style={option.colorStyle}
     >
       {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
       {option.label}

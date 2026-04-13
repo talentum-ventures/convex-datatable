@@ -29,6 +29,7 @@ export function MultiSelectBadges({
               "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
               option?.colorClass ?? "bg-slate-100 text-slate-700"
             )}
+            style={option?.colorStyle}
           >
             {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
             {option?.label ?? entry}

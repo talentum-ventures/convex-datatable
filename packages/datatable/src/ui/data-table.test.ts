@@ -1,7 +1,12 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { createElement } from "react";
+import { createElement, useMemo, useState } from "react";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type { CollaboratorCellCoord, DataTableColumn, DataTableDataSource } from "../core/types";
+import type {
+  CollaboratorCellCoord,
+  DataTableColumn,
+  DataTableDataSource,
+  DataTableProps
+} from "../core/types";
 import { DataTable, canHandleGridPaste, shouldCenterHeaderContent } from "./data-table";
 
 type TestRow = {
@@ -18,6 +23,27 @@ const columns: ReadonlyArray<DataTableColumn<TestRow>> = [
   }
 ];
 
+type ToolbarRow = {
+  id: string;
+  name: string;
+  amount: number;
+};
+
+const toolbarColumns: ReadonlyArray<DataTableColumn<ToolbarRow>> = [
+  {
+    id: "name",
+    field: "name",
+    header: "Name",
+    kind: "text"
+  },
+  {
+    id: "amount",
+    field: "amount",
+    header: "Amount",
+    kind: "number"
+  }
+];
+
 function createDataSource(rows: ReadonlyArray<TestRow>): DataTableDataSource<TestRow> {
   return {
     useRows: () => ({
@@ -30,6 +56,58 @@ function createDataSource(rows: ReadonlyArray<TestRow>): DataTableDataSource<Tes
       refresh: () => undefined
     })
   };
+}
+
+function ToolbarHarness({
+  renderToolbar
+}: {
+  renderToolbar?: DataTableProps<ToolbarRow>["renderToolbar"];
+}): JSX.Element {
+  const [rows, setRows] = useState<ReadonlyArray<ToolbarRow>>([
+    { id: "row-1", name: "Alpha", amount: 10 },
+    { id: "row-2", name: "Beta", amount: 20 }
+  ]);
+
+  const dataSource = useMemo<DataTableDataSource<ToolbarRow>>(
+    () => ({
+      useRows: () => ({
+        rows,
+        hasMore: false,
+        isLoading: false,
+        isLoadingMore: false,
+        error: null,
+        loadMore: () => undefined,
+        refresh: () => undefined
+      }),
+      deleteRows: async (rowIds) => {
+        setRows((current) => current.filter((row) => !rowIds.includes(row.id)));
+      },
+      createRow: async (draft) => {
+        const nextRow: ToolbarRow = {
+          id: `row-${rows.length + 1}`,
+          name: String(draft.name ?? ""),
+          amount: Number(draft.amount ?? 0)
+        };
+        setRows((current) => [...current, nextRow]);
+        return nextRow;
+      }
+    }),
+    [rows]
+  );
+
+  return createElement(DataTable<ToolbarRow>, {
+    tableId: "toolbar-harness",
+    columns: toolbarColumns,
+    getRowId: (row: ToolbarRow) => row.id,
+    dataSource,
+    features: {
+      rowAdd: true,
+      rowDelete: true,
+      columnVisibility: true,
+      virtualization: false
+    },
+    ...(renderToolbar ? { renderToolbar } : {})
+  });
 }
 
 const originalResizeObserver = globalThis.ResizeObserver;
@@ -282,5 +360,84 @@ describe("DataTable column menus", () => {
       expect(screen.queryByRole("dialog", { name: "Name options" })).toBeNull();
     });
     expect(document.activeElement).toBe(trigger);
+  });
+});
+
+describe("DataTable toolbar rendering", () => {
+  it("passes declarative toolbar state to renderToolbar and lets custom actions control the table", async () => {
+    render(
+      createElement(ToolbarHarness, {
+        renderToolbar: (state) =>
+          createElement(
+            "div",
+            null,
+            createElement("output", { "data-testid": "selected-count" }, String(state.selectedRowCount)),
+            createElement("output", { "data-testid": "hidden-count" }, String(state.hiddenColumns.length)),
+            createElement(
+              "button",
+              {
+                type: "button",
+                onClick: () => {
+                  state.deleteSelected();
+                }
+              },
+              "Delete from custom toolbar"
+            ),
+            ...state.hiddenColumns.map((column) =>
+              createElement(
+                "button",
+                {
+                  key: column.id,
+                  type: "button",
+                  onClick: () => {
+                    state.showColumn(column.id);
+                  }
+                },
+                `Show ${column.header}`
+              )
+            )
+          )
+      })
+    );
+
+    expect(screen.getByTestId("selected-count").textContent).toBe("0");
+    expect(screen.getByTestId("hidden-count").textContent).toBe("0");
+
+    fireEvent.click(screen.getByLabelText("Select row row-1"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-count").textContent).toBe("1");
+    });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Open column menu" })[1] ?? screen.getByRole("button", { name: "Open column menu" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hide" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("hidden-count").textContent).toBe("1");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Show Amount" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("columnheader", { name: /Amount/i })).not.toBeNull();
+      expect(screen.getByTestId("hidden-count").textContent).toBe("0");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete from custom toolbar" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Alpha")).toBeNull();
+    });
+  });
+
+  it("hides the toolbar area when renderToolbar returns null", () => {
+    render(
+      createElement(ToolbarHarness, {
+        renderToolbar: () => null
+      })
+    );
+
+    expect(screen.queryByText("Copy")).toBeNull();
+    expect(screen.queryByText("Add row")).toBeNull();
   });
 });

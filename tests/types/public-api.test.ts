@@ -9,7 +9,9 @@ import type {
   DataTableDataSource,
   DataTableFeatureFlags,
   DataTableProps,
-  DataTableRowAction
+  DataTableRowAction,
+  DataTableToolbarState,
+  SelectOption
 } from "@talentum-ventures/convex-datatable";
 import { useConvexPresence } from "@talentum-ventures/convex-datatable/convex";
 import {
@@ -145,6 +147,10 @@ const props: DataTableProps<InvoiceRow> = {
   ],
   onActiveCellChange: (cell) => {
     expectTypeOf(cell).toEqualTypeOf<CollaboratorCellCoord | null>();
+  },
+  renderToolbar: (state) => {
+    expectTypeOf(state).toEqualTypeOf<DataTableToolbarState>();
+    return state.hiddenColumns.length;
   }
 };
 
@@ -202,5 +208,67 @@ describe("public api", () => {
     };
 
     expectTypeOf(invalidColumn.id).toEqualTypeOf<string>();
+  });
+
+  it("supports row-aware options and inline option styles", () => {
+    const dynamicSelectColumn: DataTableColumn<InvoiceRow> = {
+      id: "status",
+      field: "status",
+      header: "Status",
+      kind: "select",
+      getOptions: (row) => [
+        {
+          value: row.status,
+          label: "Dynamic",
+          colorStyle: {
+            backgroundColor: "#111827",
+            color: "#ffffff"
+          }
+        }
+      ]
+    };
+    const styledMultiSelectColumn: DataTableColumn<InvoiceRow> = {
+      id: "tags",
+      field: "tags",
+      header: "Tags",
+      kind: "multiselect",
+      options: [
+        {
+          value: "urgent",
+          label: "Urgent",
+          colorStyle: {
+            backgroundColor: "#fecaca",
+            color: "#7f1d1d",
+            borderColor: "#ef4444"
+          }
+        }
+      ]
+    };
+    const invalidSelectColumn: DataTableColumn<InvoiceRow> = {
+      id: "invalid",
+      field: "status",
+      header: "Invalid",
+      kind: "select",
+      options: [],
+      // @ts-expect-error options and getOptions are mutually exclusive
+      getOptions: () => []
+    };
+    // @ts-expect-error SelectOption requires colorClass or colorStyle
+    const invalidOption: SelectOption = {
+      value: "todo",
+      label: "To Do"
+    };
+    const invalidOptionColumn: DataTableColumn<InvoiceRow> = {
+      id: "invalid-option",
+      field: "status",
+      header: "Invalid option",
+      kind: "select",
+      options: [invalidOption]
+    };
+
+    expectTypeOf(dynamicSelectColumn.id).toEqualTypeOf<string>();
+    expectTypeOf(styledMultiSelectColumn.id).toEqualTypeOf<string>();
+    expectTypeOf(invalidSelectColumn.id).toEqualTypeOf<string>();
+    expectTypeOf(invalidOptionColumn.id).toEqualTypeOf<string>();
   });
 });

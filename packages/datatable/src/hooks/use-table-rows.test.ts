@@ -64,7 +64,8 @@ function useTestTableRows(
   dataSource: DataTableDataSource<TestRow>,
   rowsRefresh: () => void,
   rowSchema?: RowSchema<TestRow>,
-  sourceRows: ReadonlyArray<TestRow> = []
+  sourceRows: ReadonlyArray<TestRow> = [],
+  defaultDraftRow?: Partial<TestRow>
 ) {
   const [, setEditingCell] = useState<EditingCellState>(null);
   const undoStack = useUndoStack<TestRow>();
@@ -78,6 +79,7 @@ function useTestTableRows(
     rowsRefresh,
     rowDeleteEnabled: false,
     rowAddEnabled: true,
+    ...(defaultDraftRow ? { defaultDraftRow } : {}),
     undoEnabled: false,
     setEditingCell,
     undoStack
@@ -219,6 +221,66 @@ describe("useTableRows", () => {
 
     expect(result.current.draftRow).toEqual({});
     expect(result.current.draftEditingColumnId).toBeNull();
+  });
+
+  it("initializes and resets the draft row from default values", async () => {
+    const rowsRefresh = vi.fn();
+    const createRow = vi.fn(async (draft: Partial<TestRow>) => ({
+      id: "row-1",
+      title: String(draft.title ?? "")
+    }));
+    const { result } = renderHook(() =>
+      useTestTableRows(createDataSource({ createRow }), rowsRefresh, undefined, [], {
+        title: "Prefilled title"
+      })
+    );
+
+    expect(result.current.draftRow).toEqual({
+      title: "Prefilled title"
+    });
+
+    act(() => {
+      result.current.commitDraftCell(titleColumn, "Edited title");
+    });
+
+    await act(async () => {
+      await result.current.commitDraftRow();
+    });
+
+    expect(createRow).toHaveBeenCalledWith({
+      title: "Edited title"
+    });
+    expect(result.current.draftRow).toEqual({
+      title: "Prefilled title"
+    });
+    expect(rowsRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("merges late-arriving default draft values without overwriting touched fields", () => {
+    const { result, rerender } = renderHook(
+      ({ defaultDraftRow }: { defaultDraftRow?: Partial<TestRow> }) =>
+        useTestTableRows(createDataSource({}), vi.fn(), undefined, [], defaultDraftRow),
+      {
+        initialProps: {}
+      }
+    );
+
+    expect(result.current.draftRow).toEqual({});
+
+    act(() => {
+      result.current.commitDraftCell(titleColumn, "Custom title");
+    });
+
+    rerender({
+      defaultDraftRow: {
+        title: "Late default"
+      }
+    });
+
+    expect(result.current.draftRow).toEqual({
+      title: "Custom title"
+    });
+    expect(result.current.hasTouchedDraftRow).toBe(true);
   });
 
 });

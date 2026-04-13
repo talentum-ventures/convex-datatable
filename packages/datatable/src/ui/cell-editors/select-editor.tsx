@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check } from "lucide-react";
 import { cn } from "../../core/cn";
-import { findOptionByValue } from "../../core/select-options";
+import { findOptionByValue, resolveOptions } from "../../core/select-options";
 import type { DataTableColumn, DataTableRowModel } from "../../core/types";
 import { useDropdownPosition } from "../../hooks/use-dropdown-position";
 import { usePortaledListboxFocus } from "../../hooks/use-portaled-listbox-focus";
@@ -15,6 +15,7 @@ export type SelectMenuEditorProps<TRow extends DataTableRowModel> = DefaultEdito
 
 export function SelectMenuEditor<TRow extends DataTableRowModel>({
   column,
+  row,
   value,
   onCommit,
   onCancel
@@ -24,8 +25,9 @@ export function SelectMenuEditor<TRow extends DataTableRowModel>({
   const listRef = useRef<HTMLDivElement | null>(null);
   const dropdownStyle = useDropdownPosition(wrapperRef);
   const portalRoot = typeof document === "undefined" ? null : document.body;
+  const options = resolveOptions(column, row);
   const [activeIndex, setActiveIndex] = useState(() => {
-    const selectedIndex = column.options.findIndex((option) => option.value === String(value ?? ""));
+    const selectedIndex = options.findIndex((option) => option.value === String(value ?? ""));
     return selectedIndex >= 0 ? selectedIndex : 0;
   });
 
@@ -36,10 +38,10 @@ export function SelectMenuEditor<TRow extends DataTableRowModel>({
     activeNode?.scrollIntoView({ block: "nearest" });
   }, [activeIndex]);
 
-  const selectedOption = findOptionByValue(column.options, String(value ?? ""));
+  const selectedOption = findOptionByValue(options, String(value ?? ""));
 
   const commitIndex = (index: number): void => {
-    const option = column.options[index];
+    const option = options[index];
     if (!option) {
       onCancel();
       return;
@@ -48,11 +50,11 @@ export function SelectMenuEditor<TRow extends DataTableRowModel>({
   };
 
   const moveActive = (delta: number): void => {
-    if (column.options.length === 0) {
+    if (options.length === 0) {
       return;
     }
 
-    const lastIndex = column.options.length - 1;
+    const lastIndex = options.length - 1;
     setActiveIndex((current) => Math.min(lastIndex, Math.max(0, current + delta)));
   };
 
@@ -123,7 +125,7 @@ export function SelectMenuEditor<TRow extends DataTableRowModel>({
 
                   if (event.key === "End") {
                     event.preventDefault();
-                    setActiveIndex(Math.max(0, column.options.length - 1));
+                    setActiveIndex(Math.max(0, options.length - 1));
                     return;
                   }
 
@@ -133,7 +135,7 @@ export function SelectMenuEditor<TRow extends DataTableRowModel>({
                   }
                 }}
               >
-                {column.options.map((option, index) => {
+                {options.map((option, index) => {
                   const isSelected = option.value === String(value ?? "");
                   const isActive = index === activeIndex;
 

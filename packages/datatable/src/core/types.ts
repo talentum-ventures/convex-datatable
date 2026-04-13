@@ -95,12 +95,26 @@ export type DataTableFeatureFlags = {
   virtualization?: boolean;
 };
 
+export type SelectOptionColorStyle = {
+  backgroundColor: string;
+  color: string;
+  borderColor?: string;
+};
+
 export type SelectOption = {
   value: string;
   label: string;
-  colorClass: string;
   icon?: ComponentType<{ className?: string | undefined }>;
-};
+} & (
+  | {
+      colorClass: string;
+      colorStyle?: SelectOptionColorStyle;
+    }
+  | {
+      colorClass?: string;
+      colorStyle: SelectOptionColorStyle;
+    }
+);
 
 export type DataTableCellRenderContext<
   TRow extends DataTableRowModel,
@@ -197,22 +211,34 @@ export type CurrencyColumn<
   maximumFractionDigits?: number;
 };
 
+export type StaticSelectOptions = {
+  options: ReadonlyArray<SelectOption>;
+  getOptions?: never;
+};
+
+export type DynamicSelectOptions<TRow extends DataTableRowModel> = {
+  options?: never;
+  getOptions: (row: TRow) => ReadonlyArray<SelectOption>;
+};
+
+export type SelectColumnOptions<TRow extends DataTableRowModel> =
+  | StaticSelectOptions
+  | DynamicSelectOptions<TRow>;
+
 export type SelectColumn<
   TRow extends DataTableRowModel,
   K extends StringKey<TRow> = StringKey<TRow>
 > =
   ColumnCommon<TRow, K, string> & {
     kind: "select";
-    options: ReadonlyArray<SelectOption>;
-  };
+  } & SelectColumnOptions<TRow>;
 
 export type MultiSelectColumn<
   TRow extends DataTableRowModel,
   K extends StringKey<TRow> = StringKey<TRow>
 > = ColumnCommon<TRow, K, ReadonlyArray<string>> & {
   kind: "multiselect";
-  options: ReadonlyArray<SelectOption>;
-};
+} & SelectColumnOptions<TRow>;
 
 export type LinkColumn<
   TRow extends DataTableRowModel,
@@ -313,6 +339,23 @@ export type DataTableDataSource<TRow extends DataTableRowModel> = {
 
 export type DataTableOnError = (message: string) => void;
 
+export type DataTableToolbarState = {
+  canAddRow: boolean;
+  addRow: () => void;
+  canDeleteSelected: boolean;
+  deleteSelected: () => void;
+  selectedRowCount: number;
+  canCopy: boolean;
+  copy: () => void;
+  hiddenColumns: ReadonlyArray<{
+    id: string;
+    header: string;
+  }>;
+  showColumn: (columnId: string) => void;
+  showAllColumns: () => void;
+  isLoading: boolean;
+};
+
 export type CollaboratorCellCoord = {
   rowId: RowId;
   columnId: ColumnId;
@@ -373,6 +416,8 @@ export type DataTableProps<TRow extends DataTableRowModel> = {
   surface?: "default" | "plain";
   className?: string;
   collaborators?: ReadonlyArray<CollaboratorPresence>;
+  defaultDraftRow?: Partial<TRow>;
+  renderToolbar?: (state: DataTableToolbarState) => ReactNode;
   onActiveCellChange?: (cell: CollaboratorCellCoord | null) => void;
   onError?: DataTableOnError;
 };

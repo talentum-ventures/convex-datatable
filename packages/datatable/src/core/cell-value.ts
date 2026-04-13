@@ -6,7 +6,12 @@ import type {
   SelectOption
 } from "./types";
 import { formatColumnValue, parseDateValue, parseTextNumber } from "./formatters";
-import { findOptionByValue, resolveMultiSelectTokens, resolveOptionToken } from "./select-options";
+import {
+  findOptionByValue,
+  resolveMultiSelectTokens,
+  resolveOptions,
+  resolveOptionToken
+} from "./select-options";
 
 function optionLabel(options: ReadonlyArray<SelectOption>, value: string): string {
   return findOptionByValue(options, value)?.label ?? value;
@@ -90,12 +95,13 @@ export function serializeCellForClipboard<TRow extends DataTableRowModel>(
   }
 
   if (column.kind === "select") {
-    return optionLabel(column.options, String(value ?? ""));
+    return optionLabel(resolveOptions(column, row), String(value ?? ""));
   }
 
   if (column.kind === "multiselect") {
     const values = Array.isArray(value) ? value : [];
-    return values.map((entry) => optionLabel(column.options, entry)).join(", ");
+    const options = resolveOptions(column, row);
+    return values.map((entry) => optionLabel(options, entry)).join(", ");
   }
 
   if (column.kind === "date") {
@@ -108,7 +114,8 @@ export function serializeCellForClipboard<TRow extends DataTableRowModel>(
 
   return formatColumnValue(
     column,
-    toFormattableValue(value)
+    toFormattableValue(value),
+    row
   );
 }
 
@@ -158,7 +165,7 @@ export function parseClipboardToCellValue<TRow extends DataTableRowModel>(
         };
       }
 
-      const option = resolveOptionToken(column.options, trimmedText);
+      const option = resolveOptionToken(resolveOptions(column, row), trimmedText);
       if (!option) {
         return {
           ok: false,
@@ -185,7 +192,7 @@ export function parseClipboardToCellValue<TRow extends DataTableRowModel>(
         };
       }
 
-      const resolvedTokens = resolveMultiSelectTokens(column.options, text);
+      const resolvedTokens = resolveMultiSelectTokens(resolveOptions(column, row), text);
       if (!resolvedTokens.ok) {
         return {
           ok: false,

@@ -2,7 +2,7 @@ import type {
   DataTableColumn,
   DataTableRowModel
 } from "./types";
-import { findOptionByValue } from "./select-options";
+import { findOptionByValue, getStaticOptions, resolveOptions } from "./select-options";
 
 const COMMON_DATE_LOCALES = ["en-US", "en-GB", "pt-BR", "pt-PT", "es-ES", "fr-FR", "de-DE", "it-IT"];
 const monthLookupCache = new Map<string, ReadonlyMap<string, number>>();
@@ -152,7 +152,8 @@ function parseNumericDate(raw: string, locale: string | undefined): string | nul
 
 export function formatColumnValue<TRow extends DataTableRowModel>(
   column: DataTableColumn<TRow>,
-  value: string | number | boolean | null | Date | ReadonlyArray<string>
+  value: string | number | boolean | null | Date | ReadonlyArray<string>,
+  row?: TRow
 ): string {
   if (value === null) {
     return "";
@@ -178,16 +179,17 @@ export function formatColumnValue<TRow extends DataTableRowModel>(
     }
     case "select": {
       const textValue = typeof value === "string" ? value : "";
-      const option = findOptionByValue(column.options, textValue);
+      const option = findOptionByValue(row ? resolveOptions(column, row) : getStaticOptions(column), textValue);
       return option ? option.label : textValue;
     }
     case "multiselect": {
       if (!Array.isArray(value)) {
         return "";
       }
+      const options = row ? resolveOptions(column, row) : getStaticOptions(column);
       const labels = value
         .map((entry) => {
-          const option = findOptionByValue(column.options, entry);
+          const option = findOptionByValue(options, entry);
           return option ? option.label : entry;
         })
         .filter((entry) => entry.length > 0);

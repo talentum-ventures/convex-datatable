@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { ChevronDown, ChevronUp, EyeOff, Pin, PinOff } from "lucide-react";
 import type { FilterOperator, DataTableColumn, DataTableRowModel } from "../core/types";
 import { filterOperatorsForColumn } from "../core/filtering";
+import { getStaticOptions } from "../core/select-options";
 import type { ColumnMenuAnchor } from "../hooks/use-table-columns";
 import { useHeaderMenuPosition } from "../hooks/use-header-menu-position";
 import { Button, Checkbox, Input } from "./primitives";
@@ -51,6 +52,13 @@ export function ColumnMenu<TRow extends DataTableRowModel>({
   onToggleFilterValue
 }: ColumnMenuProps<TRow>): JSX.Element {
   const filterOperators = filterOperatorsForColumn(column);
+  const staticOptions =
+    column.kind === "select" || column.kind === "multiselect"
+      ? getStaticOptions(column)
+      : [];
+  const showOptionFilters =
+    (column.kind === "select" || column.kind === "multiselect") &&
+    staticOptions.length > 0;
   const menuRef = useRef<HTMLDivElement | null>(null);
   const style = useHeaderMenuPosition(trigger, anchor);
 
@@ -206,9 +214,9 @@ export function ColumnMenu<TRow extends DataTableRowModel>({
             </div>
           )}
 
-          {column.kind === "select" || column.kind === "multiselect" ? (
+          {showOptionFilters ? (
             <div className="max-h-36 space-y-1 overflow-auto rounded-md border border-slate-200 p-2">
-              {column.options.map((option) => (
+              {staticOptions.map((option) => (
                 <label
                   key={`${column.id}-${option.value}`}
                   className="flex items-center gap-2 text-xs text-slate-700"

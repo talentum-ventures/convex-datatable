@@ -1,4 +1,36 @@
-import type { SelectOption } from "./types";
+import type {
+  DataTableRowModel,
+  MultiSelectColumn,
+  SelectColumn,
+  SelectOption
+} from "./types";
+
+type OptionColumn<TRow extends DataTableRowModel> =
+  | SelectColumn<TRow>
+  | MultiSelectColumn<TRow>;
+
+export function hasStaticOptions<TRow extends DataTableRowModel>(
+  column: OptionColumn<TRow>
+): column is OptionColumn<TRow> & { options: ReadonlyArray<SelectOption> } {
+  return Array.isArray(column.options);
+}
+
+export function getStaticOptions<TRow extends DataTableRowModel>(
+  column: OptionColumn<TRow>
+): ReadonlyArray<SelectOption> {
+  return hasStaticOptions(column) ? column.options : [];
+}
+
+export function resolveOptions<TRow extends DataTableRowModel>(
+  column: OptionColumn<TRow>,
+  row: TRow
+): ReadonlyArray<SelectOption> {
+  if (typeof column.getOptions === "function") {
+    return column.getOptions(row);
+  }
+
+  return column.options;
+}
 
 export type ResolvedMultiSelectTokens =
   | {

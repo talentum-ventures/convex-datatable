@@ -47,6 +47,7 @@ import type {
   DataTableFeatureFlags,
   DataTableProps,
   DataTableRowModel,
+  DataTableToolbarState,
   DataTableThemeTokens,
   EditingCellState,
   RowId
@@ -184,6 +185,8 @@ const DataTableInner = <TRow extends DataTableRowModel>({
   surface = "default",
   className,
   collaborators,
+  defaultDraftRow,
+  renderToolbar,
   onActiveCellChange,
   onError
 }: DataTableProps<TRow>): JSX.Element => {
@@ -296,6 +299,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
     rowActionMenuRowId,
     setRowActionMenuRowId,
     draftRow,
+    hasTouchedDraftRow,
     draftEditingColumnId,
     setDraftEditingColumnId,
     draftRowRef,
@@ -318,6 +322,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
     rowsRefresh: rowsResult.refresh,
     rowDeleteEnabled: mergedFeatures.rowDelete,
     rowAddEnabled: mergedFeatures.rowAdd,
+    ...(defaultDraftRow ? { defaultDraftRow } : {}),
     undoEnabled: mergedFeatures.undo,
     setEditingCell,
     undoStack
@@ -529,7 +534,26 @@ const DataTableInner = <TRow extends DataTableRowModel>({
   });
 
   const hiddenColumns = useMemo(
-    () => orderedColumns.filter((column) => columnVisibility[column.id] === false),
+    () =>
+      orderedColumns
+        .filter((column) => columnVisibility[column.id] === false)
+        .map((column) => ({
+          id: column.id,
+          header: column.header
+        })),
+    [columnVisibility, orderedColumns]
+  );
+  const selectedRows = useMemo(
+    () => mergedRows.filter((row) => rowSelection[getRowId(row)]),
+    [getRowId, mergedRows, rowSelection]
+  );
+  const orderedToolbarColumns = useMemo(
+    () =>
+      orderedColumns.map((column) => ({
+        id: column.id,
+        header: column.header,
+        isVisible: columnVisibility[column.id] !== false
+      })),
     [columnVisibility, orderedColumns]
   );
   const visibleColumnsVersion = useMemo(
@@ -1014,7 +1038,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
 
     tableBodyRef.current?.scrollToIndex(displayedRows.length, "end");
 
-    if (hasPendingDraftValues) {
+    if (hasPendingDraftValues && hasTouchedDraftRow) {
       void commitDraftRow();
       return;
     }
@@ -1027,17 +1051,77 @@ const DataTableInner = <TRow extends DataTableRowModel>({
     commitDraftRow,
     displayedRows.length,
     draftRowRef,
+    hasTouchedDraftRow,
     firstVisibleDraftColumnId,
     setDraftEditingColumnId,
     setEditingCell
   ]);
   const handleDeleteSelected = useCallback(() => {
-    const selectedRows = mergedRows.filter((row) => rowSelection[getRowId(row)]);
     void deleteRowsNow(selectedRows);
-  }, [deleteRowsNow, getRowId, mergedRows, rowSelection]);
+  }, [deleteRowsNow, selectedRows]);
   const handleCopySelection = useCallback(() => {
     void copySelection();
   }, [copySelection]);
+  const showColumn = useCallback((columnId: string) => {
+    table.getColumn(columnId)?.toggleVisibility(true);
+  }, [table]);
+  const showAllColumns = useCallback(() => {
+    for (const column of hiddenColumns) {
+      table.getColumn(column.id)?.toggleVisibility(true);
+    }
+  }, [hiddenColumns, table]);
+  const toolbarState = useMemo<DataTableToolbarState>(
+    () => ({
+      canAddRow: mergedFeatures.rowAdd && Boolean(dataSource.createRow),
+      addRow: handleAddRow,
+      canDeleteSelected:
+        mergedFeatures.rowDelete &&
+        Boolean(dataSource.deleteRows) &&
+        selectedRows.length > 0,
+      deleteSelected: handleDeleteSelected,
+      selectedRowCount: selectedRows.length,
+      canCopy: mergedFeatures.clipboardCopy,
+      copy: handleCopySelection,
+      hiddenColumns,
+      showColumn,
+      showAllColumns,
+      isLoading: rowsResult.isLoading
+    }),
+    [
+      dataSource.createRow,
+      dataSource.deleteRows,
+      handleAddRow,
+      handleCopySelection,
+      handleDeleteSelected,
+      hiddenColumns,
+      mergedFeatures.clipboardCopy,
+      mergedFeatures.rowAdd,
+      mergedFeatures.rowDelete,
+      rowsResult.isLoading,
+      selectedRows.length,
+      showAllColumns,
+      showColumn
+    ]
+  );
+  const toolbarContent = renderToolbar
+    ? renderToolbar(toolbarState)
+    : (
+        <TableToolbar
+          canAddRow={toolbarState.canAddRow}
+          canDeleteSelected={mergedFeatures.rowDelete && Boolean(dataSource.deleteRows)}
+          selectedRowCount={toolbarState.selectedRowCount}
+          canCopy={toolbarState.canCopy}
+          canManageVisibility={mergedFeatures.columnVisibility}
+          isLoading={toolbarState.isLoading}
+          hiddenColumns={toolbarState.hiddenColumns}
+          orderedColumns={orderedToolbarColumns}
+          onAddRow={toolbarState.addRow}
+          onDeleteSelected={toolbarState.deleteSelected}
+          onCopy={toolbarState.copy}
+          onShowColumn={toolbarState.showColumn}
+          onShowAllColumns={toolbarState.showAllColumns}
+        />
+      );
   const handleBeginDraftEdit = useCallback((columnId: string) => {
     setEditingCell(null);
     setDraftEditingColumnId(columnId);
@@ -1065,24 +1149,9 @@ const DataTableInner = <TRow extends DataTableRowModel>({
           )}
           style={rootStyle}
         >
-          <div className="mb-3">
-            <TableToolbar
-              canAddRow={mergedFeatures.rowAdd && Boolean(dataSource.createRow)}
-              canDeleteRows={mergedFeatures.rowDelete && Boolean(dataSource.deleteRows)}
-              canCopySelection={mergedFeatures.clipboardCopy}
-              canManageVisibility={mergedFeatures.columnVisibility}
-              isLoadingRows={rowsResult.isLoading}
-              hiddenColumns={hiddenColumns}
-              orderedColumns={orderedColumns}
-              table={table}
-              rowSelection={rowSelection}
-              mergedRows={mergedRows}
-              getRowId={getRowId}
-              onAddRow={handleAddRow}
-              onDeleteSelected={handleDeleteSelected}
-              onCopy={handleCopySelection}
-            />
-          </div>
+          {toolbarContent !== null && toolbarContent !== undefined && toolbarContent !== false ? (
+            <div className="mb-3">{toolbarContent}</div>
+          ) : null}
 
           <div
             className={cn(

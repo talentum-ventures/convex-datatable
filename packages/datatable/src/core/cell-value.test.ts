@@ -204,6 +204,47 @@ describe("cell value clipboard helpers", () => {
     expect(expectValidParse(parseClipboardToCellValue(textColumn, row, "alpha"))).toBe("input:alpha");
   });
 
+  it("uses row-aware options when serializing and parsing select values", () => {
+    const currentRow = {
+      ...row,
+      meta: "product"
+    };
+    const selectColumn: DataTableColumn<Row> = {
+      id: "status",
+      field: "status",
+      header: "Status",
+      kind: "select",
+      getOptions: (sourceRow) =>
+        sourceRow.meta === "product"
+          ? [{ value: "todo", label: "Product todo", colorClass: "bg-slate-100 text-slate-700" }]
+          : [{ value: "done", label: "Ops done", colorClass: "bg-emerald-100 text-emerald-700" }]
+    };
+    const multiColumn: DataTableColumn<Row> = {
+      id: "tags",
+      field: "tags",
+      header: "Tags",
+      kind: "multiselect",
+      getOptions: (sourceRow) =>
+        sourceRow.meta === "product"
+          ? [
+              { value: "urgent", label: "Product urgent", colorClass: "bg-rose-100 text-rose-700" },
+              { value: "ops", label: "Product ops", colorClass: "bg-cyan-100 text-cyan-700" }
+            ]
+          : [{ value: "ops", label: "Ops", colorClass: "bg-cyan-100 text-cyan-700" }]
+    };
+
+    expect(serializeCellForClipboard(selectColumn, currentRow, "todo")).toBe("Product todo");
+    expect(serializeCellForClipboard(multiColumn, currentRow, ["urgent", "ops"])).toBe(
+      "Product urgent, Product ops"
+    );
+    expect(expectValidParse(parseClipboardToCellValue(selectColumn, currentRow, "Product todo"))).toBe(
+      "todo"
+    );
+    expect(
+      expectValidParse(parseClipboardToCellValue(multiColumn, currentRow, "Product urgent, Product ops"))
+    ).toEqual(["urgent", "ops"]);
+  });
+
   it("supports reactNode custom parse/serialize", () => {
     const reactNodeColumn: DataTableColumn<Row> = {
       id: "meta",

@@ -38,6 +38,12 @@ function asRecord<TValue>(entries: ReadonlyArray<readonly [string, TValue]>): Re
   return output;
 }
 
+function cloneDraftRow<TRow extends DataTableRowModel>(
+  draftRow: Partial<TRow> | undefined
+): Partial<TRow> {
+  return draftRow ? { ...draftRow } : {};
+}
+
 export type UseTableRowsArgs<TRow extends DataTableRowModel> = {
   sourceRows: ReadonlyArray<TRow>;
   getRowId: (row: TRow) => RowId;
@@ -47,6 +53,7 @@ export type UseTableRowsArgs<TRow extends DataTableRowModel> = {
   rowsRefresh: () => void;
   rowDeleteEnabled: boolean;
   rowAddEnabled: boolean;
+  defaultDraftRow?: Partial<TRow>;
   undoEnabled: boolean;
   setEditingCell: Dispatch<SetStateAction<EditingCellState>>;
   undoStack: UseUndoStackResult<TRow>;
@@ -60,6 +67,7 @@ export type UseTableRowsResult<TRow extends DataTableRowModel> = {
   rowActionMenuRowId: RowId | null;
   setRowActionMenuRowId: Dispatch<SetStateAction<RowId | null>>;
   draftRow: Partial<TRow>;
+  hasTouchedDraftRow: boolean;
   draftEditingColumnId: string | null;
   setDraftEditingColumnId: Dispatch<SetStateAction<string | null>>;
   draftRowRef: React.MutableRefObject<Partial<TRow>>;
@@ -84,6 +92,7 @@ export function useTableRows<TRow extends DataTableRowModel>({
   rowsRefresh,
   rowDeleteEnabled,
   rowAddEnabled,
+  defaultDraftRow,
   undoEnabled,
   setEditingCell,
   undoStack
@@ -97,13 +106,46 @@ export function useTableRows<TRow extends DataTableRowModel>({
   const [optimisticRows, setOptimisticRows] = useState<Record<RowId, TRow>>({});
   const [deletedRows, setDeletedRows] = useState<Record<RowId, TRow>>({});
   const [rowActionMenuRowId, setRowActionMenuRowId] = useState<RowId | null>(null);
-  const [draftRow, setDraftRow] = useState<Partial<TRow>>({});
+  const [draftRow, setDraftRow] = useState<Partial<TRow>>(() => cloneDraftRow(defaultDraftRow));
   const [draftEditingColumnId, setDraftEditingColumnId] = useState<string | null>(null);
   const draftRowRef = useRef<Partial<TRow>>(draftRow);
+  const touchedDraftFieldsRef = useRef<Set<string>>(new Set());
+  const previousDefaultDraftRowRef = useRef<Partial<TRow>>(cloneDraftRow(defaultDraftRow));
   const editingCellRef = useRef<EditingCellState>(null);
   const editingSnapshotRef = useRef<Record<RowId, EditingSnapshot>>({});
 
   draftRowRef.current = draftRow;
+
+  useEffect(() => {
+    const nextDefaultDraftRow = cloneDraftRow(defaultDraftRow);
+    const previousDefaultDraftRow = previousDefaultDraftRowRef.current;
+    previousDefaultDraftRowRef.current = nextDefaultDraftRow;
+
+    setDraftRow((currentDraftRow) => {
+      const nextDraftRow = { ...currentDraftRow };
+      const touchedDraftFields = touchedDraftFieldsRef.current;
+      const allKeys = new Set([
+        ...Object.keys(previousDefaultDraftRow),
+        ...Object.keys(nextDefaultDraftRow)
+      ]);
+
+      for (const key of allKeys) {
+        if (touchedDraftFields.has(key)) {
+          continue;
+        }
+
+        if (key in nextDefaultDraftRow) {
+          nextDraftRow[key as keyof TRow] = nextDefaultDraftRow[key as keyof TRow];
+          continue;
+        }
+
+        delete nextDraftRow[key as keyof TRow];
+      }
+
+      draftRowRef.current = nextDraftRow;
+      return nextDraftRow;
+    });
+  }, [defaultDraftRow]);
 
   const deletedRowIds = useMemo(() => new Set(Object.keys(deletedRows)), [deletedRows]);
 
@@ -337,8 +379,10 @@ export function useTableRows<TRow extends DataTableRowModel>({
 
     try {
       await dataSource.createRow(currentDraftRow);
-      draftRowRef.current = {};
-      setDraftRow({});
+      touchedDraftFieldsRef.current = new Set();
+      const resetDraftRow = cloneDraftRow(previousDefaultDraftRowRef.current);
+      draftRowRef.current = resetDraftRow;
+      setDraftRow(resetDraftRow);
       setDraftEditingColumnId(null);
       rowsRefresh();
       toast.success("Row added");
@@ -353,6 +397,7 @@ export function useTableRows<TRow extends DataTableRowModel>({
       [column.field]: value
     };
 
+    touchedDraftFieldsRef.current.add(column.field);
     draftRowRef.current = nextDraftRow;
     setDraftRow(nextDraftRow);
     setDraftEditingColumnId(null);
@@ -363,8 +408,10 @@ export function useTableRows<TRow extends DataTableRowModel>({
   }, []);
 
   const clearDraftRow = useCallback(() => {
-    draftRowRef.current = {};
-    setDraftRow({});
+    touchedDraftFieldsRef.current = new Set();
+    const resetDraftRow = cloneDraftRow(previousDefaultDraftRowRef.current);
+    draftRowRef.current = resetDraftRow;
+    setDraftRow(resetDraftRow);
     setDraftEditingColumnId(null);
   }, []);
 
@@ -376,6 +423,7 @@ export function useTableRows<TRow extends DataTableRowModel>({
     rowActionMenuRowId,
     setRowActionMenuRowId,
     draftRow,
+    hasTouchedDraftRow: touchedDraftFieldsRef.current.size > 0,
     draftEditingColumnId,
     setDraftEditingColumnId,
     draftRowRef,

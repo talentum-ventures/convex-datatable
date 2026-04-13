@@ -1,45 +1,44 @@
 import { memo } from "react";
 import { ChevronDown, Copy, LoaderCircle, Plus, Rows3, Trash2 } from "lucide-react";
-import type { Table } from "@tanstack/react-table";
 import { cn } from "../core/cn";
-import type { DataTableColumn, DataTableRowModel, RowId } from "../core/types";
+import type { DataTableToolbarState } from "../core/types";
 import { Button } from "./primitives";
 
-export type TableToolbarProps<TRow extends DataTableRowModel> = {
+export type TableToolbarProps = {
   canAddRow: boolean;
-  canDeleteRows: boolean;
-  canCopySelection: boolean;
+  canDeleteSelected: boolean;
+  selectedRowCount: number;
+  canCopy: boolean;
   canManageVisibility: boolean;
-  isLoadingRows: boolean;
-  hiddenColumns: ReadonlyArray<DataTableColumn<TRow>>;
-  orderedColumns: ReadonlyArray<DataTableColumn<TRow>>;
-  table: Table<TRow>;
-  rowSelection: Readonly<Record<string, boolean>>;
-  mergedRows: ReadonlyArray<TRow>;
-  getRowId: (row: TRow) => RowId;
+  isLoading: boolean;
+  hiddenColumns: DataTableToolbarState["hiddenColumns"];
+  orderedColumns: ReadonlyArray<{
+    id: string;
+    header: string;
+    isVisible: boolean;
+  }>;
   onAddRow: () => void;
   onDeleteSelected: () => void;
   onCopy: () => void;
+  onShowColumn: (columnId: string) => void;
+  onShowAllColumns: () => void;
 };
 
-function TableToolbarInner<TRow extends DataTableRowModel>({
+function TableToolbarInner({
   canAddRow,
-  canDeleteRows,
-  canCopySelection,
+  canDeleteSelected,
+  selectedRowCount,
+  canCopy,
   canManageVisibility,
-  isLoadingRows,
+  isLoading,
   hiddenColumns,
   orderedColumns,
-  table,
-  rowSelection,
-  mergedRows,
-  getRowId,
   onAddRow,
   onDeleteSelected,
-  onCopy
-}: TableToolbarProps<TRow>): JSX.Element {
-  const selectedRowCount = Object.keys(rowSelection).length;
-
+  onCopy,
+  onShowColumn,
+  onShowAllColumns
+}: TableToolbarProps): JSX.Element {
   return (
     <div className="grid gap-3 md:grid-cols-[1fr_auto]">
       <div className="flex flex-wrap items-center gap-2">
@@ -50,11 +49,11 @@ function TableToolbarInner<TRow extends DataTableRowModel>({
           </Button>
         ) : null}
 
-        {canDeleteRows ? (
+        {canDeleteSelected ? (
           <Button
             variant="destructive"
             size="sm"
-            disabled={selectedRowCount === 0 || mergedRows.every((row) => !rowSelection[getRowId(row)])}
+            disabled={selectedRowCount === 0}
             onClick={onDeleteSelected}
           >
             <Trash2 className="h-4 w-4" />
@@ -62,14 +61,14 @@ function TableToolbarInner<TRow extends DataTableRowModel>({
           </Button>
         ) : null}
 
-        {canCopySelection ? (
+        {canCopy ? (
           <Button variant="secondary" size="sm" onClick={onCopy}>
             <Copy className="h-4 w-4" />
             Copy
           </Button>
         ) : null}
 
-        {isLoadingRows ? (
+        {isLoading ? (
           <span className="inline-flex items-center gap-1 text-xs text-slate-500">
             <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
             Loading rows...
@@ -92,17 +91,13 @@ function TableToolbarInner<TRow extends DataTableRowModel>({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  for (const column of hiddenColumns) {
-                    table.getColumn(column.id)?.toggleVisibility(true);
-                  }
-                }}
+                onClick={onShowAllColumns}
               >
                 Show all hidden
               </Button>
             </div>
             {orderedColumns.map((column) => {
-              const isVisible = table.getColumn(column.id)?.getIsVisible() ?? true;
+              const isVisible = column.isVisible;
               return (
                 <div
                   key={column.id}
@@ -126,7 +121,7 @@ function TableToolbarInner<TRow extends DataTableRowModel>({
                       variant="secondary"
                       size="sm"
                       onClick={() => {
-                        table.getColumn(column.id)?.toggleVisibility(true);
+                        onShowColumn(column.id);
                       }}
                     >
                       Show
@@ -144,4 +139,4 @@ function TableToolbarInner<TRow extends DataTableRowModel>({
   );
 }
 
-export const TableToolbar = memo(TableToolbarInner) as typeof TableToolbarInner;
+export const TableToolbar = memo(TableToolbarInner);

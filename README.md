@@ -2,8 +2,8 @@
 
 A production-ready, fully typed React data-grid component with Airtable-style editing, selection, clipboard, persistence, and optional Convex real-time adapters. Built on [TanStack Table](https://tanstack.com/table) internally, but exposes a clean public API with **zero TanStack types leaked**.
 
-[![npm](https://img.shields.io/npm/v/@talentum-ventures/convex-datatable)](https://www.npmjs.com/package/@talentum-ventures/convex-datatable)
-[![license](https://img.shields.io/npm/l/@talentum-ventures/convex-datatable)](./LICENSE)
+[npm](https://www.npmjs.com/package/@talentum-ventures/convex-datatable)
+[license](./LICENSE)
 
 ---
 
@@ -95,11 +95,13 @@ npm install @talentum-ventures/convex-datatable
 
 Peer dependencies:
 
-| Package     | Version    | Required |
-|-------------|------------|----------|
-| `react`     | `^18.3.1`  | Yes      |
-| `react-dom` | `^18.3.1`  | Yes      |
-| `convex`    | `^1.32.0`  | No — only needed if using the Convex adapter |
+
+| Package     | Version   | Required                                     |
+| ----------- | --------- | -------------------------------------------- |
+| `react`     | `^18.3.1` | Yes                                          |
+| `react-dom` | `^18.3.1` | Yes                                          |
+| `convex`    | `^1.32.0` | No — only needed if using the Convex adapter |
+
 
 ### Styling
 
@@ -232,29 +234,31 @@ If you prefer a plain look, skip `DataTableContainer` and pass `surface="plain"`
 
 Every column kind shares these properties (from `ColumnCommon<TRow, K, TValue>`):
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `id` | `string` | Yes | Unique column identifier. |
-| `field` | `StringKey<TRow>` | Yes | The row property this column reads from. Must be a valid key of your row type. |
-| `header` | `string` | Yes | Display label in the header. |
-| `description` | `string` | No | Tooltip text shown on the header. |
-| `width` | `number` | No | Initial column width in pixels. |
-| `minWidth` | `number` | No | Minimum resize width. |
-| `maxWidth` | `number` | No | Maximum resize width. |
-| `isEditable` | `boolean` | No | Whether this column allows editing. Requires the `editing` feature flag. |
-| `isResizable` | `boolean` | No | Override the global `columnResize` flag for this column. |
-| `isReorderable` | `boolean` | No | Override the global `columnReorder` flag for this column. |
-| `isPinnable` | `boolean` | No | Override the global `columnPinning` flag for this column. |
-| `isHideable` | `boolean` | No | Override the global `columnVisibility` flag for this column. |
-| `isSortable` | `boolean` | No | Override the global `columnSort` flag for this column. |
-| `isFilterable` | `boolean` | No | Override the global `columnFilter` flag for this column. |
-| `accessor` | `(row: TRow) => TValue` | No | Custom value accessor. If omitted, the value is read from `row[field]`. |
-| `validator` | `(value: TValue, row: TRow) => string \| null` | No | Cell-level validation. Return an error message or `null`. |
-| `parseInput` | `(input: string, row: TRow) => TValue` | No | Parse user-entered text into the cell's value type. |
-| `serializeClipboard` | `(value: TValue, row: TRow) => string` | No | Serialize the cell value for clipboard copy. |
-| `parseClipboard` | `(text: string, row: TRow) => TValue` | No | Parse clipboard text into the cell's value type (for paste). |
-| `renderCell` | `(ctx: DataTableCellRenderContext) => ReactNode` | No | Custom cell renderer. |
-| `renderEditor` | `(ctx: DataTableCellEditorContext) => ReactNode` | No | Custom editor component when the cell is being edited. |
+
+| Property             | Type                                             | Required | Description                                                                    |
+| -------------------- | ------------------------------------------------ | -------- | ------------------------------------------------------------------------------ |
+| `id`                 | `string`                                         | Yes      | Unique column identifier.                                                      |
+| `field`              | `StringKey<TRow>`                                | Yes      | The row property this column reads from. Must be a valid key of your row type. |
+| `header`             | `string`                                         | Yes      | Display label in the header.                                                   |
+| `description`        | `string`                                         | No       | Tooltip text shown on the header.                                              |
+| `width`              | `number`                                         | No       | Initial column width in pixels.                                                |
+| `minWidth`           | `number`                                         | No       | Minimum resize width.                                                          |
+| `maxWidth`           | `number`                                         | No       | Maximum resize width.                                                          |
+| `isEditable`         | `boolean`                                        | No       | Whether this column allows editing. Requires the `editing` feature flag.       |
+| `isResizable`        | `boolean`                                        | No       | Override the global `columnResize` flag for this column.                       |
+| `isReorderable`      | `boolean`                                        | No       | Override the global `columnReorder` flag for this column.                      |
+| `isPinnable`         | `boolean`                                        | No       | Override the global `columnPinning` flag for this column.                      |
+| `isHideable`         | `boolean`                                        | No       | Override the global `columnVisibility` flag for this column.                   |
+| `isSortable`         | `boolean`                                        | No       | Override the global `columnSort` flag for this column.                         |
+| `isFilterable`       | `boolean`                                        | No       | Override the global `columnFilter` flag for this column.                       |
+| `accessor`           | `(row: TRow) => TValue`                          | No       | Custom value accessor. If omitted, the value is read from `row[field]`.        |
+| `validator`          | `(value: TValue, row: TRow) => string | null`    | No       | Cell-level validation. Return an error message or `null`.                      |
+| `parseInput`         | `(input: string, row: TRow) => TValue`           | No       | Parse user-entered text into the cell's value type.                            |
+| `serializeClipboard` | `(value: TValue, row: TRow) => string`           | No       | Serialize the cell value for clipboard copy.                                   |
+| `parseClipboard`     | `(text: string, row: TRow) => TValue`            | No       | Parse clipboard text into the cell's value type (for paste).                   |
+| `renderCell`         | `(ctx: DataTableCellRenderContext) => ReactNode` | No       | Custom cell renderer.                                                          |
+| `renderEditor`       | `(ctx: DataTableCellEditorContext) => ReactNode` | No       | Custom editor component when the cell is being edited.                         |
+
 
 ### Column Kinds
 
@@ -266,9 +270,11 @@ Single-line text field.
 { id: "name", field: "name", header: "Name", kind: "text", placeholder: "Enter name..." }
 ```
 
-| Extra Property | Type | Description |
-|----------------|------|-------------|
-| `placeholder` | `string` | Placeholder text for the editor. |
+
+| Extra Property | Type     | Description                      |
+| -------------- | -------- | -------------------------------- |
+| `placeholder`  | `string` | Placeholder text for the editor. |
+
 
 #### `longText`
 
@@ -278,10 +284,12 @@ Multi-line text field with `pre-wrap` rendering.
 { id: "notes", field: "notes", header: "Notes", kind: "longText", maxLines: 5 }
 ```
 
-| Extra Property | Type | Description |
-|----------------|------|-------------|
-| `placeholder` | `string` | Placeholder text for the editor. |
-| `maxLines` | `number` | Maximum visible lines before truncation. |
+
+| Extra Property | Type     | Description                              |
+| -------------- | -------- | ---------------------------------------- |
+| `placeholder`  | `string` | Placeholder text for the editor.         |
+| `maxLines`     | `number` | Maximum visible lines before truncation. |
+
 
 #### `number`
 
@@ -291,11 +299,13 @@ Numeric field with optional precision bounds.
 { id: "qty", field: "qty", header: "Quantity", kind: "number", precision: 0, minimum: 0 }
 ```
 
-| Extra Property | Type | Description |
-|----------------|------|-------------|
-| `precision` | `number` | Decimal places. |
-| `minimum` | `number` | Minimum allowed value. |
-| `maximum` | `number` | Maximum allowed value. |
+
+| Extra Property | Type     | Description            |
+| -------------- | -------- | ---------------------- |
+| `precision`    | `number` | Decimal places.        |
+| `minimum`      | `number` | Minimum allowed value. |
+| `maximum`      | `number` | Maximum allowed value. |
+
 
 #### `currency`
 
@@ -305,12 +315,14 @@ Formatted currency value using `Intl.NumberFormat`.
 { id: "price", field: "price", header: "Price", kind: "currency", currency: "USD", locale: "en-US" }
 ```
 
-| Extra Property | Type | Required | Description |
-|----------------|------|----------|-------------|
-| `currency` | `string` | Yes | ISO 4217 currency code (e.g. `"USD"`, `"EUR"`). |
-| `locale` | `string` | No | BCP 47 locale for formatting. |
-| `minimumFractionDigits` | `number` | No | Minimum decimal digits. |
-| `maximumFractionDigits` | `number` | No | Maximum decimal digits. |
+
+| Extra Property          | Type     | Required | Description                                     |
+| ----------------------- | -------- | -------- | ----------------------------------------------- |
+| `currency`              | `string` | Yes      | ISO 4217 currency code (e.g. `"USD"`, `"EUR"`). |
+| `locale`                | `string` | No       | BCP 47 locale for formatting.                   |
+| `minimumFractionDigits` | `number` | No       | Minimum decimal digits.                         |
+| `maximumFractionDigits` | `number` | No       | Maximum decimal digits.                         |
+
 
 #### `select`
 
@@ -329,18 +341,22 @@ Single-value dropdown from a predefined set of options.
 }
 ```
 
-| Extra Property | Type | Required | Description |
-|----------------|------|----------|-------------|
-| `options` | `SelectOption[]` | Yes | Available options. |
 
-**`SelectOption`:**
+| Extra Property | Type             | Required | Description        |
+| -------------- | ---------------- | -------- | ------------------ |
+| `options`      | `SelectOption[]` | Yes      | Available options. |
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `value` | `string` | Yes | Stored value. |
-| `label` | `string` | Yes | Display label. |
-| `colorClass` | `string` | Yes | Tailwind classes for the badge (e.g. `"bg-blue-100 text-blue-800"`). |
-| `icon` | `ComponentType` | No | Optional icon component. |
+
+`**SelectOption`:**
+
+
+| Property     | Type            | Required | Description                                                          |
+| ------------ | --------------- | -------- | -------------------------------------------------------------------- |
+| `value`      | `string`        | Yes      | Stored value.                                                        |
+| `label`      | `string`        | Yes      | Display label.                                                       |
+| `colorClass` | `string`        | Yes      | Tailwind classes for the badge (e.g. `"bg-blue-100 text-blue-800"`). |
+| `icon`       | `ComponentType` | No       | Optional icon component.                                             |
+
 
 #### `multiselect`
 
@@ -359,9 +375,11 @@ Multi-value tag selector. The cell value is `ReadonlyArray<string>`.
 }
 ```
 
-| Extra Property | Type | Required | Description |
-|----------------|------|----------|-------------|
-| `options` | `SelectOption[]` | Yes | Available options. |
+
+| Extra Property | Type             | Required | Description        |
+| -------------- | ---------------- | -------- | ------------------ |
+| `options`      | `SelectOption[]` | Yes      | Available options. |
+
 
 #### `link`
 
@@ -371,10 +389,12 @@ Clickable URL with optional target and rel attributes.
 { id: "url", field: "url", header: "Website", kind: "link", target: "_blank" }
 ```
 
-| Extra Property | Type | Description |
-|----------------|------|-------------|
-| `target` | `"_self" \| "_blank"` | Link target. |
-| `rel` | `string` | `rel` attribute value. |
+
+| Extra Property | Type                 | Description            |
+| -------------- | -------------------- | ---------------------- |
+| `target`       | `"_self" | "_blank"` | Link target.           |
+| `rel`          | `string`             | `rel` attribute value. |
+
 
 #### `date`
 
@@ -384,11 +404,13 @@ Date value formatted via `Intl.DateTimeFormat`. Accepts `string` (ISO) or `Date`
 { id: "createdAt", field: "createdAt", header: "Created", kind: "date", dateStyle: "medium" }
 ```
 
-| Extra Property | Type | Description |
-|----------------|------|-------------|
-| `locale` | `string` | BCP 47 locale. |
-| `timezone` | `string` | IANA timezone. |
-| `dateStyle` | `"full" \| "long" \| "medium" \| "short"` | Date format style. |
+
+| Extra Property | Type                                   | Description        |
+| -------------- | -------------------------------------- | ------------------ |
+| `locale`       | `string`                               | BCP 47 locale.     |
+| `timezone`     | `string`                               | IANA timezone.     |
+| `dateStyle`    | `"full" | "long" | "medium" | "short"` | Date format style. |
+
 
 #### `reactNode`
 
@@ -418,36 +440,42 @@ Fully custom column for arbitrary React content. All five lifecycle callbacks ar
 }
 ```
 
-| Required Property | Type | Description |
-|-------------------|------|-------------|
-| `renderCell` | `(ctx) => ReactNode` | Render the display content. |
-| `renderEditor` | `(ctx) => ReactNode` | Render the editor. |
-| `parseInput` | `(input, row) => DataTableReactValue` | Parse text input to value. |
-| `parseClipboard` | `(text, row) => DataTableReactValue` | Parse clipboard text to value. |
-| `serializeClipboard` | `(value, row) => string` | Serialize value for clipboard. |
+
+| Required Property    | Type                                  | Description                    |
+| -------------------- | ------------------------------------- | ------------------------------ |
+| `renderCell`         | `(ctx) => ReactNode`                  | Render the display content.    |
+| `renderEditor`       | `(ctx) => ReactNode`                  | Render the editor.             |
+| `parseInput`         | `(input, row) => DataTableReactValue` | Parse text input to value.     |
+| `parseClipboard`     | `(text, row) => DataTableReactValue`  | Parse clipboard text to value. |
+| `serializeClipboard` | `(value, row) => string`              | Serialize value for clipboard. |
+
 
 ### Custom Renderers
 
 Any column kind can provide `renderCell` and `renderEditor` to override the built-in rendering.
 
-**`DataTableCellRenderContext<TRow, TValue>`:**
+`**DataTableCellRenderContext<TRow, TValue>`:**
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `row` | `TRow` | The full row data. |
-| `rowId` | `string` | The row's unique ID. |
-| `value` | `TValue` | The cell's current value. |
+
+| Property    | Type      | Description                       |
+| ----------- | --------- | --------------------------------- |
+| `row`       | `TRow`    | The full row data.                |
+| `rowId`     | `string`  | The row's unique ID.              |
+| `value`     | `TValue`  | The cell's current value.         |
 | `isEditing` | `boolean` | Whether the cell is in edit mode. |
 
-**`DataTableCellEditorContext<TRow, TValue>`:**
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `row` | `TRow` | The full row data. |
-| `rowId` | `string` | The row's unique ID. |
-| `value` | `TValue` | The cell's current value. |
-| `commit` | `(nextValue: TValue) => void` | Save the new value. |
-| `cancel` | `() => void` | Discard changes and exit edit mode. |
+`**DataTableCellEditorContext<TRow, TValue>`:**
+
+
+| Property | Type                          | Description                         |
+| -------- | ----------------------------- | ----------------------------------- |
+| `row`    | `TRow`                        | The full row data.                  |
+| `rowId`  | `string`                      | The row's unique ID.                |
+| `value`  | `TValue`                      | The cell's current value.           |
+| `commit` | `(nextValue: TValue) => void` | Save the new value.                 |
+| `cancel` | `() => void`                  | Discard changes and exit edit mode. |
+
 
 ### Validators
 
@@ -495,17 +523,19 @@ const dataSource: DataTableDataSource<MyRow> = {
 };
 ```
 
-**`DataTableRowsResult<TRow>`** (returned by `useRows`):
+`**DataTableRowsResult<TRow>**` (returned by `useRows`):
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `rows` | `ReadonlyArray<TRow>` | The current page of rows. |
-| `hasMore` | `boolean` | Whether more rows are available. |
-| `isLoading` | `boolean` | True during initial load (no rows yet). |
-| `isLoadingMore` | `boolean` | True while loading the next page (rows already visible). |
-| `error` | `string \| null` | Error message, if any. |
-| `loadMore` | `() => void` | Called by infinite scroll to load the next page. |
-| `refresh` | `() => void` | Reset and reload from the beginning. |
+
+| Property        | Type                  | Description                                              |
+| --------------- | --------------------- | -------------------------------------------------------- |
+| `rows`          | `ReadonlyArray<TRow>` | The current page of rows.                                |
+| `hasMore`       | `boolean`             | Whether more rows are available.                         |
+| `isLoading`     | `boolean`             | True during initial load (no rows yet).                  |
+| `isLoadingMore` | `boolean`             | True while loading the next page (rows already visible). |
+| `error`         | `string | null`       | Error message, if any.                                   |
+| `loadMore`      | `() => void`          | Called by infinite scroll to load the next page.         |
+| `refresh`       | `() => void`          | Reset and reload from the beginning.                     |
+
 
 ### Full CRUD Data Source
 
@@ -536,24 +566,28 @@ const dataSource: DataTableDataSource<MyRow> = {
 };
 ```
 
-| Function | Signature | Required | Description |
-|----------|-----------|----------|-------------|
-| `useRows` | `(query: DataTableQueryState) => DataTableRowsResult<TRow>` | Yes | React hook for data fetching. |
-| `createRow` | `(draft: Partial<TRow>) => Promise<TRow>` | No | Create a new row from partial data. |
-| `updateRows` | `(changes: ReadonlyArray<RowPatch<TRow>>) => Promise<void>` | No | Batch update rows. |
-| `deleteRows` | `(rowIds: ReadonlyArray<string>) => Promise<void>` | No | Delete rows by ID. |
-| `restoreRows` | `(rows: ReadonlyArray<TRow>) => Promise<void>` | No | Restore previously deleted rows. |
+
+| Function      | Signature                                                   | Required | Description                         |
+| ------------- | ----------------------------------------------------------- | -------- | ----------------------------------- |
+| `useRows`     | `(query: DataTableQueryState) => DataTableRowsResult<TRow>` | Yes      | React hook for data fetching.       |
+| `createRow`   | `(draft: Partial<TRow>) => Promise<TRow>`                   | No       | Create a new row from partial data. |
+| `updateRows`  | `(changes: ReadonlyArray<RowPatch<TRow>>) => Promise<void>` | No       | Batch update rows.                  |
+| `deleteRows`  | `(rowIds: ReadonlyArray<string>) => Promise<void>`          | No       | Delete rows by ID.                  |
+| `restoreRows` | `(rows: ReadonlyArray<TRow>) => Promise<void>`              | No       | Restore previously deleted rows.    |
+
 
 ### Query State
 
 The `DataTableQueryState` object passed to `useRows`:
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `sorting` | `ReadonlyArray<DataTableSort>` | Active sorts (e.g. `[{ columnId: "name", direction: "asc" }]`). |
-| `filters` | `ReadonlyArray<DataTableFilter>` | Active filters (e.g. `[{ columnId: "status", op: "eq", value: "active" }]`). |
-| `pageSize` | `number` | Rows per page (default `50`). |
-| `cursor` | `string \| null` | Pagination cursor (null for the first page). |
+
+| Property   | Type                             | Description                                                                  |
+| ---------- | -------------------------------- | ---------------------------------------------------------------------------- |
+| `sorting`  | `ReadonlyArray<DataTableSort>`   | Active sorts (e.g. `[{ columnId: "name", direction: "asc" }]`).              |
+| `filters`  | `ReadonlyArray<DataTableFilter>` | Active filters (e.g. `[{ columnId: "status", op: "eq", value: "active" }]`). |
+| `pageSize` | `number`                         | Rows per page (default `50`).                                                |
+| `cursor`   | `string | null`                  | Pagination cursor (null for the first page).                                 |
+
 
 ---
 
@@ -574,26 +608,28 @@ Feature flags are independent toggles merged with defaults. Pass only the flags 
 />
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `columnResize` | `true` | Drag column borders to resize. |
-| `rowResize` | `true` | Drag row borders to resize height. |
-| `columnReorder` | `true` | Drag-and-drop column headers to reorder. |
-| `columnPinning` | `true` | Pin columns left or right via the column menu. |
-| `columnVisibility` | `true` | Show/hide columns from the toolbar. |
-| `columnFilter` | `true` | Per-column filtering via the column menu. |
-| `columnSort` | `true` | Click headers or use the column menu to sort. |
-| `rowDelete` | `false` | Enable row deletion with undo toast. Requires `dataSource.deleteRows`. |
-| `rowSelect` | `true` | Show row selection checkboxes. |
-| `rowAdd` | `false` | Show "Add row" button and draft row. Requires `dataSource.createRow`. |
-| `rowActions` | `true` | Show the row action overflow menu. |
-| `editing` | `false` | Enable cell editing. Columns must also set `isEditable: true`. |
-| `cellSelect` | `true` | Enable click-to-select cells with keyboard navigation. |
-| `clipboardCopy` | `true` | Enable Ctrl+C to copy selected cells. |
-| `clipboardPaste` | `true` | Enable Ctrl+V to paste into cells. Requires `editing` and `dataSource.updateRows`. |
-| `undo` | `false` | Enable Ctrl+Z / Ctrl+Shift+Z undo/redo for edits and pastes. |
-| `infiniteScroll` | `true` | Automatically call `loadMore` when the user scrolls near the bottom. |
-| `virtualization` | `true` | Only render visible rows for large datasets (via `@tanstack/react-virtual`). |
+
+| Flag               | Default | Description                                                                        |
+| ------------------ | ------- | ---------------------------------------------------------------------------------- |
+| `columnResize`     | `true`  | Drag column borders to resize.                                                     |
+| `rowResize`        | `true`  | Drag row borders to resize height.                                                 |
+| `columnReorder`    | `true`  | Drag-and-drop column headers to reorder.                                           |
+| `columnPinning`    | `true`  | Pin columns left or right via the column menu.                                     |
+| `columnVisibility` | `true`  | Show/hide columns from the toolbar.                                                |
+| `columnFilter`     | `true`  | Per-column filtering via the column menu.                                          |
+| `columnSort`       | `true`  | Click headers or use the column menu to sort.                                      |
+| `rowDelete`        | `false` | Enable row deletion with undo toast. Requires `dataSource.deleteRows`.             |
+| `rowSelect`        | `true`  | Show row selection checkboxes.                                                     |
+| `rowAdd`           | `false` | Show "Add row" button and draft row. Requires `dataSource.createRow`.              |
+| `rowActions`       | `true`  | Show the row action overflow menu.                                                 |
+| `editing`          | `false` | Enable cell editing. Columns must also set `isEditable: true`.                     |
+| `cellSelect`       | `true`  | Enable click-to-select cells with keyboard navigation.                             |
+| `clipboardCopy`    | `true`  | Enable Ctrl+C to copy selected cells.                                              |
+| `clipboardPaste`   | `true`  | Enable Ctrl+V to paste into cells. Requires `editing` and `dataSource.updateRows`. |
+| `undo`             | `false` | Enable Ctrl+Z / Ctrl+Shift+Z undo/redo for edits and pastes.                       |
+| `infiniteScroll`   | `true`  | Automatically call `loadMore` when the user scrolls near the bottom.               |
+| `virtualization`   | `true`  | Only render visible rows for large datasets (via `@tanstack/react-virtual`).       |
+
 
 ---
 
@@ -623,17 +659,19 @@ const rowActions: DataTableRowAction<MyRow>[] = [
 <DataTable rowActions={rowActions} ... />
 ```
 
-**`DataTableRowAction<TRow>`:**
+`**DataTableRowAction<TRow>`:**
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `id` | `string` | Yes | Unique action identifier. |
-| `label` | `string` | Yes | Display text in the menu. |
-| `icon` | `ComponentType` | No | Icon component (e.g. from `lucide-react`). |
-| `variant` | `"default" \| "destructive"` | No | Visual style. Destructive actions render in red. |
-| `isVisible` | `(row: TRow) => boolean` | No | Hide the action for certain rows. |
-| `isDisabled` | `(row: TRow) => boolean` | No | Disable the action for certain rows. |
-| `onSelect` | `(ctx: { row, rowId }) => void \| Promise<void>` | Yes | Callback when the action is selected. |
+
+| Property     | Type                                            | Required | Description                                      |
+| ------------ | ----------------------------------------------- | -------- | ------------------------------------------------ |
+| `id`         | `string`                                        | Yes      | Unique action identifier.                        |
+| `label`      | `string`                                        | Yes      | Display text in the menu.                        |
+| `icon`       | `ComponentType`                                 | No       | Icon component (e.g. from `lucide-react`).       |
+| `variant`    | `"default" | "destructive"`                     | No       | Visual style. Destructive actions render in red. |
+| `isVisible`  | `(row: TRow) => boolean`                        | No       | Hide the action for certain rows.                |
+| `isDisabled` | `(row: TRow) => boolean`                        | No       | Disable the action for certain rows.             |
+| `onSelect`   | `(ctx: { row, rowId }) => void | Promise<void>` | Yes      | Callback when the action is selected.            |
+
 
 ---
 
@@ -654,7 +692,7 @@ const rowSchema = z.object({
 <DataTable rowSchema={rowSchema} ... />
 ```
 
-**`RowSchema<TRow>` interface:**
+`**RowSchema<TRow>` interface:**
 
 ```ts
 type RowSchema<TRow> = {
@@ -697,46 +735,52 @@ import { DEFAULT_THEME_TOKENS } from "@talentum-ventures/convex-datatable";
 
 ### Theme Tokens Reference
 
-| Token | Type | Default | Description |
-|-------|------|---------|-------------|
-| `fontFamily` | `string` | `"'IBM Plex Sans', 'Avenir Next', 'Segoe UI', sans-serif"` | Table font family. |
-| `radius` | `string` | `"14px"` | Border radius of the outer table container. |
-| `borderColor` | `string` | `"hsl(215 18% 85%)"` | Cell and header border color. |
-| `headerBg` | `string` | `"linear-gradient(180deg, hsl(210 33% 98%), hsl(210 35% 95%))"` | Header row background. |
-| `pinnedHeaderBg` | `string` | `"linear-gradient(180deg, hsl(210 28% 96%), hsl(210 28% 92.5%))"` | Pinned column header background. |
-| `rowBg` | `string` | `"hsl(0 0% 100%)"` | Row background. |
-| `rowHoverBg` | `string` | `"hsl(206 45% 97%)"` | Row background on hover. |
-| `pinnedRowBg` | `string` | `"hsl(210 20% 97%)"` | Pinned column cell background. |
-| `pinnedRowHoverBg` | `string` | `"hsl(206 42% 95%)"` | Pinned column cell background on hover. |
-| `pinnedShadow` | `string` | `"0 0 0 1px hsl(213 20% 84%), 0 8px 24px -16px hsl(215 30% 35%)"` | Box shadow for pinned column edges. |
-| `activeCellRing` | `string` | `"hsl(206 90% 48%)"` | Outline color of the focused cell. |
-| `selectionBg` | `string` | `"hsl(205 86% 94%)"` | Background color of selected cell ranges. |
+
+| Token              | Type     | Default                                                           | Description                                 |
+| ------------------ | -------- | ----------------------------------------------------------------- | ------------------------------------------- |
+| `fontFamily`       | `string` | `"'IBM Plex Sans', 'Avenir Next', 'Segoe UI', sans-serif"`        | Table font family.                          |
+| `radius`           | `string` | `"14px"`                                                          | Border radius of the outer table container. |
+| `borderColor`      | `string` | `"hsl(215 18% 85%)"`                                              | Cell and header border color.               |
+| `headerBg`         | `string` | `"linear-gradient(180deg, hsl(210 33% 98%), hsl(210 35% 95%))"`   | Header row background.                      |
+| `pinnedHeaderBg`   | `string` | `"linear-gradient(180deg, hsl(210 28% 96%), hsl(210 28% 92.5%))"` | Pinned column header background.            |
+| `rowBg`            | `string` | `"hsl(0 0% 100%)"`                                                | Row background.                             |
+| `rowHoverBg`       | `string` | `"hsl(206 45% 97%)"`                                              | Row background on hover.                    |
+| `pinnedRowBg`      | `string` | `"hsl(210 20% 97%)"`                                              | Pinned column cell background.              |
+| `pinnedRowHoverBg` | `string` | `"hsl(206 42% 95%)"`                                              | Pinned column cell background on hover.     |
+| `pinnedShadow`     | `string` | `"0 0 0 1px hsl(213 20% 84%), 0 8px 24px -16px hsl(215 30% 35%)"` | Box shadow for pinned column edges.         |
+| `activeCellRing`   | `string` | `"hsl(206 90% 48%)"`                                              | Outline color of the focused cell.          |
+| `selectionBg`      | `string` | `"hsl(205 86% 94%)"`                                              | Background color of selected cell ranges.   |
+
 
 ### CSS Variables
 
 Theme tokens are injected as CSS custom properties on the table root element. You can also target these in your own CSS:
 
-| CSS Variable | Token |
-|-------------|-------|
-| `--dt-font-family` | `fontFamily` |
-| `--dt-radius` | `radius` |
-| `--dt-border-color` | `borderColor` |
-| `--dt-header-bg` | `headerBg` |
-| `--dt-pinned-header-bg` | `pinnedHeaderBg` |
-| `--dt-row-bg` | `rowBg` |
-| `--dt-row-hover-bg` | `rowHoverBg` |
-| `--dt-pinned-row-bg` | `pinnedRowBg` |
+
+| CSS Variable               | Token              |
+| -------------------------- | ------------------ |
+| `--dt-font-family`         | `fontFamily`       |
+| `--dt-radius`              | `radius`           |
+| `--dt-border-color`        | `borderColor`      |
+| `--dt-header-bg`           | `headerBg`         |
+| `--dt-pinned-header-bg`    | `pinnedHeaderBg`   |
+| `--dt-row-bg`              | `rowBg`            |
+| `--dt-row-hover-bg`        | `rowHoverBg`       |
+| `--dt-pinned-row-bg`       | `pinnedRowBg`      |
 | `--dt-pinned-row-hover-bg` | `pinnedRowHoverBg` |
-| `--dt-pinned-shadow` | `pinnedShadow` |
-| `--dt-active-cell-ring` | `activeCellRing` |
-| `--dt-selection-bg` | `selectionBg` |
+| `--dt-pinned-shadow`       | `pinnedShadow`     |
+| `--dt-active-cell-ring`    | `activeCellRing`   |
+| `--dt-selection-bg`        | `selectionBg`      |
+
 
 ### Surface Variants
 
-| Value | Description |
-|-------|-------------|
+
+| Value       | Description                                                        |
+| ----------- | ------------------------------------------------------------------ |
 | `"default"` | Standard appearance with borders and background styling (default). |
-| `"plain"` | Minimal appearance without outer container styling. |
+| `"plain"`   | Minimal appearance without outer container styling.                |
+
 
 ---
 
@@ -748,15 +792,17 @@ Convex DataTable automatically persists table view state (sorting, filters, colu
 
 Table state is encoded into URL search parameters using a `dt_{tableId}_` prefix. For a table with `tableId="invoices"`:
 
-| Parameter | Example |
-|-----------|---------|
-| `dt_invoices_sort` | `amount.desc` |
-| `dt_invoices_filter` | `status.eq.s:active` |
-| `dt_invoices_order` | `name,amount,status` |
-| `dt_invoices_pin_left` | `name` |
-| `dt_invoices_pin_right` | `actions` |
-| `dt_invoices_hidden` | `description` |
-| `dt_invoices_width` | `name.220` |
+
+| Parameter               | Example              |
+| ----------------------- | -------------------- |
+| `dt_invoices_sort`      | `amount.desc`        |
+| `dt_invoices_filter`    | `status.eq.s:active` |
+| `dt_invoices_order`     | `name,amount,status` |
+| `dt_invoices_pin_left`  | `name`               |
+| `dt_invoices_pin_right` | `actions`            |
+| `dt_invoices_hidden`    | `description`        |
+| `dt_invoices_width`     | `name.220`           |
+
 
 URL parameters are debounced at 150ms to avoid history spam.
 
@@ -779,12 +825,14 @@ import {
 } from "@talentum-ventures/convex-datatable";
 ```
 
-| Function | Description |
-|----------|-------------|
-| `encodePersistedStateToUrl(tableId, state, currentParams)` | Encode persisted state into `URLSearchParams`. |
-| `decodePersistedStateFromUrl(tableId, params, onError?)` | Decode persisted state from `URLSearchParams`. |
-| `mergePersistedState(fromUrl, fromStorage)` | Merge URL and storage state (URL wins for non-empty). |
-| `storageKey(pathname, tableId)` | Returns the `localStorage` key for the given table. |
+
+| Function                                                   | Description                                           |
+| ---------------------------------------------------------- | ----------------------------------------------------- |
+| `encodePersistedStateToUrl(tableId, state, currentParams)` | Encode persisted state into `URLSearchParams`.        |
+| `decodePersistedStateFromUrl(tableId, params, onError?)`   | Decode persisted state from `URLSearchParams`.        |
+| `mergePersistedState(fromUrl, fromStorage)`                | Merge URL and storage state (URL wins for non-empty). |
+| `storageKey(pathname, tableId)`                            | Returns the `localStorage` key for the given table.   |
+
 
 ---
 
@@ -824,26 +872,30 @@ const dataSource = useConvexDataSource({
 });
 ```
 
-**`ConvexDataSourceConfig<TRow>`:**
+`**ConvexDataSourceConfig<TRow>`:**
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `tableId` | `string` | Yes | Unique identifier matching your Convex table. |
-| `pageSize` | `number` | No | Rows per page (default `50`). |
-| `usePageQuery` | `(args) => ConvexPageResult<TRow>` | Yes | Hook returning page data. |
-| `createRow` | `(draft: Partial<TRow>) => Promise<TRow>` | No | Create mutation. |
-| `updateRows` | `(changes: RowPatch<TRow>[]) => Promise<void>` | No | Batch update mutation. |
-| `deleteRows` | `(rowIds: string[]) => Promise<void>` | No | Delete mutation. |
-| `restoreRows` | `(rows: TRow[]) => Promise<void>` | No | Restore mutation. |
 
-**`ConvexPageResult<TRow>`** (returned by `usePageQuery`):
+| Property       | Type                                           | Required | Description                                   |
+| -------------- | ---------------------------------------------- | -------- | --------------------------------------------- |
+| `tableId`      | `string`                                       | Yes      | Unique identifier matching your Convex table. |
+| `pageSize`     | `number`                                       | No       | Rows per page (default `50`).                 |
+| `usePageQuery` | `(args) => ConvexPageResult<TRow>`             | Yes      | Hook returning page data.                     |
+| `createRow`    | `(draft: Partial<TRow>) => Promise<TRow>`      | No       | Create mutation.                              |
+| `updateRows`   | `(changes: RowPatch<TRow>[]) => Promise<void>` | No       | Batch update mutation.                        |
+| `deleteRows`   | `(rowIds: string[]) => Promise<void>`          | No       | Delete mutation.                              |
+| `restoreRows`  | `(rows: TRow[]) => Promise<void>`              | No       | Restore mutation.                             |
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `rows` | `ReadonlyArray<TRow>` | Rows for the current page. |
-| `nextCursor` | `string \| null` | Cursor for the next page, or null if no more. |
-| `status` | `"loading" \| "loaded" \| "error"` | Current load status. |
-| `error` | `string \| null` | Error message, if any. |
+
+`**ConvexPageResult<TRow>`** (returned by `usePageQuery`):
+
+
+| Property     | Type                             | Description                                   |
+| ------------ | -------------------------------- | --------------------------------------------- |
+| `rows`       | `ReadonlyArray<TRow>`            | Rows for the current page.                    |
+| `nextCursor` | `string | null`                  | Cursor for the next page, or null if no more. |
+| `status`     | `"loading" | "loaded" | "error"` | Current load status.                          |
+| `error`      | `string | null`                  | Error message, if any.                        |
+
 
 ### useConvexPresence
 
@@ -874,25 +926,29 @@ const presence = useConvexPresence({
 />
 ```
 
-**`ConvexPresenceConfig`:**
+`**ConvexPresenceConfig`:**
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `tableId` | `string` | Yes | Table identifier (must match data source). |
-| `userId` | `string` | Yes | Current user's unique ID. |
-| `userName` | `string` | Yes | Current user's display name. |
-| `userColor` | `string` | No | Explicit hex color. If omitted, one is auto-assigned from a built-in palette. |
-| `usePresenceData` | `(tableId: string) => ConvexPresenceEntry[]` | Yes | Hook returning all presence entries for the table. |
-| `sendHeartbeat` | `(entry: ConvexPresenceEntry) => void \| Promise<void>` | Yes | Mutation to upsert the user's presence. |
-| `debounceMs` | `number` | No | Debounce before sending heartbeat on cell change (default `150`). |
-| `heartbeatIntervalMs` | `number` | No | Interval for keep-alive heartbeats (default `10000`). |
+
+| Property              | Type                                                   | Required | Description                                                                   |
+| --------------------- | ------------------------------------------------------ | -------- | ----------------------------------------------------------------------------- |
+| `tableId`             | `string`                                               | Yes      | Table identifier (must match data source).                                    |
+| `userId`              | `string`                                               | Yes      | Current user's unique ID.                                                     |
+| `userName`            | `string`                                               | Yes      | Current user's display name.                                                  |
+| `userColor`           | `string`                                               | No       | Explicit hex color. If omitted, one is auto-assigned from a built-in palette. |
+| `usePresenceData`     | `(tableId: string) => ConvexPresenceEntry[]`           | Yes      | Hook returning all presence entries for the table.                            |
+| `sendHeartbeat`       | `(entry: ConvexPresenceEntry) => void | Promise<void>` | Yes      | Mutation to upsert the user's presence.                                       |
+| `debounceMs`          | `number`                                               | No       | Debounce before sending heartbeat on cell change (default `150`).             |
+| `heartbeatIntervalMs` | `number`                                               | No       | Interval for keep-alive heartbeats (default `10000`).                         |
+
 
 **Return value:**
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `collaborators` | `ReadonlyArray<CollaboratorPresence>` | Other users' presence data (pass to `DataTable`). |
-| `onActiveCellChange` | `(cell: CollaboratorCellCoord \| null) => void` | Callback to pass to `DataTable`. |
+
+| Property             | Type                                           | Description                                       |
+| -------------------- | ---------------------------------------------- | ------------------------------------------------- |
+| `collaborators`      | `ReadonlyArray<CollaboratorPresence>`          | Other users' presence data (pass to `DataTable`). |
+| `onActiveCellChange` | `(cell: CollaboratorCellCoord | null) => void` | Callback to pass to `DataTable`.                  |
+
 
 ### Convex Server Helpers
 
@@ -939,11 +995,13 @@ export const getPresence = query(getPresenceHandler("presence"));
 export const clearStale = mutation(clearStalePresenceHandler("presence"));
 ```
 
-| Handler | Type | Description |
-|---------|------|-------------|
-| `heartbeatHandler(tableName)` | Mutation | Upsert a user's presence entry (creates or updates). |
-| `getPresenceHandler(tableName)` | Query | Returns all non-stale presence entries for a table (stale = 30s by default). |
-| `clearStalePresenceHandler(tableName)` | Mutation | Removes stale entries; returns the count removed. |
+
+| Handler                                | Type     | Description                                                                  |
+| -------------------------------------- | -------- | ---------------------------------------------------------------------------- |
+| `heartbeatHandler(tableName)`          | Mutation | Upsert a user's presence entry (creates or updates).                         |
+| `getPresenceHandler(tableName)`        | Query    | Returns all non-stale presence entries for a table (stale = 30s by default). |
+| `clearStalePresenceHandler(tableName)` | Mutation | Removes stale entries; returns the count removed.                            |
+
 
 ---
 
@@ -951,18 +1009,20 @@ export const clearStale = mutation(clearStalePresenceHandler("presence"));
 
 When `cellSelect` is enabled:
 
-| Shortcut | Action |
-|----------|--------|
-| Arrow keys | Move active cell |
-| Tab / Shift+Tab | Move to next/previous cell |
-| Enter / F2 | Start editing the active cell |
-| Escape | Cancel edit, or deselect cell |
-| Ctrl+C / Cmd+C | Copy selected range as TSV |
-| Ctrl+V / Cmd+V | Paste from clipboard into cells |
-| Ctrl+Z / Cmd+Z | Undo last edit or paste |
-| Ctrl+Shift+Z / Cmd+Shift+Z | Redo |
-| Shift+Click | Extend selection to a range |
-| Delete / Backspace | Clear cell content (when editing) |
+
+| Shortcut                   | Action                            |
+| -------------------------- | --------------------------------- |
+| Arrow keys                 | Move active cell                  |
+| Tab / Shift+Tab            | Move to next/previous cell        |
+| Enter / F2                 | Start editing the active cell     |
+| Escape                     | Cancel edit, or deselect cell     |
+| Ctrl+C / Cmd+C             | Copy selected range as TSV        |
+| Ctrl+V / Cmd+V             | Paste from clipboard into cells   |
+| Ctrl+Z / Cmd+Z             | Undo last edit or paste           |
+| Ctrl+Shift+Z / Cmd+Shift+Z | Redo                              |
+| Shift+Click                | Extend selection to a range       |
+| Delete / Backspace         | Clear cell content (when editing) |
+
 
 ---
 
@@ -991,12 +1051,14 @@ This applies the same filter operators and sort logic that the table uses intern
 
 ## Package Exports
 
-| Import Path | Contents |
-|-------------|----------|
-| `@talentum-ventures/convex-datatable` | `DataTable`, `DataTableContainer`, all types, defaults, persistence utilities |
-| `@talentum-ventures/convex-datatable/styles.css` | Bundled CSS stylesheet |
-| `@talentum-ventures/convex-datatable/convex` | `useConvexDataSource`, `useConvexPresence` |
+
+| Import Path                                         | Contents                                                                                |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `@talentum-ventures/convex-datatable`               | `DataTable`, `DataTableContainer`, all types, defaults, persistence utilities           |
+| `@talentum-ventures/convex-datatable/styles.css`    | Bundled CSS stylesheet                                                                  |
+| `@talentum-ventures/convex-datatable/convex`        | `useConvexDataSource`, `useConvexPresence`                                              |
 | `@talentum-ventures/convex-datatable/convex-server` | `presenceFields`, `heartbeatHandler`, `getPresenceHandler`, `clearStalePresenceHandler` |
+
 
 ---
 
@@ -1024,23 +1086,25 @@ type DataTableProps<TRow extends DataTableRowModel> = {
 };
 ```
 
-| Prop | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `tableId` | `string` | Yes | — | Unique ID used for persistence keys. |
-| `columns` | `DataTableColumn<TRow>[]` | Yes | — | Column definitions. |
-| `getRowId` | `(row: TRow) => string` | Yes | — | Extract a unique ID from each row. |
-| `dataSource` | `DataTableDataSource<TRow>` | Yes | — | Data fetching and mutation interface. |
-| `rowSchema` | `RowSchema<TRow>` | No | — | Schema for validating draft rows. |
-| `features` | `DataTableFeatureFlags` | No | See [defaults](#feature-flags) | Feature toggles (merged with defaults). |
-| `rowActions` | `DataTableRowAction<TRow>[]` | No | — | Per-row action menu items. |
-| `minRowHeight` | `number` | No | `40` | Minimum row height in pixels. |
-| `pageSize` | `number` | No | `50` | Rows per page for pagination. |
-| `theme` | `Partial<DataTableThemeTokens>` | No | See [defaults](#theme-tokens-reference) | Partial theme overrides. |
-| `surface` | `"default" \| "plain"` | No | `"default"` | Container visual style. |
-| `className` | `string` | No | — | Additional CSS class on the table root. |
-| `collaborators` | `CollaboratorPresence[]` | No | — | Other users' presence data. |
-| `onActiveCellChange` | `(cell \| null) => void` | No | — | Callback when the local user's active cell changes. |
-| `onError` | `(message: string) => void` | No | — | Error callback for persistence and validation errors. |
+
+| Prop                 | Type                            | Required | Default                                 | Description                                           |
+| -------------------- | ------------------------------- | -------- | --------------------------------------- | ----------------------------------------------------- |
+| `tableId`            | `string`                        | Yes      | —                                       | Unique ID used for persistence keys.                  |
+| `columns`            | `DataTableColumn<TRow>[]`       | Yes      | —                                       | Column definitions.                                   |
+| `getRowId`           | `(row: TRow) => string`         | Yes      | —                                       | Extract a unique ID from each row.                    |
+| `dataSource`         | `DataTableDataSource<TRow>`     | Yes      | —                                       | Data fetching and mutation interface.                 |
+| `rowSchema`          | `RowSchema<TRow>`               | No       | —                                       | Schema for validating draft rows.                     |
+| `features`           | `DataTableFeatureFlags`         | No       | See [defaults](#feature-flags)          | Feature toggles (merged with defaults).               |
+| `rowActions`         | `DataTableRowAction<TRow>[]`    | No       | —                                       | Per-row action menu items.                            |
+| `minRowHeight`       | `number`                        | No       | `40`                                    | Minimum row height in pixels.                         |
+| `pageSize`           | `number`                        | No       | `50`                                    | Rows per page for pagination.                         |
+| `theme`              | `Partial<DataTableThemeTokens>` | No       | See [defaults](#theme-tokens-reference) | Partial theme overrides.                              |
+| `surface`            | `"default" | "plain"`           | No       | `"default"`                             | Container visual style.                               |
+| `className`          | `string`                        | No       | —                                       | Additional CSS class on the table root.               |
+| `collaborators`      | `CollaboratorPresence[]`        | No       | —                                       | Other users' presence data.                           |
+| `onActiveCellChange` | `(cell | null) => void`         | No       | —                                       | Callback when the local user's active cell changes.   |
+| `onError`            | `(message: string) => void`     | No       | —                                       | Error callback for persistence and validation errors. |
+
 
 ### DataTableColumn
 

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Check, ExternalLink, Link as LinkIcon, Pencil } from "lucide-react";
 import { cn } from "../core/cn";
 import { formatColumnValue } from "../core/formatters";
-import { findOptionByValue } from "../core/select-options";
+import { findOptionByValue, resolveOptions } from "../core/select-options";
 import type {
   DataTableCellValue,
   DataTableColumn,
@@ -107,7 +107,7 @@ export function renderColumnContent<TRow extends DataTableRowModel>({
     );
   }
 
-  return renderDefaultCell(column, value);
+  return renderDefaultCell(column, row, value);
 }
 
 export function renderColumnEditor<TRow extends DataTableRowModel>({
@@ -159,16 +159,23 @@ export function renderColumnEditor<TRow extends DataTableRowModel>({
 
 function renderDefaultCell<TRow extends DataTableRowModel>(
   column: DataTableColumn<TRow>,
+  row: TRow,
   value: DataTableCellValue
 ): JSX.Element {
   if (column.kind === "select") {
-    const option = findOptionByValue(column.options, String(value));
+    const option = findOptionByValue(resolveOptions(column, row), String(value));
     if (!option) {
       return <span className="text-slate-700">{String(value ?? "")}</span>;
     }
     const Icon = option.icon;
     return (
-      <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium", option.colorClass)}>
+      <span
+        className={cn(
+          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+          option.colorClass ?? ""
+        )}
+        style={option.colorStyle}
+      >
         {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
         {option.label}
       </span>
@@ -176,7 +183,13 @@ function renderDefaultCell<TRow extends DataTableRowModel>(
   }
 
   if (column.kind === "multiselect") {
-    return <MultiSelectBadges columnId={column.id} options={column.options} values={multiSelectValues(value)} />;
+    return (
+      <MultiSelectBadges
+        columnId={column.id}
+        options={resolveOptions(column, row)}
+        values={multiSelectValues(value)}
+      />
+    );
   }
 
   if (column.kind === "link") {
@@ -198,7 +211,7 @@ function renderDefaultCell<TRow extends DataTableRowModel>(
     );
   }
 
-  const display = formatColumnValue(column, toFormattableValue(value));
+  const display = formatColumnValue(column, toFormattableValue(value), row);
 
   return (
     <span
