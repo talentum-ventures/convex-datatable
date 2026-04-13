@@ -1,5 +1,13 @@
 /// <reference types="@testing-library/cypress" />
 
+function expectNodeExists<T extends Element>($nodes: JQuery<T>): T {
+  const first = $nodes[0];
+  if (first === undefined) {
+    throw new Error("Expected jQuery collection to contain a DOM node");
+  }
+  return first;
+}
+
 describe("demo app", () => {
   it("loads and performs key interactions", () => {
     cy.visit("/");
@@ -25,13 +33,13 @@ describe("demo app", () => {
     cy.get("th[data-column-id='name']")
       .first()
       .then(($headerCell) => {
-        const headerRect = $headerCell[0].getBoundingClientRect();
+        const headerRect = expectNodeExists($headerCell).getBoundingClientRect();
 
         cy.get("tr[data-row-id='1'] [role='gridcell'][data-column-id='name']")
           .first()
           .closest("td")
           .then(($bodyCell) => {
-            const bodyRect = $bodyCell[0].getBoundingClientRect();
+            const bodyRect = expectNodeExists($bodyCell).getBoundingClientRect();
             expect(Math.abs(headerRect.left - bodyRect.left), "name left edge alignment").to.be.lte(1);
             expect(Math.abs(headerRect.right - bodyRect.right), "name right edge alignment").to.be.lte(1);
             expect(Math.abs(headerRect.width - bodyRect.width), "name width alignment").to.be.lte(1);
@@ -48,18 +56,19 @@ describe("demo app", () => {
     cy.visit("/");
 
     cy.get("main").then(($main) => {
-      const mainRect = $main[0].getBoundingClientRect();
+      const mainRect = expectNodeExists($main).getBoundingClientRect();
       expect(Math.round(mainRect.height), "main height").to.equal(Cypress.config("viewportHeight"));
     });
 
     cy.findByRole("grid").then(($grid) => {
-      expect($grid[0].scrollHeight, "grid scroll height").to.be.greaterThan($grid[0].clientHeight);
+      const grid = expectNodeExists($grid);
+      expect(grid.scrollHeight, "grid scroll height").to.be.greaterThan(grid.clientHeight);
     });
 
     cy.findByRole("grid")
       .scrollTo("bottom")
       .then(($grid) => {
-        expect($grid[0].scrollTop, "grid scrollTop").to.be.greaterThan(0);
+        expect(expectNodeExists($grid).scrollTop, "grid scrollTop").to.be.greaterThan(0);
       });
 
     cy.window().its("scrollY").should("equal", 0);

@@ -322,17 +322,25 @@ const dynamicOptionColumns: ReadonlyArray<DataTableColumn<DynamicOptionRow>> = [
   }
 ];
 
+function expectNodeExists<T extends Element>($nodes: JQuery<T>): T {
+  const first = $nodes[0];
+  if (first === undefined) {
+    throw new Error("Expected jQuery collection to contain a DOM node");
+  }
+  return first;
+}
+
 function assertHeaderBodyColumnAlignment(columnId: string, rowId: string): void {
   cy.get(`th[data-column-id='${columnId}']`)
     .first()
     .then(($headerCell) => {
-      const headerRect = $headerCell[0].getBoundingClientRect();
+      const headerRect = expectNodeExists($headerCell).getBoundingClientRect();
 
       cy.get(`tr[data-row-id='${rowId}'] [role='gridcell'][data-column-id='${columnId}']`)
         .first()
         .closest("td")
         .then(($bodyCell) => {
-          const bodyRect = $bodyCell[0].getBoundingClientRect();
+          const bodyRect = expectNodeExists($bodyCell).getBoundingClientRect();
           expect(Math.abs(headerRect.left - bodyRect.left), `${columnId} left edge alignment`).to.be.lte(1);
           expect(Math.abs(headerRect.right - bodyRect.right), `${columnId} right edge alignment`).to.be.lte(1);
           expect(Math.abs(headerRect.width - bodyRect.width), `${columnId} width alignment`).to.be.lte(1);
@@ -345,13 +353,13 @@ function assertBodyColumnWidthConsistency(columnId: string, firstRowId: string, 
     .first()
     .closest("td")
     .then(($firstBodyCell) => {
-      const firstRect = $firstBodyCell[0].getBoundingClientRect();
+      const firstRect = expectNodeExists($firstBodyCell).getBoundingClientRect();
 
       cy.get(`tr[data-row-id='${secondRowId}'] [role='gridcell'][data-column-id='${columnId}']`)
         .first()
         .closest("td")
         .then(($secondBodyCell) => {
-          const secondRect = $secondBodyCell[0].getBoundingClientRect();
+          const secondRect = expectNodeExists($secondBodyCell).getBoundingClientRect();
           expect(Math.abs(firstRect.width - secondRect.width), `${columnId} row-to-row width consistency`).to.be.lte(1);
           expect(Math.abs(firstRect.left - secondRect.left), `${columnId} row-to-row left edge consistency`).to.be.lte(1);
           expect(Math.abs(firstRect.right - secondRect.right), `${columnId} row-to-row right edge consistency`).to.be.lte(1);
@@ -359,14 +367,14 @@ function assertBodyColumnWidthConsistency(columnId: string, firstRowId: string, 
     });
 }
 
-function dispatchPlainTextPaste(win: Window, node: Element, text: string): boolean {
+function dispatchPlainTextPaste(_win: Window, node: Element, text: string): boolean {
   const pasteEvent =
-    typeof win.ClipboardEvent === "function"
-      ? new win.ClipboardEvent("paste", {
+    typeof globalThis.ClipboardEvent === "function"
+      ? new globalThis.ClipboardEvent("paste", {
           bubbles: true,
           cancelable: true
         })
-      : new win.Event("paste", {
+      : new globalThis.Event("paste", {
           bubbles: true,
           cancelable: true
         });
@@ -467,7 +475,7 @@ function Harness({
         dataSource={dataSource}
         getRowId={(row) => row.id}
         features={tableFeatures}
-        rowActions={rowActions}
+        {...(rowActions !== undefined ? { rowActions } : {})}
       />
       <output data-testid="title-raw">{rows[0]?.title ?? ""}</output>
       <output data-testid="status-raw">{rows[0]?.status ?? ""}</output>
@@ -732,8 +740,8 @@ function DraftRowHorizontalScrollHarness({ tableId }: { tableId: string }): JSX.
         setRows((current) => [row, ...current]);
         return row;
       },
-      deleteRows: async (deletedRows) => {
-        const ids = new Set(deletedRows.map((r) => r.id));
+      deleteRows: async (rowIds) => {
+        const ids = new Set(rowIds);
         setRows((current) => current.filter((r) => !ids.has(r.id)));
       }
     }),
@@ -1352,7 +1360,7 @@ describe("DataTable component", () => {
 
     cy.window().then((win) =>
       cy.findByRole("grid").then(($grid) => {
-        const defaultPrevented = dispatchPlainTextPaste(win, $grid[0], "Paste title");
+        const defaultPrevented = dispatchPlainTextPaste(win, expectNodeExists($grid), "Paste title");
         expect(defaultPrevented).to.equal(true);
       })
     );
@@ -1429,7 +1437,7 @@ describe("DataTable component", () => {
       .should("have.text", "Ana");
 
     cy.get("@statusCell").should(($cell) => {
-      const cell = $cell[0];
+      const cell = expectNodeExists($cell);
       if (!(cell instanceof HTMLElement)) {
         throw new Error("Expected status collaborator cell to be an HTMLElement");
       }
@@ -1439,7 +1447,7 @@ describe("DataTable component", () => {
     });
 
     cy.get("[data-dt-collaborator-label='ana']").should(($label) => {
-      const label = $label[0];
+      const label = expectNodeExists($label);
 
       if (!(label instanceof HTMLElement)) {
         throw new Error("Expected collaborator label to be an HTMLElement");
@@ -1683,7 +1691,7 @@ describe("DataTable component", () => {
 
       cy.get("[data-column-reorder-handle='title']").trigger("dragstart", { dataTransfer, force: true });
       cy.get("th[data-column-id='amount']").then(($target) => {
-        const rect = $target[0].getBoundingClientRect();
+        const rect = expectNodeExists($target).getBoundingClientRect();
         cy.wrap($target).trigger("dragover", { dataTransfer, clientX: rect.right - 2 });
         cy.wrap($target).trigger("drop", { dataTransfer, clientX: rect.right - 2 });
       });
@@ -1711,7 +1719,7 @@ describe("DataTable component", () => {
 
       cy.get("[data-column-reorder-handle='title']").trigger("dragstart", { dataTransfer, force: true });
       cy.get("th[data-column-id='amount']").then(($target) => {
-        const rect = $target[0].getBoundingClientRect();
+        const rect = expectNodeExists($target).getBoundingClientRect();
         cy.wrap($target).trigger("dragover", { dataTransfer, clientX: rect.left + 2 });
         cy.wrap($target).trigger("drop", { dataTransfer, clientX: rect.left + 2 });
       });
@@ -1743,7 +1751,7 @@ describe("DataTable component", () => {
 
       cy.get("[data-column-reorder-handle='amount']").trigger("dragstart", { dataTransfer, force: true });
       cy.get("th[data-column-id='title']").then(($target) => {
-        const rect = $target[0].getBoundingClientRect();
+        const rect = expectNodeExists($target).getBoundingClientRect();
         cy.wrap($target).trigger("dragover", { dataTransfer, clientX: rect.left + 2 });
         cy.wrap($target).trigger("drop", { dataTransfer, clientX: rect.left + 2 });
       });
@@ -1779,12 +1787,12 @@ describe("DataTable component", () => {
     cy.get("th[data-column-id='title']")
       .should("have.attr", "data-pinned-state", "left")
       .then(($pinnedHeader) => {
-        const pinnedHeaderStyle = getComputedStyle($pinnedHeader[0]);
+        const pinnedHeaderStyle = getComputedStyle(expectNodeExists($pinnedHeader));
 
         cy.get("th[data-column-id='status']")
           .should("have.attr", "data-pinned-state", "center")
           .then(($centerHeader) => {
-            const centerHeaderStyle = getComputedStyle($centerHeader[0]);
+            const centerHeaderStyle = getComputedStyle(expectNodeExists($centerHeader));
             expect(pinnedHeaderStyle.backgroundImage).to.not.equal(centerHeaderStyle.backgroundImage);
           });
       });
@@ -1794,14 +1802,14 @@ describe("DataTable component", () => {
       .closest("td")
       .should("have.attr", "data-pinned-state", "left")
       .then(($pinnedCell) => {
-        const pinnedCellStyle = getComputedStyle($pinnedCell[0]);
+        const pinnedCellStyle = getComputedStyle(expectNodeExists($pinnedCell));
 
         cy.get(`tr[data-row-id='1'] [role='gridcell'][data-column-id='status']`)
           .first()
           .closest("td")
           .should("have.attr", "data-pinned-state", "center")
           .then(($centerCell) => {
-            const centerCellStyle = getComputedStyle($centerCell[0]);
+            const centerCellStyle = getComputedStyle(expectNodeExists($centerCell));
             expect(pinnedCellStyle.backgroundColor).to.not.equal(centerCellStyle.backgroundColor);
           });
       });
@@ -1831,8 +1839,8 @@ describe("DataTable component", () => {
     let resizeStartX = 0;
 
     cy.get("th[data-column-id='status']").then(($header) => {
-      beforeWidth = $header[0].getBoundingClientRect().width;
-      const rect = $header[0].getBoundingClientRect();
+      beforeWidth = expectNodeExists($header).getBoundingClientRect().width;
+      const rect = expectNodeExists($header).getBoundingClientRect();
       resizeStartX = Math.round(rect.right - 1);
 
       cy.get("[data-column-resize-handle='status']").trigger("mousedown", {
@@ -1848,7 +1856,7 @@ describe("DataTable component", () => {
     });
 
     cy.get("th[data-column-id='status']").then(($header) => {
-      const afterWidth = $header[0].getBoundingClientRect().width;
+      const afterWidth = expectNodeExists($header).getBoundingClientRect().width;
       expect(afterWidth).to.be.greaterThan(beforeWidth);
     });
 
@@ -1874,7 +1882,7 @@ describe("DataTable component", () => {
     let resizeStartX = 0;
 
     cy.get("th[data-column-id='status']").then(($header) => {
-      const rect = $header[0].getBoundingClientRect();
+      const rect = expectNodeExists($header).getBoundingClientRect();
       resizeStartX = Math.round(rect.right - 1);
       cy.get("[data-column-resize-handle='status']").trigger("mousedown", {
         button: 0,
@@ -1902,7 +1910,7 @@ describe("DataTable component", () => {
     cy.get(`tr[data-row-id='1'] [role='gridcell'][data-column-id='website']`)
       .first()
       .then(($cell) => {
-        const cell = $cell[0];
+        const cell = expectNodeExists($cell);
         const cellRect = cell.getBoundingClientRect();
         const style = getComputedStyle(cell);
 
@@ -1912,7 +1920,7 @@ describe("DataTable component", () => {
         cy.wrap($cell)
           .closest("td")
           .then(($bodyCell) => {
-            const bodyRect = $bodyCell[0].getBoundingClientRect();
+            const bodyRect = expectNodeExists($bodyCell).getBoundingClientRect();
             expect(Math.abs(cellRect.right - bodyRect.right), "website cell should stay within its column width").to.be.lte(1);
           });
       });
@@ -1922,19 +1930,19 @@ describe("DataTable component", () => {
     cy.mount(<MultilineTextHarness tableId="cypress-table-multiline-text" />);
 
     cy.get(`tr[data-row-id='1'] [role='gridcell'][data-column-id='title'] span`).should(($value) => {
-      const style = getComputedStyle($value[0]);
+      const style = getComputedStyle(expectNodeExists($value));
       expect(style.whiteSpace).to.equal("pre-wrap");
     });
 
     cy.get(`tr[data-row-id='1'] [role='gridcell'][data-column-id='title']`)
       .first()
       .then(($multilineCell) => {
-        const multilineHeight = $multilineCell[0].getBoundingClientRect().height;
+        const multilineHeight = expectNodeExists($multilineCell).getBoundingClientRect().height;
 
         cy.get(`tr[data-row-id='2'] [role='gridcell'][data-column-id='title']`)
           .first()
           .then(($singleLineCell) => {
-            const singleLineHeight = $singleLineCell[0].getBoundingClientRect().height;
+            const singleLineHeight = expectNodeExists($singleLineCell).getBoundingClientRect().height;
             expect(multilineHeight).to.be.greaterThan(singleLineHeight);
           });
       });
@@ -1944,7 +1952,7 @@ describe("DataTable component", () => {
     cy.mount(<MeasuredRowsHarness tableId="cypress-table-measured-row-heights" />);
 
     cy.get("tbody").should(($tbody) => {
-      const tbody = $tbody[0];
+      const tbody = expectNodeExists($tbody);
       const firstRow = tbody.querySelector("tr[data-row-id='1']");
       const secondRow = tbody.querySelector("tr[data-row-id='2']");
 
@@ -1975,7 +1983,7 @@ describe("DataTable component", () => {
     cy.mount(<VirtualizedDeleteMeasuredRowsHarness tableId="cypress-table-virtualized-delete-measured-rows" />);
 
     cy.get("tbody").should(($tbody) => {
-      const tbody = $tbody[0];
+      const tbody = expectNodeExists($tbody);
       const firstRow = tbody.querySelector("tr[data-row-id='1']");
       const secondRow = tbody.querySelector("tr[data-row-id='2']");
 
@@ -2000,7 +2008,7 @@ describe("DataTable component", () => {
     cy.get("tr[data-row-id='1']").should("not.exist");
 
     cy.get("tbody").should(($tbody) => {
-      const tbody = $tbody[0];
+      const tbody = expectNodeExists($tbody);
       const firstRemainingRow = tbody.querySelector("tr[data-row-id='2']");
       const secondRemainingRow = tbody.querySelector("tr[data-row-id='3']");
       const tbodyRect = tbody.getBoundingClientRect();
@@ -2061,22 +2069,22 @@ describe("DataTable component", () => {
     cy.findByLabelText("Edit Title").type("Draft pinned{enter}");
 
     cy.findByRole("grid").then(($grid) => {
-      const grid = $grid[0];
+      const grid = expectNodeExists($grid);
       grid.scrollLeft = grid.scrollWidth - grid.clientWidth;
     });
 
     cy.findByRole("grid").should(($grid) => {
-      expect($grid[0]?.scrollLeft ?? 0).to.be.greaterThan(0);
+      expect(expectNodeExists($grid).scrollLeft).to.be.greaterThan(0);
     });
 
     cy.get("tr[data-row-id='__draft__'] td[data-pinned-state='right']").then(($td) => {
-      expect(getComputedStyle($td[0]).position).to.equal("sticky");
+      expect(getComputedStyle(expectNodeExists($td)).position).to.equal("sticky");
     });
 
     cy.findByLabelText("Create row").then(($btn) => {
-      const buttonRect = $btn[0].getBoundingClientRect();
+      const buttonRect = expectNodeExists($btn).getBoundingClientRect();
       cy.findByRole("grid").then(($grid) => {
-        const gridRect = $grid[0].getBoundingClientRect();
+        const gridRect = expectNodeExists($grid).getBoundingClientRect();
         expect(buttonRect.right, "create control should stay inside the scroll viewport").to.be.lte(gridRect.right + 1);
         expect(buttonRect.left, "create control should stay inside the scroll viewport").to.be.gte(gridRect.left - 1);
       });
@@ -2095,16 +2103,16 @@ describe("DataTable component", () => {
     cy.findByLabelText("Edit Title").type("Left pin draft{enter}");
 
     cy.findByRole("grid").then(($grid) => {
-      const grid = $grid[0];
+      const grid = expectNodeExists($grid);
       grid.scrollLeft = grid.scrollWidth - grid.clientWidth;
     });
 
     cy.findByRole("grid").should(($grid) => {
-      expect($grid[0]?.scrollLeft ?? 0).to.be.greaterThan(0);
+      expect(expectNodeExists($grid).scrollLeft).to.be.greaterThan(0);
     });
 
     cy.get("tr[data-row-id='__draft__'] td[data-pinned-state='left']").should(($td) => {
-      expect(getComputedStyle($td[0]).position).to.equal("sticky");
+      expect(getComputedStyle(expectNodeExists($td)).position).to.equal("sticky");
     });
   });
 
@@ -2132,9 +2140,10 @@ describe("DataTable component", () => {
     cy.findByRole("grid").trigger("keydown", { key: "Enter" });
     cy.findByLabelText(/Search Status options/i).should("have.focus");
     cy.findByRole("listbox", { name: /Edit Status/i }).then(($listbox) => {
-      const dialog = $listbox.closest("[role='dialog']")[0];
+      const listboxEl = expectNodeExists($listbox);
+      const dialog = listboxEl.closest("[role='dialog']");
       expect(dialog?.parentElement, "select editor dialog should portal to body").to.equal(
-        $listbox[0].ownerDocument.body
+        listboxEl.ownerDocument.body
       );
     });
     cy.findByRole("listbox", { name: /Edit Status/i }).within(() => {
@@ -2202,7 +2211,7 @@ describe("DataTable component", () => {
 
     cy.window().then((win) =>
       cy.findByRole("grid").then(($grid) => {
-        const defaultPrevented = dispatchPlainTextPaste(win, $grid[0], "2 de fev. de 2026");
+        const defaultPrevented = dispatchPlainTextPaste(win, expectNodeExists($grid), "2 de fev. de 2026");
         expect(defaultPrevented).to.equal(true);
       })
     );
@@ -2219,9 +2228,10 @@ describe("DataTable component", () => {
     cy.findByRole("listbox", { name: /Edit Tags/i })
       .should("have.attr", "aria-multiselectable", "true")
       .then(($listbox) => {
-        const dialog = $listbox.closest("[role='dialog']")[0];
+        const listboxEl = expectNodeExists($listbox);
+        const dialog = listboxEl.closest("[role='dialog']");
         expect(dialog?.parentElement, "multiselect editor dialog should portal to body").to.equal(
-          $listbox[0].ownerDocument.body
+          listboxEl.ownerDocument.body
         );
       });
 
@@ -2257,7 +2267,7 @@ describe("DataTable component", () => {
     cy.get("tr[data-row-id='1'] [role='gridcell'][data-column-id='owners']")
       .contains("span", "Maya")
       .then(($badge) => {
-        const style = getComputedStyle($badge[0]);
+        const style = getComputedStyle(expectNodeExists($badge));
         expect(style.backgroundColor).to.equal("rgb(254, 226, 226)");
         expect(style.color).to.equal("rgb(153, 27, 27)");
         expect(style.borderColor).to.equal("rgb(248, 113, 113)");
@@ -2291,21 +2301,21 @@ describe("DataTable component", () => {
     cy.get(`tr[data-row-id='1'] [role='gridcell'][data-column-id='title']`).click();
     cy.findByRole("grid").focus();
     cy.findByRole("grid").should(($grid) => {
-      expect($grid[0]?.scrollLeft ?? 0).to.equal(0);
+      expect(expectNodeExists($grid).scrollLeft).to.equal(0);
     });
 
     cy.findByRole("grid").trigger("keydown", { key: "ArrowRight" });
     cy.findByRole("grid").trigger("keydown", { key: "ArrowRight" });
 
     cy.findByRole("grid").should(($grid) => {
-      expect($grid[0]?.scrollLeft ?? 0).to.be.greaterThan(0);
+      expect(expectNodeExists($grid).scrollLeft).to.be.greaterThan(0);
     });
 
     cy.get(`tr[data-row-id='1'] [role='gridcell'][data-column-id='amount']`).then(($cell) => {
-      const cellRect = $cell[0].getBoundingClientRect();
+      const cellRect = expectNodeExists($cell).getBoundingClientRect();
 
       cy.findByRole("grid").then(($grid) => {
-        const gridRect = $grid[0].getBoundingClientRect();
+        const gridRect = expectNodeExists($grid).getBoundingClientRect();
         expect(cellRect.right, "amount cell should be inside the scroll viewport").to.be.lte(gridRect.right + 1);
       });
     });
@@ -2322,7 +2332,7 @@ describe("DataTable component", () => {
     });
 
     cy.findByRole("grid").should(($grid) => {
-      expect($grid[0]?.scrollTop ?? 0).to.be.greaterThan(0);
+      expect(expectNodeExists($grid).scrollTop).to.be.greaterThan(0);
     });
 
     cy.get(`[role='gridcell'][data-row-index='20'][data-column-id='title']`).should("exist");
@@ -2345,7 +2355,7 @@ describe("DataTable component", () => {
 
     cy.window().then((win) =>
       cy.findByRole("grid").then(($grid) => {
-        const defaultPrevented = dispatchPlainTextPaste(win, $grid[0], "Pasted title");
+        const defaultPrevented = dispatchPlainTextPaste(win, expectNodeExists($grid), "Pasted title");
         expect(defaultPrevented).to.equal(true);
       })
     );
@@ -2361,7 +2371,7 @@ describe("DataTable component", () => {
 
     cy.window().then((win) =>
       cy.findByLabelText("Edit Title").then(($editor) => {
-        const defaultPrevented = dispatchPlainTextPaste(win, $editor[0], "native paste");
+        const defaultPrevented = dispatchPlainTextPaste(win, expectNodeExists($editor), "native paste");
         expect(defaultPrevented).to.equal(false);
       })
     );
@@ -2382,7 +2392,7 @@ describe("DataTable component", () => {
 
     cy.window().then((win) =>
       cy.findByRole("grid").then(($grid) => {
-        const defaultPrevented = dispatchPlainTextPaste(win, $grid[0], "Should not paste");
+        const defaultPrevented = dispatchPlainTextPaste(win, expectNodeExists($grid), "Should not paste");
         expect(defaultPrevented).to.equal(false);
       })
     );
@@ -2397,7 +2407,7 @@ describe("DataTable component", () => {
 
     cy.window().then((win) =>
       cy.findByRole("grid").then(($grid) => {
-        const defaultPrevented = dispatchPlainTextPaste(win, $grid[0], "To do");
+        const defaultPrevented = dispatchPlainTextPaste(win, expectNodeExists($grid), "To do");
         expect(defaultPrevented).to.equal(true);
       })
     );
@@ -2415,7 +2425,7 @@ describe("DataTable component", () => {
 
     cy.window().then((win) =>
       cy.findByRole("grid").then(($grid) => {
-        const defaultPrevented = dispatchPlainTextPaste(win, $grid[0], "Urgent, Design");
+        const defaultPrevented = dispatchPlainTextPaste(win, expectNodeExists($grid), "Urgent, Design");
         expect(defaultPrevented).to.equal(true);
       })
     );
@@ -2435,7 +2445,7 @@ describe("DataTable component", () => {
 
     cy.window().then((win) =>
       cy.findByRole("grid").then(($grid) => {
-        const defaultPrevented = dispatchPlainTextPaste(win, $grid[0], "To do\tUrgent, Missing");
+        const defaultPrevented = dispatchPlainTextPaste(win, expectNodeExists($grid), "To do\tUrgent, Missing");
         expect(defaultPrevented).to.equal(true);
       })
     );
@@ -2455,9 +2465,10 @@ describe("DataTable component", () => {
     cy.contains("Add row").click();
     cy.findByLabelText(/Search Status options/i).should("have.focus");
     cy.findByRole("listbox", { name: /Edit Status/i }).then(($listbox) => {
-      const dialog = $listbox.closest("[role='dialog']")[0];
+      const listboxEl = expectNodeExists($listbox);
+      const dialog = listboxEl.closest("[role='dialog']");
       expect(dialog?.parentElement, "draft select editor dialog should portal to body").to.equal(
-        $listbox[0].ownerDocument.body
+        listboxEl.ownerDocument.body
       );
     });
     cy.findByRole("listbox", { name: /Edit Status/i }).within(() => {
@@ -2467,9 +2478,10 @@ describe("DataTable component", () => {
     cy.get("tr[data-row-id='__draft__'] [role='gridcell'][data-column-id='tags']").click();
     cy.findByLabelText(/Search Tags options/i).should("have.focus");
     cy.findByRole("listbox", { name: /Edit Tags/i }).then(($listbox) => {
-      const dialog = $listbox.closest("[role='dialog']")[0];
+      const listboxEl = expectNodeExists($listbox);
+      const dialog = listboxEl.closest("[role='dialog']");
       expect(dialog?.parentElement, "draft multiselect editor dialog should portal to body").to.equal(
-        $listbox[0].ownerDocument.body
+        listboxEl.ownerDocument.body
       );
     });
     cy.findByRole("listbox", { name: /Edit Tags/i }).within(() => {
@@ -2569,7 +2581,7 @@ describe("DataTable component", () => {
     cy.findByRole("grid").scrollTo(0, 420);
 
     cy.get("thead").then(($thead) => {
-      const style = getComputedStyle($thead[0]);
+      const style = getComputedStyle(expectNodeExists($thead));
       expect(
         style.backgroundImage !== "none" || style.backgroundColor !== "rgba(0, 0, 0, 0)",
         "thead should render a painted background"
@@ -2581,7 +2593,7 @@ describe("DataTable component", () => {
       .find("th")
       .first()
       .then(($headerCell) => {
-        const style = getComputedStyle($headerCell[0]);
+        const style = getComputedStyle(expectNodeExists($headerCell));
         expect(
           style.backgroundImage !== "none" || style.backgroundColor !== "rgba(0, 0, 0, 0)",
           "header cell should render a painted background"
