@@ -1,12 +1,13 @@
 import { useMemo, useRef, useState } from "react";
-import { Flag, Globe, Layers } from "lucide-react";
+import { Copy, Eye, Flag, Globe, Layers, LoaderCircle, Plus, Trash2 } from "lucide-react";
 import {
   DataTable,
   DataTableContainer,
   type DataTableColumn,
   type DataTableDataSource,
+  type DataTableQueryState,
   type DataTableRowAction,
-  type DataTableQueryState
+  type DataTableToolbarState
 } from "@talentum-ventures/convex-datatable";
 import { z } from "zod";
 import { applyServerQuery } from "./demo-query";
@@ -65,6 +66,113 @@ function queryCacheKey(state: DataTableQueryState): string {
     .join("|");
 
   return `${sortingPart}::${filtersPart}::${state.pageSize}::${state.cursor ?? ""}`;
+}
+
+function renderDemoToolbar(state: DataTableToolbarState): JSX.Element {
+  const {
+    canAddRow,
+    addRow,
+    canDeleteSelected,
+    deleteSelected,
+    selectedRowCount,
+    canCopy,
+    copy,
+    hiddenColumns,
+    showColumn,
+    showAllColumns,
+    isLoading
+  } = state;
+
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-sky-200/80 bg-gradient-to-br from-sky-50/90 via-white to-white p-3 shadow-sm sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-800">Custom toolbar (renderToolbar)</p>
+        <div className="flex flex-wrap items-center gap-2">
+          {canAddRow ? (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 rounded-md bg-sky-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-sky-700"
+              onClick={addRow}
+            >
+              <Plus className="h-4 w-4" />
+              Add row
+            </button>
+          ) : null}
+
+          {canDeleteSelected ? (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-rose-700"
+              onClick={deleteSelected}
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete selected
+            </button>
+          ) : null}
+
+          {canCopy ? (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 shadow-sm hover:bg-slate-50"
+              onClick={copy}
+            >
+              <Copy className="h-4 w-4" />
+              Copy
+            </button>
+          ) : null}
+
+          {isLoading ? (
+            <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+              <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+              Loading rows…
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="flex w-full max-w-md flex-col gap-2 sm:w-auto sm:items-end">
+        <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-slate-600">
+          <span className="rounded-full bg-white px-2 py-0.5 font-medium text-slate-800 ring-1 ring-slate-200">
+            {selectedRowCount === 0 ? "No rows selected" : `${selectedRowCount} selected`}
+          </span>
+        </div>
+
+        {hiddenColumns.length > 0 ? (
+          <div className="w-full rounded-lg border border-amber-200 bg-amber-50/80 p-2 sm:max-w-sm">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-900">
+                <Eye className="h-3.5 w-3.5" />
+                Hidden columns ({hiddenColumns.length})
+              </span>
+              <button
+                type="button"
+                className="shrink-0 rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-medium text-amber-900 hover:bg-amber-100"
+                onClick={showAllColumns}
+              >
+                Show all
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {hiddenColumns.map((column) => (
+                <button
+                  key={column.id}
+                  type="button"
+                  className="inline-flex max-w-full items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+                  title={column.header}
+                  onClick={() => {
+                    showColumn(column.id);
+                  }}
+                >
+                  <span className="truncate">{column.header}</span>
+                  <span className="text-sky-600">+</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 export function InMemoryPage(): JSX.Element {
@@ -423,6 +531,7 @@ export function InMemoryPage(): JSX.Element {
           rowActions={rowActions}
           features={features}
           theme={theme}
+          renderToolbar={renderDemoToolbar}
         />
       </DataTableContainer>
     </div>
