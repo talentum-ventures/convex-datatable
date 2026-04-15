@@ -11,7 +11,7 @@ Internal engine: TanStack Table (not exposed in public API)
 ## Package Exports
 
 - `@talentum-ventures/convex-datatable` — main entry point with all components, types, defaults, persistence utils, debug utils
-- `@talentum-ventures/convex-datatable/styles.css` — bundled CSS stylesheet (must be imported)
+- `@talentum-ventures/convex-datatable/styles.css` — bundled Tailwind CSS (no preflight; wrapped in `@layer datatable` so host unlayered styles win; import in app entry)
 - `@talentum-ventures/convex-datatable/convex` — Convex client adapter hooks (`useConvexDataSource`, `useConvexPresence`)
 - `@talentum-ventures/convex-datatable/convex-server` — Convex server-side helpers (`presenceFields`, `heartbeatHandler`, `getPresenceHandler`, `clearStalePresenceHandler`)
 
@@ -27,6 +27,8 @@ Import the CSS in your app entry:
 ```ts
 import "@talentum-ventures/convex-datatable/styles.css";
 ```
+
+The bundle does **not** include Tailwind preflight (global reset). It is emitted inside **`@layer datatable`**, so typical host CSS / Tailwind output stays higher in the cascade than the library’s utilities regardless of `<link>` order. Tailwind hosts can instead add `node_modules/@talentum-ventures/convex-datatable/dist/**/*.js` to `content` for one combined build; using both approaches together is also safe.
 
 ## Components
 

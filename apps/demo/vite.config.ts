@@ -8,6 +8,9 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      "@talentum-ventures/convex-datatable/styles.css": fileURLToPath(
+        new URL("../../packages/datatable/src/styles.css", import.meta.url)
+      ),
       "@talentum-ventures/convex-datatable/convex-server": fileURLToPath(new URL("../../packages/datatable/src/convex/server.ts", import.meta.url)),
       "@talentum-ventures/convex-datatable/convex": fileURLToPath(new URL("../../packages/datatable/src/convex/index.ts", import.meta.url)),
       "@talentum-ventures/convex-datatable": fileURLToPath(new URL("../../packages/datatable/src/index.ts", import.meta.url))

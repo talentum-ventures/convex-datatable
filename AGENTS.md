@@ -83,6 +83,16 @@ All public exports are defined in `packages/datatable/src/index.ts`. This is the
 | `@talentum-ventures/convex-datatable/convex` | `dist/convex/index.js` |
 | `@talentum-ventures/convex-datatable/convex-server` | `dist/convex/server.js` |
 
+### CSS Architecture (`packages/datatable`)
+
+The publishable package builds `dist/styles.css` with Tailwind v3.
+
+- **`corePlugins.preflight: false`** — the library must not ship Tailwind’s global CSS reset; the host app owns resets.
+- **`@tailwind base` is required** — with preflight off, the base layer still emits `--tw-*` custom property initialization on `*, ::before, ::after` (and `::backdrop`). Utilities such as `ring-*`, `shadow-*`, `-translate-y-*`, `rotate-*`, and `border-spacing-*` depend on those variables. Removing `@tailwind base` breaks the zero-config path for apps that import only the pre-built CSS and do not run their own Tailwind base.
+- **`@layer datatable { ... }` wrapper** — the built stylesheet is wrapped in a CSS cascade layer so **unlayered** host styles (typical Tailwind app output) always win in the cascade regardless of `<link>` / import order. This fixes the class of bugs where a library’s `.flex` appeared after a host’s `md:hidden` and overrode responsive display.
+- **Portals** — column menus and some editors use `createPortal(..., document.body)`. Selector scoping under a single DOM root (e.g. `data-dt-root`) would not cover that content without extra work; cascade layers address host conflicts without requiring all UI to live under one subtree.
+- **No Tailwind `prefix`** — shipped CSS still contains global utility selectors (`.flex`, `.hidden`, etc.). Cascade layers fix precedence vs. the host’s Tailwind; they do **not** prevent those class names from applying to any matching element in a host that does not use Tailwind. A full fix would be prefixing or deep scoping (larger migration).
+
 ### Core Types (`packages/datatable/src/core/types.ts`)
 
 This 426-line file defines the entire public type surface. Key types:
@@ -182,6 +192,7 @@ DataTable (data-table.tsx)
 - **Row schema uses structural typing** (`safeParse` interface) to avoid cross-package Zod identity coupling.
 - **Preserve round-trip tests** for persistence/state conversion.
 - **Preserve parser/formatter tests** for clipboard and column values.
+- **Library CSS** — never remove `@tailwind base` from `packages/datatable/src/styles.css` (see [CSS Architecture](#css-architecture-packagesdatatable)); keep `corePlugins.preflight: false` in `packages/datatable/tailwind.config.ts`; keep the post-build `@layer datatable` wrap in the package `build` pipeline so host apps do not suffer cascade-order conflicts.
 
 ## Testing Structure
 

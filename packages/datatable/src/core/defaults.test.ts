@@ -6,6 +6,7 @@ describe("defaults", () => {
     expect(DEFAULT_FEATURE_FLAGS.columnResize).toBe(true);
     expect(DEFAULT_FEATURE_FLAGS.rowResize).toBe(true);
     expect(DEFAULT_FEATURE_FLAGS.columnReorder).toBe(true);
+    expect(DEFAULT_FEATURE_FLAGS.dragHandle).toBe(true);
     expect(DEFAULT_FEATURE_FLAGS.columnPinning).toBe(true);
     expect(DEFAULT_FEATURE_FLAGS.columnVisibility).toBe(true);
     expect(DEFAULT_FEATURE_FLAGS.columnFilter).toBe(true);

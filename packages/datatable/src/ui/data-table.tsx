@@ -1024,10 +1024,12 @@ const DataTableInner = <TRow extends DataTableRowModel>({
       columnVisibility: mergedFeatures.columnVisibility,
       columnPinning: mergedFeatures.columnPinning,
       columnReorder: mergedFeatures.columnReorder,
+      dragHandle: mergedFeatures.dragHandle,
       columnResize: mergedFeatures.columnResize
     }),
     [
       mergedFeatures.columnFilter,
+      mergedFeatures.dragHandle,
       mergedFeatures.columnPinning,
       mergedFeatures.columnReorder,
       mergedFeatures.columnResize,

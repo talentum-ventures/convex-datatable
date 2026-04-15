@@ -38,6 +38,7 @@ export type TableHeaderProps<TRow extends DataTableRowModel> = {
     columnVisibility: boolean;
     columnPinning: boolean;
     columnReorder: boolean;
+    dragHandle: boolean;
     columnResize: boolean;
   };
   filterByColumnId: ReadonlyMap<string, DataTableFilter>;
@@ -144,6 +145,8 @@ function TableHeaderInner<TRow extends DataTableRowModel>({
               Boolean(columnConfig) && mergedFeatures.columnPinning && (columnConfig?.isPinnable ?? true);
             const canReorder =
               Boolean(columnConfig) && mergedFeatures.columnReorder && (columnConfig?.isReorderable ?? true);
+            const showGripReorderHandle = canReorder && mergedFeatures.dragHandle;
+            const wholeCellReorderDrag = canReorder && !mergedFeatures.dragHandle;
             const currentFilter = columnConfig ? filterByColumnId.get(columnConfig.id) : undefined;
             const hasFilter = Boolean(currentFilter && isActiveFilterValue(currentFilter.value));
             const isMenuOpen = columnMenuId === columnConfig?.id;
@@ -174,6 +177,15 @@ function TableHeaderInner<TRow extends DataTableRowModel>({
             return (
               <th
                 key={header.id}
+                draggable={wholeCellReorderDrag}
+                onDragStart={
+                  wholeCellReorderDrag && columnConfig
+                    ? (event) => {
+                        onHeaderDragStart(event, columnConfig.id);
+                      }
+                    : undefined
+                }
+                onDragEnd={wholeCellReorderDrag ? onHeaderDragEnd : undefined}
                 onDragOver={
                   canReorder && columnConfig
                     ? (event) => {
@@ -189,11 +201,16 @@ function TableHeaderInner<TRow extends DataTableRowModel>({
                     : undefined
                 }
                 data-column-id={columnConfig?.id}
+                data-column-reorder-handle={
+                  wholeCellReorderDrag && columnConfig ? columnConfig.id : undefined
+                }
+                aria-label={wholeCellReorderDrag ? `Reorder ${fallbackHeader}` : undefined}
                 data-column-sort-status={sortState || "none"}
                 data-column-filter-active={hasFilter ? "true" : "false"}
                 data-pinned-state={pinnedState || "center"}
                 className={cn(
                   "group relative border-b border-r border-[var(--dt-border-color)] px-2 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600",
+                  wholeCellReorderDrag ? "cursor-grab active:cursor-grabbing" : "",
                   isFirstRightPinned ? "border-l border-l-[var(--dt-border-color)]" : "",
                   isActionHeader ? "border-l border-l-[var(--dt-border-color)]" : "",
                   pinnedState
@@ -219,7 +236,7 @@ function TableHeaderInner<TRow extends DataTableRowModel>({
                       centerHeaderContent ? "w-full justify-center" : undefined
                     )}
                   >
-                    {canReorder && columnConfig ? (
+                    {showGripReorderHandle && columnConfig ? (
                       <button
                         type="button"
                         draggable
@@ -261,6 +278,7 @@ function TableHeaderInner<TRow extends DataTableRowModel>({
                         variant="ghost"
                         size="sm"
                         className="h-7 px-2"
+                        draggable={false}
                         data-column-menu-trigger={columnConfig.id}
                         onClick={(event) => {
                           toggleColumnMenu(columnConfig.id, event.currentTarget);

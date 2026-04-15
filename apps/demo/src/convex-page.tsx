@@ -330,7 +330,8 @@ export function ConvexPage(): JSX.Element {
       cellSelect: true,
       infiniteScroll: true,
       virtualization: true,
-      undo: true
+      undo: true,
+      dragHandle: false
     }),
     []
   );

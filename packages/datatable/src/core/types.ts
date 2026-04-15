@@ -78,6 +78,8 @@ export type DataTableFeatureFlags = {
   columnResize?: boolean;
   rowResize?: boolean;
   columnReorder?: boolean;
+  /** When `true` (default), a grip icon is the drag source. When `false`, the whole header cell is draggable. */
+  dragHandle?: boolean;
   columnPinning?: boolean;
   columnVisibility?: boolean;
   columnFilter?: boolean;

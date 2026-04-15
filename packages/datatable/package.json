@@ -1,6 +1,6 @@
 {
   "name": "@talentum-ventures/convex-datatable",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "license": "MIT",
   "keywords": [
@@ -53,7 +53,8 @@
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "build:ts": "tsc -p tsconfig.build.json",
     "build:css": "tailwindcss -c tailwind.config.ts -i ./src/styles.css -o ./dist/styles.css --minify",
-    "build": "bun run clean && bun run build:ts && bun run build:css",
+    "build:css:layer": "node -e \"const fs=require('node:fs');const p='dist/styles.css';const css=fs.readFileSync(p,'utf8');fs.writeFileSync(p,css.startsWith('@layer datatable{')?css:'@layer datatable{'+css+'}');\"",
+    "build": "bun run clean && bun run build:ts && bun run build:css && bun run build:css:layer",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "publishConfig": {

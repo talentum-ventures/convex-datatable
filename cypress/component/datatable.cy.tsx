@@ -1683,8 +1683,49 @@ describe("DataTable component", () => {
     cy.get("th[data-column-id='tags']").should("have.attr", "data-column-filter-active", "true");
   });
 
+  it("renders a grip drag handle on headers by default", () => {
+    cy.mount(<Harness tableId="cypress-table-reorder-grip-default" />);
+
+    cy.get("th[data-column-id='title']").should("not.have.attr", "data-column-reorder-handle");
+    cy.get("th[data-column-id='title']").should("have.attr", "draggable", "false");
+    cy.get("th[data-column-id='title'] button[data-column-reorder-handle='title']").should("exist");
+  });
+
+  it("uses the whole header as the drag handle when dragHandle is disabled", () => {
+    cy.mount(<Harness tableId="cypress-table-reorder-no-grip" features={{ dragHandle: false }} />);
+
+    cy.get("th[data-column-id='title']")
+      .should("have.attr", "data-column-reorder-handle", "title")
+      .and("have.attr", "draggable", "true");
+    cy.get("th[data-column-id='title'] button[data-column-reorder-handle]").should("not.exist");
+  });
+
   it("reorders columns via drag and drop in the same pin zone", () => {
     cy.mount(<Harness tableId="cypress-table-reorder" />);
+
+    cy.window().then((win) => {
+      const dataTransfer = new win.DataTransfer();
+
+      cy.get("[data-column-reorder-handle='title']").trigger("dragstart", { dataTransfer, force: true });
+      cy.get("th[data-column-id='amount']").then(($target) => {
+        const rect = expectNodeExists($target).getBoundingClientRect();
+        cy.wrap($target).trigger("dragover", { dataTransfer, clientX: rect.right - 2 });
+        cy.wrap($target).trigger("drop", { dataTransfer, clientX: rect.right - 2 });
+      });
+      cy.get("[data-column-reorder-handle='title']").trigger("dragend", { dataTransfer, force: true });
+    });
+
+    cy.get("thead tr")
+      .first()
+      .find("th[data-column-id]")
+      .then(($cells) => {
+        const order = [...$cells].map((cell) => cell.getAttribute("data-column-id"));
+        expect(order).to.deep.equal(["status", "amount", "title"]);
+      });
+  });
+
+  it("reorders columns via whole-header drag when dragHandle is disabled", () => {
+    cy.mount(<Harness tableId="cypress-table-reorder-whole-header" features={{ dragHandle: false }} />);
 
     cy.window().then((win) => {
       const dataTransfer = new win.DataTransfer();

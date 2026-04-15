@@ -22,13 +22,15 @@ Recommended:
 import "@talentum-ventures/convex-datatable/styles.css";
 ```
 
-If your app already runs Tailwind and you intentionally want Convex DataTable styles folded into your own generated stylesheet, add this scan path:
+The published stylesheet is a Tailwind v3 build with **no preflight** (your app owns any global CSS reset). It is wrapped in **`@layer datatable`**, so unlayered styles in your app (including a normal Tailwind build) win in the cascade regardless of import order. Utility selectors such as `.flex` and `.hidden` remain global names; the layer fixes precedence conflicts with your Tailwind, not full selector isolation.
+
+If your app already runs Tailwind and you want one combined build, add this scan path:
 
 ```txt
 node_modules/@talentum-ventures/convex-datatable/dist/**/*.js
 ```
 
-Scanning installed package files is toolchain-dependent, so the explicit CSS import remains the default recommendation.
+Scanning installed package files is toolchain-dependent, so the explicit CSS import remains the default recommendation for non-Tailwind apps. Using both import and content scanning is safe thanks to the cascade layer.
 
 ## Minimal Usage
 
