@@ -302,6 +302,24 @@ describe("DataTable draft row placement", () => {
     expect(container.querySelector("tbody tr[data-row-id='__draft__']")).toBeNull();
   });
 
+  it("allows the sticky draft row to grow beyond the base row height", () => {
+    const { container } = render(
+      createElement(DataTable<TestRow>, {
+        tableId: "sticky-draft-grow",
+        columns,
+        getRowId: (row: TestRow) => row.id,
+        dataSource: createMutableDataSource([{ id: "row-1", name: "Alpha" }]),
+        features: { rowAdd: true, virtualization: false }
+      })
+    );
+
+    const draftRow = container.querySelector<HTMLTableRowElement>("tfoot tr[data-row-id='__draft__']");
+
+    expect(draftRow).not.toBeNull();
+    expect(draftRow?.style.minHeight).toBe("40px");
+    expect(draftRow?.style.height).toBe("");
+  });
+
   it("renders the draft row in the scrollable body when stickyDraftRow is disabled", () => {
     const { container } = render(
       createElement(DataTable<TestRow>, {

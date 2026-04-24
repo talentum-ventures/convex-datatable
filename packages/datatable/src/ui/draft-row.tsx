@@ -131,7 +131,7 @@ export function DraftRow<TRow extends DataTableRowModel>({
       style={{
         display: "flex",
         ...(sticky ? {} : { top: `${top}px` }),
-        height: `${size}px`,
+        minHeight: `${size}px`,
         width: `${columnRenderLayout.tableRenderWidth}px`
       }}
       data-row-id={draftRowId}
