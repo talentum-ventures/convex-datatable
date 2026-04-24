@@ -44,6 +44,7 @@ export type DraftRowProps<TRow extends DataTableRowModel> = {
   rowIndex: number;
   top: number;
   size: number;
+  sticky?: boolean;
   draftRowId: string;
   draftRow: Partial<TRow>;
   draftEditingColumnId: string | null;
@@ -65,6 +66,7 @@ export function DraftRow<TRow extends DataTableRowModel>({
   rowIndex,
   top,
   size,
+  sticky,
   draftRowId,
   draftRow,
   draftEditingColumnId,
@@ -122,12 +124,13 @@ export function DraftRow<TRow extends DataTableRowModel>({
   return (
     <tr
       key={draftRowId}
-      className="group absolute left-0 overflow-visible bg-slate-50"
+      className={cn(
+        "group overflow-visible bg-slate-50",
+        sticky ? "" : "absolute left-0"
+      )}
       style={{
         display: "flex",
-        // Use `top` (not `translateY`) so `position: sticky` on cells resolves against the grid
-        // scrollport; transforms on the row break horizontal sticky pinning for body cells.
-        top: `${top}px`,
+        ...(sticky ? {} : { top: `${top}px` }),
         height: `${size}px`,
         width: `${columnRenderLayout.tableRenderWidth}px`
       }}
@@ -195,7 +198,9 @@ export function DraftRow<TRow extends DataTableRowModel>({
               onCancel: onCancelDraftEdit
             })
           : showPlaceholder
-            ? <span className="text-sm text-slate-400">{`Add ${columnConfig.header}`}</span>
+            ? (
+                <span className="text-sm leading-5 text-slate-400">{`Add ${columnConfig.header}`}</span>
+              )
             : renderColumnContent({
                 column: columnConfig,
                 row: draftCandidateRow,
@@ -259,12 +264,12 @@ export function DraftRow<TRow extends DataTableRowModel>({
             >
               <div
                 className={cn(
-                  "flex h-full min-w-0 items-start gap-2",
+                  "flex h-full min-w-0 items-center gap-2",
                   showInlineActionButtons ? "justify-between" : ""
                 )}
               >
-                <div className="min-w-0 flex-1">{content}</div>
-                {showInlineActionButtons ? actionButtons : null}
+                <div className="flex min-w-0 flex-1 items-center">{content}</div>
+                  {showInlineActionButtons ? actionButtons : null}
               </div>
               {indicator}
             </div>

@@ -29,7 +29,7 @@ export function SelectMenuEditor<TRow extends DataTableRowModel>({
   const listRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const searchEffectPrimedRef = useRef(false);
-  const dropdownStyle = useDropdownPosition(wrapperRef);
+  const dropdownStyle = useDropdownPosition(wrapperRef, dialogRef);
   const portalRoot = typeof document === "undefined" ? null : document.body;
   const options = resolveOptions(column, row);
   const [search, setSearch] = useState("");

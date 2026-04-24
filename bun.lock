@@ -43,7 +43,7 @@
     },
     "packages/datatable": {
       "name": "@talentum-ventures/convex-datatable",
-      "version": "0.1.0",
+      "version": "0.3.0",
       "dependencies": {
         "@tanstack/react-table": "^8.20.5",
         "@tanstack/react-virtual": "^3.11.2",

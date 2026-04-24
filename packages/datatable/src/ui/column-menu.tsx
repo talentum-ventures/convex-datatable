@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, ChevronUp, EyeOff, Pin, PinOff } from "lucide-react";
 import type { FilterOperator, DataTableColumn, DataTableRowModel } from "../core/types";
-import { filterOperatorsForColumn } from "../core/filtering";
+import { filterOperatorsForColumn, resolveAllowEmptyFilter } from "../core/filtering";
 import { getStaticOptions } from "../core/select-options";
 import type { ColumnMenuAnchor } from "../hooks/use-table-columns";
 import { useHeaderMenuPosition } from "../hooks/use-header-menu-position";
@@ -30,6 +30,16 @@ export type ColumnMenuProps<TRow extends DataTableRowModel> = {
   onToggleFilterValue: (value: string, enabled: boolean) => void;
 };
 
+function operatorLabel(operator: FilterOperator): string {
+  if (operator === "isEmpty") {
+    return "Is empty";
+  }
+  if (operator === "isNotEmpty") {
+    return "Is not empty";
+  }
+  return operator;
+}
+
 export function ColumnMenu<TRow extends DataTableRowModel>({
   column,
   trigger,
@@ -52,6 +62,7 @@ export function ColumnMenu<TRow extends DataTableRowModel>({
   onToggleFilterValue
 }: ColumnMenuProps<TRow>): JSX.Element {
   const filterOperators = filterOperatorsForColumn(column);
+  const allowEmptyFilter = resolveAllowEmptyFilter(column);
   const staticOptions =
     column.kind === "select" || column.kind === "multiselect"
       ? getStaticOptions(column)
@@ -59,6 +70,9 @@ export function ColumnMenu<TRow extends DataTableRowModel>({
   const showOptionFilters =
     (column.kind === "select" || column.kind === "multiselect") &&
     staticOptions.length > 0;
+  const isEmptyOperator = activeFilterOperator === "isEmpty";
+  const isNotEmptyOperator = activeFilterOperator === "isNotEmpty";
+  const hidesFilterInputs = isEmptyOperator || isNotEmptyOperator;
   const menuRef = useRef<HTMLDivElement | null>(null);
   const style = useHeaderMenuPosition(trigger, anchor);
 
@@ -204,18 +218,40 @@ export function ColumnMenu<TRow extends DataTableRowModel>({
             >
               {filterOperators.map((operator) => (
                 <option key={`${column.id}-${operator}`} value={operator}>
-                  {operator}
+                  {operatorLabel(operator)}
                 </option>
               ))}
             </select>
           ) : (
             <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs font-medium text-slate-600">
-              Operator: {filterOperators[0]}
+              Operator: {filterOperators[0] ? operatorLabel(filterOperators[0]) : ""}
             </div>
           )}
 
-          {showOptionFilters ? (
+          {hidesFilterInputs ? (
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-600">
+              {isEmptyOperator ? "Matches empty cells." : "Matches non-empty cells."}
+            </div>
+          ) : null}
+
+          {showOptionFilters && !hidesFilterInputs ? (
             <div className="max-h-36 space-y-1 overflow-auto rounded-md border border-slate-200 p-2">
+              {allowEmptyFilter ? (
+                <label className="flex items-center gap-2 text-xs text-slate-700">
+                  <Checkbox
+                    data-dt-column-menu-filter-checkbox="true"
+                    checked={isEmptyOperator}
+                    onChange={(event) => {
+                      if (event.target.checked) {
+                        onSetFilterOperator("isEmpty");
+                        return;
+                      }
+                      onClearFilter();
+                    }}
+                  />
+                  (Empty)
+                </label>
+              ) : null}
               {staticOptions.map((option) => (
                 <label
                   key={`${column.id}-${option.value}`}
@@ -234,7 +270,7 @@ export function ColumnMenu<TRow extends DataTableRowModel>({
             </div>
           ) : null}
 
-          {column.kind !== "select" && column.kind !== "multiselect" ? (
+          {column.kind !== "select" && column.kind !== "multiselect" && !hidesFilterInputs ? (
             <Input
               data-dt-column-menu-text-filter="true"
               type={

@@ -36,6 +36,7 @@ export type UseTableFiltersResult<TRow extends DataTableRowModel> = {
   selectColumnFilterValues: (column: DataTableColumn<TRow>) => ReadonlyArray<string>;
   toggleColumnFilterInValue: (column: DataTableColumn<TRow>, value: string, enabled: boolean) => void;
   clearColumnFilter: (columnId: string) => void;
+  clearAllFilters: () => void;
 };
 
 export function useTableFilters<TRow extends DataTableRowModel>({
@@ -57,7 +58,7 @@ export function useTableFilters<TRow extends DataTableRowModel>({
   const setColumnFilter = useCallback((columnId: string, nextFilter: DataTableFilter | null) => {
     setColumnFilters((current) => {
       const next = fromTanStackFilters(current).filter((entry) => entry.columnId !== columnId);
-      if (nextFilter && isActiveFilterValue(nextFilter.value)) {
+      if (nextFilter && isActiveFilterValue(nextFilter)) {
         next.push(nextFilter);
       }
       return toTanStackFilters(next);
@@ -84,10 +85,24 @@ export function useTableFilters<TRow extends DataTableRowModel>({
 
   const setColumnFilterOperator = useCallback(
     (column: DataTableColumn<TRow>, operator: FilterOperator): void => {
+      const allowed = filterOperatorsForColumn(column);
+      if (!allowed.includes(operator)) {
+        return;
+      }
+
       setFilterOperatorDrafts((current) => ({
         ...current,
         [column.id]: operator
       }));
+
+      if (operator === "isEmpty" || operator === "isNotEmpty") {
+        setColumnFilter(column.id, {
+          columnId: column.id,
+          op: operator,
+          value: null
+        });
+        return;
+      }
 
       const activeFilter = filterByColumnId.get(column.id);
       if (!activeFilter) {
@@ -206,6 +221,11 @@ export function useTableFilters<TRow extends DataTableRowModel>({
     [setColumnFilter]
   );
 
+  const clearAllFilters = useCallback((): void => {
+    setColumnFilters([]);
+    setFilterOperatorDrafts({});
+  }, [setColumnFilters]);
+
   return {
     filterByColumnId,
     selectedFilterOperator,
@@ -214,6 +234,7 @@ export function useTableFilters<TRow extends DataTableRowModel>({
     setColumnFilterTextValue,
     selectColumnFilterValues,
     toggleColumnFilterInValue,
-    clearColumnFilter
+    clearColumnFilter,
+    clearAllFilters
   };
 }

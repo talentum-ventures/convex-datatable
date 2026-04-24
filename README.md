@@ -69,6 +69,7 @@ A production-ready, fully typed React data-grid component with Airtable-style ed
 - **Clipboard** — Ctrl+C to copy selection as TSV, Ctrl+V to paste (multi-cell grid paste supported)
 - **Undo / Redo** — Ctrl+Z / Ctrl+Shift+Z for edit and paste operations
 - **Row operations** — add new rows (draft row), delete rows with soft-delete toast, restore rows
+- **Sticky add-row draft** — when row creation is enabled, the draft row stays visible at the bottom of the viewport by default
 - **Column resize** — drag column borders to resize
 - **Column reorder** — drag-and-drop column headers
 - **Column pinning** — pin columns left or right with sticky positioning and shadow
@@ -629,6 +630,7 @@ Feature flags are independent toggles merged with defaults. Pass only the flags 
 | `undo`             | `false` | Enable Ctrl+Z / Ctrl+Shift+Z undo/redo for edits and pastes.                       |
 | `infiniteScroll`   | `true`  | Automatically call `loadMore` when the user scrolls near the bottom.               |
 | `virtualization`   | `true`  | Only render visible rows for large datasets (via `@tanstack/react-virtual`).       |
+| `stickyDraftRow`   | `true`  | Keep the add-row draft pinned to the bottom of the viewport instead of the body.   |
 
 
 ---
@@ -1157,6 +1159,7 @@ type DataTableFeatureFlags = {
   undo?: boolean;
   infiniteScroll?: boolean;
   virtualization?: boolean;
+  stickyDraftRow?: boolean;
 };
 ```
 

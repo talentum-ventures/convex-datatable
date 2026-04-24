@@ -31,6 +31,7 @@ export type TableBodyHandle = {
 export type TableBodyProps<TRow extends DataTableRowModel> = {
   scrollContainerRef: React.RefObject<HTMLDivElement | null>;
   virtualizationEnabled: boolean;
+  stickyDraftRow: boolean;
   totalRows: number;
   minHeight: number;
   overscan: number;
@@ -64,6 +65,7 @@ export type TableBodyProps<TRow extends DataTableRowModel> = {
 function TableBodyInner<TRow extends DataTableRowModel>({
   scrollContainerRef,
   virtualizationEnabled,
+  stickyDraftRow,
   totalRows,
   minHeight,
   overscan,
@@ -154,7 +156,7 @@ function TableBodyInner<TRow extends DataTableRowModel>({
         const isDraft = rowIndex >= displayedRows.length;
 
         if (isDraft) {
-          if (!rowAddEnabled || !canCreateRow) {
+          if (!rowAddEnabled || !canCreateRow || stickyDraftRow) {
             return null;
           }
 

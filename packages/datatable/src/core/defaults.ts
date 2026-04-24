@@ -28,7 +28,8 @@ export const DEFAULT_FEATURE_FLAGS: Required<DataTableFeatureFlags> = {
   clipboardPaste: true,
   undo: false,
   infiniteScroll: true,
-  virtualization: true
+  virtualization: true,
+  stickyDraftRow: true
 };
 
 export const DEFAULT_THEME_TOKENS: DataTableThemeTokens = {

@@ -47,7 +47,9 @@ export type FilterOperator =
   | "gte"
   | "lt"
   | "lte"
-  | "in";
+  | "in"
+  | "isEmpty"
+  | "isNotEmpty";
 
 export type DataTableFilterValue =
   | string
@@ -95,6 +97,8 @@ export type DataTableFeatureFlags = {
   undo?: boolean;
   infiniteScroll?: boolean;
   virtualization?: boolean;
+  /** When `true` (default), the "add row" draft row sticks to the bottom of the viewport so it's always visible without scrolling. */
+  stickyDraftRow?: boolean;
 };
 
 export type SelectOptionColorStyle = {
@@ -163,6 +167,8 @@ export type ColumnCommon<
   isHideable?: boolean;
   isSortable?: boolean;
   isFilterable?: boolean;
+  /** Enables "Is empty" / "Is not empty" filters. Defaults to true for select and multiselect columns, false otherwise. */
+  allowEmptyFilter?: boolean;
   accessor?: (row: TRow) => TValue;
   validator?: ColumnValidator<TRow, TValue>;
   parseInput?: (input: string, row: TRow) => TValue;

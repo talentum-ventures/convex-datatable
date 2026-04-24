@@ -1,10 +1,24 @@
 import { useEffect, useState, type CSSProperties } from "react";
 
+const DROPDOWN_GAP_PX = 4;
+const VIEWPORT_PADDING_PX = 8;
+
 export type NodeContainerRef = {
   current: Node | null;
 };
 
-export function useDropdownPosition(anchorRef: NodeContainerRef): CSSProperties {
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function equalPosition(current: CSSProperties, next: CSSProperties): boolean {
+  return current.left === next.left && current.top === next.top && current.opacity === next.opacity;
+}
+
+export function useDropdownPosition(
+  anchorRef: NodeContainerRef,
+  dialogRef?: NodeContainerRef
+): CSSProperties {
   const [style, setStyle] = useState<CSSProperties>({
     left: 0,
     top: 0,
@@ -26,13 +40,41 @@ export function useDropdownPosition(anchorRef: NodeContainerRef): CSSProperties 
       if (!(nextAnchor instanceof HTMLElement)) {
         return;
       }
+      const nextOwnerWindow = nextAnchor.ownerDocument.defaultView;
+      if (!nextOwnerWindow) {
+        return;
+      }
 
       const rect = nextAnchor.getBoundingClientRect();
-      setStyle({
-        left: rect.left,
-        top: rect.bottom + 4,
+      const nextDialog = dialogRef?.current;
+      const dialogRect =
+        nextDialog instanceof HTMLElement
+          ? nextDialog.getBoundingClientRect()
+          : { height: 0, width: 0 };
+      const maxLeft = Math.max(
+        VIEWPORT_PADDING_PX,
+        nextOwnerWindow.innerWidth - VIEWPORT_PADDING_PX - dialogRect.width
+      );
+      const belowTop = rect.bottom + DROPDOWN_GAP_PX;
+      const aboveTop = rect.top - DROPDOWN_GAP_PX - dialogRect.height;
+      const availableBelow = nextOwnerWindow.innerHeight - VIEWPORT_PADDING_PX - belowTop;
+      const availableAbove = rect.top - VIEWPORT_PADDING_PX;
+      const shouldFlipAbove =
+        dialogRect.height > 0 &&
+        belowTop + dialogRect.height > nextOwnerWindow.innerHeight - VIEWPORT_PADDING_PX &&
+        availableAbove > availableBelow;
+      const unclampedTop = shouldFlipAbove ? aboveTop : belowTop;
+      const maxTop = Math.max(
+        VIEWPORT_PADDING_PX,
+        nextOwnerWindow.innerHeight - VIEWPORT_PADDING_PX - dialogRect.height
+      );
+      const nextStyle = {
+        left: clamp(rect.left, VIEWPORT_PADDING_PX, maxLeft),
+        top: clamp(unclampedTop, VIEWPORT_PADDING_PX, maxTop),
         opacity: 1
-      });
+      };
+
+      setStyle((current) => (equalPosition(current, nextStyle) ? current : nextStyle));
     };
 
     const schedulePositionUpdate = (): void => {
@@ -54,6 +96,9 @@ export function useDropdownPosition(anchorRef: NodeContainerRef): CSSProperties 
     const resizeObserver =
       typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => schedulePositionUpdate());
     resizeObserver?.observe(anchor);
+    if (dialogRef?.current instanceof HTMLElement) {
+      resizeObserver?.observe(dialogRef.current);
+    }
 
     return () => {
       if (ownerWindow) {
@@ -64,7 +109,7 @@ export function useDropdownPosition(anchorRef: NodeContainerRef): CSSProperties 
       grid?.removeEventListener("scroll", schedulePositionUpdate);
       resizeObserver?.disconnect();
     };
-  }, [anchorRef]);
+  }, [anchorRef, dialogRef]);
 
   return style;
 }

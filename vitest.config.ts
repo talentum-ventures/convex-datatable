@@ -32,8 +32,7 @@ export default defineConfig({
       "apps/demo/src/**/*.test.ts",
       "apps/demo/src/**/*.test.tsx",
       "packages/datatable/src/**/*.test.ts",
-      "packages/datatable/src/**/*.test.tsx",
-      "tests/**/*.test.ts"
+      "packages/datatable/src/**/*.test.tsx"
     ]
   }
 });

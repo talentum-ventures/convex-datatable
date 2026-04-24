@@ -12,7 +12,9 @@ type FilterOperator =
   | "gte"
   | "lt"
   | "lte"
-  | "in";
+  | "in"
+  | "isEmpty"
+  | "isNotEmpty";
 
 type FilterValue = string | number | boolean | null | string[];
 
@@ -49,7 +51,9 @@ const filterValidator = v.object({
     v.literal("gte"),
     v.literal("lt"),
     v.literal("lte"),
-    v.literal("in")
+    v.literal("in"),
+    v.literal("isEmpty"),
+    v.literal("isNotEmpty")
   ),
   value: v.union(v.string(), v.number(), v.boolean(), v.null(), v.array(v.string()))
 });
@@ -192,9 +196,33 @@ function comparableValue(value: ConvexDemoRow[keyof ConvexDemoRow]): string | nu
   return null;
 }
 
+function isCellEmpty(value: ConvexDemoRow[keyof ConvexDemoRow]): boolean {
+  if (value === null || value === undefined) {
+    return true;
+  }
+
+  if (Array.isArray(value)) {
+    return value.length === 0;
+  }
+
+  if (typeof value === "string") {
+    return value.trim().length === 0;
+  }
+
+  return false;
+}
+
 function matchesFilter(row: ConvexDemoRow, filter: QueryFilter): boolean {
   const raw = row[filter.columnId as keyof ConvexDemoRow];
   const text = stringifyValue(raw);
+
+  if (filter.op === "isEmpty") {
+    return isCellEmpty(raw);
+  }
+
+  if (filter.op === "isNotEmpty") {
+    return !isCellEmpty(raw);
+  }
 
   if (filter.op === "contains") {
     return text.toLowerCase().includes(String(filter.value ?? "").toLowerCase());

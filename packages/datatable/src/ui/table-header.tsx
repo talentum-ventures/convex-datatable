@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef } from "react";
 import { flexRender, type Table } from "@tanstack/react-table";
-import { ChevronDown, ChevronUp, Filter, GripVertical, MoreVertical } from "lucide-react";
+import { ChevronDown, ChevronUp, Filter, FilterX, GripVertical, MoreVertical } from "lucide-react";
 import { cn } from "../core/cn";
 import { isActiveFilterValue } from "../core/filtering";
 import type {
@@ -26,6 +26,9 @@ export type TableHeaderProps<TRow extends DataTableRowModel> = {
   table: Table<TRow>;
   columnById: ReadonlyMap<string, DataTableColumn<TRow>>;
   columnRenderLayout: ColumnLayoutResult;
+  viewportWidth: number;
+  leftPinnedWidth: number;
+  rightPinnedWidth: number;
   columnSizing: Readonly<Record<string, number>>;
   fixedTrackStyle: (width: number) => React.CSSProperties;
   columnMenuId: string | null;
@@ -42,6 +45,8 @@ export type TableHeaderProps<TRow extends DataTableRowModel> = {
     columnResize: boolean;
   };
   filterByColumnId: ReadonlyMap<string, DataTableFilter>;
+  hasActiveFilters: boolean;
+  isFilteredEmpty: boolean;
   selectedFilterOperator: (column: DataTableColumn<TRow>) => FilterOperator;
   selectColumnFilterTextValue: (column: DataTableColumn<TRow>) => string;
   selectColumnFilterValues: (column: DataTableColumn<TRow>) => ReadonlyArray<string>;
@@ -49,6 +54,7 @@ export type TableHeaderProps<TRow extends DataTableRowModel> = {
   setColumnFilterTextValue: (column: DataTableColumn<TRow>, value: string) => void;
   toggleColumnFilterInValue: (column: DataTableColumn<TRow>, value: string, enabled: boolean) => void;
   clearColumnFilter: (columnId: string) => void;
+  clearAllFilters: () => void;
   toggleColumnMenu: (columnId: string, trigger: HTMLElement) => void;
   closeColumnMenu: () => void;
   updatePinnedColumn: (columnId: string, side: "left" | "right" | "none") => void;
@@ -71,6 +77,9 @@ function TableHeaderInner<TRow extends DataTableRowModel>({
   table,
   columnById,
   columnRenderLayout,
+  viewportWidth,
+  leftPinnedWidth,
+  rightPinnedWidth,
   columnSizing,
   fixedTrackStyle,
   columnMenuId,
@@ -79,6 +88,8 @@ function TableHeaderInner<TRow extends DataTableRowModel>({
   dragOverTarget,
   mergedFeatures,
   filterByColumnId,
+  hasActiveFilters,
+  isFilteredEmpty,
   selectedFilterOperator,
   selectColumnFilterTextValue,
   selectColumnFilterValues,
@@ -86,6 +97,7 @@ function TableHeaderInner<TRow extends DataTableRowModel>({
   setColumnFilterTextValue,
   toggleColumnFilterInValue,
   clearColumnFilter,
+  clearAllFilters,
   toggleColumnMenu,
   closeColumnMenu,
   updatePinnedColumn,
@@ -98,6 +110,8 @@ function TableHeaderInner<TRow extends DataTableRowModel>({
 }: TableHeaderProps<TRow>): JSX.Element {
   const previousColumnMenuIdRef = useRef<string | null>(null);
   const lastOpenTriggerRef = useRef<HTMLElement | null>(null);
+  const visibleColumnCount = Math.max(table.getVisibleLeafColumns().length, 1);
+  const emptyBannerViewportWidth = Math.max(viewportWidth - leftPinnedWidth - rightPinnedWidth, 0);
 
   useEffect(() => {
     if (columnMenuId) {
@@ -148,7 +162,7 @@ function TableHeaderInner<TRow extends DataTableRowModel>({
             const showGripReorderHandle = canReorder && mergedFeatures.dragHandle;
             const wholeCellReorderDrag = canReorder && !mergedFeatures.dragHandle;
             const currentFilter = columnConfig ? filterByColumnId.get(columnConfig.id) : undefined;
-            const hasFilter = Boolean(currentFilter && isActiveFilterValue(currentFilter.value));
+            const hasFilter = Boolean(currentFilter && isActiveFilterValue(currentFilter));
             const isMenuOpen = columnMenuId === columnConfig?.id;
             const sortState = header.column.getIsSorted();
             const activeFilterOperator = columnConfig ? selectedFilterOperator(columnConfig) : "contains";
@@ -226,13 +240,13 @@ function TableHeaderInner<TRow extends DataTableRowModel>({
               >
                 <div
                   className={cn(
-                    "flex w-full items-center gap-1",
+                    "flex w-full items-center gap-1 h-full",
                     centerHeaderContent ? "justify-center" : "justify-between"
                   )}
                 >
                   <div
                     className={cn(
-                      "inline-flex min-w-0 items-center gap-1",
+                      "inline-flex min-w-0 items-center",
                       centerHeaderContent ? "w-full justify-center" : undefined
                     )}
                   >
@@ -251,7 +265,13 @@ function TableHeaderInner<TRow extends DataTableRowModel>({
                         <GripVertical className="h-3.5 w-3.5 cursor-grab active:cursor-grabbing" />
                       </button>
                     ) : null}
-                    <span className="truncate text-left">
+                    <span
+                      className={cn(
+                        centerHeaderContent
+                          ? "flex w-full items-center justify-center"
+                          : "truncate text-left"
+                      )}
+                    >
                       {flexRender(header.column.columnDef.header, header.getContext())}
                     </span>
                     <span className="inline-flex items-center gap-1">
@@ -375,6 +395,40 @@ function TableHeaderInner<TRow extends DataTableRowModel>({
           })}
         </tr>
       ))}
+      {hasActiveFilters && isFilteredEmpty ? (
+        <tr
+          style={{
+            display: "flex",
+            width: `${columnRenderLayout.tableRenderWidth}px`
+          }}
+        >
+          <th
+            colSpan={visibleColumnCount}
+            className="border-b border-[var(--dt-border-color)] px-4 py-3 text-center text-sm font-medium normal-case tracking-normal text-slate-600 [background:var(--dt-header-bg)]"
+            style={{
+              width: `${columnRenderLayout.tableRenderWidth}px`,
+              minWidth: `${columnRenderLayout.tableRenderWidth}px`
+            }}
+          >
+            <div
+              className="sticky flex items-center justify-center"
+              style={{
+                left: `${leftPinnedWidth}px`,
+                width: `${emptyBannerViewportWidth}px`,
+                minWidth: `${emptyBannerViewportWidth}px`
+              }}
+            >
+              <div className="flex max-w-full flex-wrap items-center justify-center gap-3">
+                <span>No rows match the current filters.</span>
+                <Button variant="ghost" size="sm" className="h-8 px-3" onClick={clearAllFilters}>
+                  <FilterX className="h-3.5 w-3.5" />
+                  Clear all filters
+                </Button>
+              </div>
+            </div>
+          </th>
+        </tr>
+      ) : null}
     </thead>
   );
 }

@@ -16,6 +16,7 @@ Reusable DataTable implementation and public API.
 - Keep external API in `src/index.ts` stable and explicit.
 - Never export TanStack types from public surface.
 - Row schema contract is structural (`safeParse`) to avoid cross-package zod identity coupling.
+- Treat `stickyDraftRow` as part of the public `DataTableFeatureFlags` contract; row creation stays sticky by default unless consumers explicitly disable it.
 
 ## CSS Build
 
@@ -29,3 +30,4 @@ Reusable DataTable implementation and public API.
 - Unit tests near source modules (`*.test.ts`).
 - Preserve round-trip tests for persistence/state conversion.
 - Preserve parser/formatter tests for clipboard and column values.
+- Cover row-creation UX changes in `src/ui/data-table.test.ts`, including both the default sticky behavior and the opt-out path.

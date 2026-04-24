@@ -13,23 +13,37 @@ const NUMBER_FILTER_OPERATORS: ReadonlyArray<FilterOperator> = ["eq", "neq", "gt
 const DATE_FILTER_OPERATORS: ReadonlyArray<FilterOperator> = ["eq", "neq", "gt", "gte", "lt", "lte"];
 const SELECT_FILTER_OPERATORS: ReadonlyArray<FilterOperator> = ["in"];
 const MULTISELECT_FILTER_OPERATORS: ReadonlyArray<FilterOperator> = ["in"];
+const EMPTY_FILTER_OPERATORS: ReadonlyArray<FilterOperator> = ["isEmpty", "isNotEmpty"];
+
+export function resolveAllowEmptyFilter<TRow extends DataTableRowModel>(
+  column: DataTableColumn<TRow>
+): boolean {
+  if (typeof column.allowEmptyFilter === "boolean") {
+    return column.allowEmptyFilter;
+  }
+
+  return column.kind === "select" || column.kind === "multiselect";
+}
 
 export function filterOperatorsForColumn<TRow extends DataTableRowModel>(
   column: DataTableColumn<TRow>
 ): ReadonlyArray<FilterOperator> {
+  let baseOperators = TEXT_FILTER_OPERATORS;
   if (column.kind === "number" || column.kind === "currency") {
-    return NUMBER_FILTER_OPERATORS;
+    baseOperators = NUMBER_FILTER_OPERATORS;
+  } else if (column.kind === "date") {
+    baseOperators = DATE_FILTER_OPERATORS;
+  } else if (column.kind === "select") {
+    baseOperators = SELECT_FILTER_OPERATORS;
+  } else if (column.kind === "multiselect") {
+    baseOperators = MULTISELECT_FILTER_OPERATORS;
   }
-  if (column.kind === "date") {
-    return DATE_FILTER_OPERATORS;
+
+  if (!resolveAllowEmptyFilter(column)) {
+    return baseOperators;
   }
-  if (column.kind === "select") {
-    return SELECT_FILTER_OPERATORS;
-  }
-  if (column.kind === "multiselect") {
-    return MULTISELECT_FILTER_OPERATORS;
-  }
-  return TEXT_FILTER_OPERATORS;
+
+  return [...baseOperators, ...EMPTY_FILTER_OPERATORS];
 }
 
 export function defaultFilterOperatorForColumn<TRow extends DataTableRowModel>(
@@ -40,7 +54,29 @@ export function defaultFilterOperatorForColumn<TRow extends DataTableRowModel>(
   return first ?? "contains";
 }
 
-export function isActiveFilterValue(value: DataTableFilter["value"]): boolean {
+export function isActiveFilterValue(filter: Pick<DataTableFilter, "op" | "value">): boolean;
+export function isActiveFilterValue(value: DataTableFilter["value"], op?: DataTableFilter["op"]): boolean;
+export function isActiveFilterValue(
+  filterOrValue: Pick<DataTableFilter, "op" | "value"> | DataTableFilter["value"],
+  op?: DataTableFilter["op"]
+): boolean {
+  const filter =
+    typeof filterOrValue === "object" &&
+    filterOrValue !== null &&
+    !Array.isArray(filterOrValue) &&
+    "op" in filterOrValue &&
+    "value" in filterOrValue
+      ? filterOrValue
+      : {
+          op,
+          value: filterOrValue
+        };
+
+  if (filter.op === "isEmpty" || filter.op === "isNotEmpty") {
+    return true;
+  }
+
+  const { value } = filter;
   if (value === null) {
     return false;
   }
@@ -51,6 +87,22 @@ export function isActiveFilterValue(value: DataTableFilter["value"]): boolean {
     return value.trim().length > 0;
   }
   return true;
+}
+
+export function isCellEmpty(raw: DataTableCellValue): boolean {
+  if (raw === null || raw === undefined) {
+    return true;
+  }
+
+  if (Array.isArray(raw)) {
+    return raw.length === 0;
+  }
+
+  if (typeof raw === "string") {
+    return raw.trim().length === 0;
+  }
+
+  return false;
 }
 
 export function stringifyFilterCellValue(raw: DataTableCellValue): string {
@@ -113,6 +165,14 @@ export function rowMatchesFilter<TRow extends DataTableRowModel>(
 ): boolean {
   const raw = row[filter.columnId as keyof TRow];
   const text = stringifyFilterCellValue(raw);
+
+  if (filter.op === "isEmpty") {
+    return isCellEmpty(raw);
+  }
+
+  if (filter.op === "isNotEmpty") {
+    return !isCellEmpty(raw);
+  }
 
   if (filter.op === "contains") {
     return text.toLowerCase().includes(String(filter.value ?? "").toLowerCase());

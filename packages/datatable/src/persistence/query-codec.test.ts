@@ -28,6 +28,16 @@ describe("query codec", () => {
     expect(decoded).toEqual(fixtureState);
   });
 
+  it("round-trips empty filters to URL", () => {
+    const state: PersistedTableState = {
+      ...fixtureState,
+      filters: [{ columnId: "status", op: "isEmpty", value: null }]
+    };
+    const params = encodePersistedStateToUrl("orders", state, new URLSearchParams());
+
+    expect(decodePersistedStateFromUrl("orders", params, undefined)).toEqual(state);
+  });
+
   it("merges with URL precedence", () => {
     const merged = mergePersistedState(
       {

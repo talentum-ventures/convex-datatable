@@ -127,6 +127,7 @@ export function InvoicesTable(): JSX.Element {
 
 - Typed column kinds for text, long text, number, currency, select, multiselect, link, date, and custom React node cells
 - Inline editing, row creation, row deletion, undo, clipboard copy and paste, and spreadsheet-style selection
+- A sticky add-row draft by default, so new rows can be created without scrolling to the end
 - Sorting, filtering, resizing, reordering, visibility, and pinning
 - Infinite scroll and virtualization
 - URL and `localStorage` persistence
@@ -174,6 +175,12 @@ export function ThemedTable(): JSX.Element {
 ```
 
 You can also pass a partial `theme` prop if you only want to change a few tokens.
+
+## Row Creation UX
+
+When `features.rowAdd` is enabled and `dataSource.createRow` is provided, the draft "add row" stays pinned to the bottom of the viewport by default via `features.stickyDraftRow = true`.
+
+Set `features.stickyDraftRow` to `false` if you want the draft row to render as the last row in the scrollable table body instead.
 
 ## Package Exports
 

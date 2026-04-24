@@ -136,7 +136,9 @@ function decodeFilters(
       op !== "gte" &&
       op !== "lt" &&
       op !== "lte" &&
-      op !== "in"
+      op !== "in" &&
+      op !== "isEmpty" &&
+      op !== "isNotEmpty"
     ) {
       if (onError) {
         onError(`Ignoring invalid filter operator: ${op}`);

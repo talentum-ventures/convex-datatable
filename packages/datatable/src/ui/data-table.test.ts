@@ -58,6 +58,16 @@ function createDataSource(rows: ReadonlyArray<TestRow>): DataTableDataSource<Tes
   };
 }
 
+function createMutableDataSource(rows: ReadonlyArray<TestRow>): DataTableDataSource<TestRow> {
+  return {
+    ...createDataSource(rows),
+    createRow: async (draft) => ({
+      id: String(draft.id ?? "draft-row"),
+      name: String(draft.name ?? "")
+    })
+  };
+}
+
 function ToolbarHarness({
   renderToolbar
 }: {
@@ -276,6 +286,38 @@ describe("DataTable surfaces", () => {
   });
 });
 
+describe("DataTable draft row placement", () => {
+  it("sticks the draft row to the bottom of the viewport by default", () => {
+    const { container } = render(
+      createElement(DataTable<TestRow>, {
+        tableId: "sticky-draft-default",
+        columns,
+        getRowId: (row: TestRow) => row.id,
+        dataSource: createMutableDataSource([{ id: "row-1", name: "Alpha" }]),
+        features: { rowAdd: true, virtualization: false }
+      })
+    );
+
+    expect(container.querySelector("tfoot tr[data-row-id='__draft__']")).not.toBeNull();
+    expect(container.querySelector("tbody tr[data-row-id='__draft__']")).toBeNull();
+  });
+
+  it("renders the draft row in the scrollable body when stickyDraftRow is disabled", () => {
+    const { container } = render(
+      createElement(DataTable<TestRow>, {
+        tableId: "sticky-draft-disabled",
+        columns,
+        getRowId: (row: TestRow) => row.id,
+        dataSource: createMutableDataSource([{ id: "row-1", name: "Alpha" }]),
+        features: { rowAdd: true, stickyDraftRow: false, virtualization: false }
+      })
+    );
+
+    expect(container.querySelector("tfoot tr[data-row-id='__draft__']")).toBeNull();
+    expect(container.querySelector("tbody tr[data-row-id='__draft__']")).not.toBeNull();
+  });
+});
+
 describe("DataTable active-cell broadcasts", () => {
   it("does not re-broadcast an unchanged null active cell when the row model changes", async () => {
     const onActiveCellChange = vi.fn<(cell: CollaboratorCellCoord | null) => void>();
@@ -346,6 +388,33 @@ describe("DataTable column menus", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Alpha")).not.toBeNull();
+    });
+  });
+
+  it("shows a clear-all button in the header when filters hide every row", async () => {
+    render(
+      createElement(DataTable<TestRow>, {
+        tableId: "header-clear-all-filters",
+        columns,
+        getRowId: (row: TestRow) => row.id,
+        dataSource: createDataSource([{ id: "row-1", name: "Alpha" }]),
+        features: { virtualization: false }
+      })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open column menu" }));
+    fireEvent.change(await screen.findByPlaceholderText("Filter value"), {
+      target: { value: "Missing" }
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Alpha")).toBeNull();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear all filters" }));
 
     await waitFor(() => {
       expect(screen.queryByText("Alpha")).not.toBeNull();

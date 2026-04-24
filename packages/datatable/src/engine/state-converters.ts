@@ -87,7 +87,9 @@ function isFilterOperator(value: string): value is DataTableFilter["op"] {
     value === "gte" ||
     value === "lt" ||
     value === "lte" ||
-    value === "in"
+    value === "in" ||
+    value === "isEmpty" ||
+    value === "isNotEmpty"
   );
 }
 

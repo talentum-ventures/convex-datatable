@@ -67,6 +67,7 @@ import { useRowObservers } from "../hooks/use-row-observers";
 import { useRowHeights } from "../virtual/row-heights";
 import { scrollCellIntoView } from "../virtual/scroll";
 import { computeColumnLayout } from "./column-layout";
+import { DraftRow } from "./draft-row";
 import { RowActions } from "./row-actions";
 import { TableBody, type TableBodyHandle } from "./table-body";
 import { TableHeader } from "./table-header";
@@ -263,7 +264,8 @@ const DataTableInner = <TRow extends DataTableRowModel>({
     setColumnFilterTextValue,
     selectColumnFilterValues,
     toggleColumnFilterInValue,
-    clearColumnFilter
+    clearColumnFilter,
+    clearAllFilters
   } = useTableFilters<TRow>({
     columnFilters,
     setColumnFilters
@@ -781,7 +783,11 @@ const DataTableInner = <TRow extends DataTableRowModel>({
     containerWidth
   });
 
-  const totalRows = displayedRows.length + (mergedFeatures.rowAdd ? 1 : 0);
+  const stickyDraftRow = mergedFeatures.stickyDraftRow && mergedFeatures.rowAdd;
+  const includeDraftInVirtualizer = mergedFeatures.rowAdd && !stickyDraftRow;
+  const totalRows = displayedRows.length + (includeDraftInVirtualizer ? 1 : 0);
+  const hasActiveFilters = columnFilters.length > 0;
+  const isFilteredEmpty = hasActiveFilters && displayedRows.length === 0 && mergedRows.length > 0;
   const rowOrderSignature = useMemo(
     () => displayedRows.map((row) => String(getRowId(row))).join("\u001f"),
     [displayedRows, getRowId]
@@ -1042,7 +1048,9 @@ const DataTableInner = <TRow extends DataTableRowModel>({
       hasDraftCellValue(value)
     );
 
-    tableBodyRef.current?.scrollToIndex(displayedRows.length, "end");
+    if (!stickyDraftRow) {
+      tableBodyRef.current?.scrollToIndex(displayedRows.length, "end");
+    }
 
     if (hasPendingDraftValues && hasTouchedDraftRow) {
       void commitDraftRow();
@@ -1060,7 +1068,8 @@ const DataTableInner = <TRow extends DataTableRowModel>({
     hasTouchedDraftRow,
     firstVisibleDraftColumnId,
     setDraftEditingColumnId,
-    setEditingCell
+    setEditingCell,
+    stickyDraftRow
   ]);
   const handleDeleteSelected = useCallback(() => {
     void deleteRowsNow(selectedRows);
@@ -1195,7 +1204,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
               onKeyDown={onGridKeyDown}
               tabIndex={0}
               role="grid"
-              aria-rowcount={totalRows}
+              aria-rowcount={displayedRows.length + (mergedFeatures.rowAdd ? 1 : 0)}
               aria-colcount={visibleDataColumns.length}
             >
               <table
@@ -1213,6 +1222,9 @@ const DataTableInner = <TRow extends DataTableRowModel>({
                   table={table}
                   columnById={columnById}
                   columnRenderLayout={columnRenderLayout}
+                  viewportWidth={containerWidth}
+                  leftPinnedWidth={leftPinnedWidth}
+                  rightPinnedWidth={rightPinnedWidth}
                   columnSizing={columnSizing}
                   fixedTrackStyle={fixedTrackStyle}
                   columnMenuId={columnMenuId}
@@ -1221,6 +1233,8 @@ const DataTableInner = <TRow extends DataTableRowModel>({
                   dragOverTarget={dragOverTarget}
                   mergedFeatures={headerFeatures}
                   filterByColumnId={filterByColumnId}
+                  hasActiveFilters={hasActiveFilters}
+                  isFilteredEmpty={isFilteredEmpty}
                   selectedFilterOperator={selectedFilterOperator}
                   selectColumnFilterTextValue={selectColumnFilterTextValue}
                   selectColumnFilterValues={selectColumnFilterValues}
@@ -1228,6 +1242,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
                   setColumnFilterTextValue={setColumnFilterTextValue}
                   toggleColumnFilterInValue={toggleColumnFilterInValue}
                   clearColumnFilter={clearColumnFilter}
+                  clearAllFilters={clearAllFilters}
                   toggleColumnMenu={toggleColumnMenu}
                   closeColumnMenu={closeColumnMenu}
                   updatePinnedColumn={updatePinnedColumn}
@@ -1243,6 +1258,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
                   ref={tableBodyRef}
                   scrollContainerRef={tableContainerRef}
                   virtualizationEnabled={mergedFeatures.virtualization}
+                  stickyDraftRow={stickyDraftRow}
                   totalRows={totalRows}
                   minHeight={minHeight}
                   overscan={DEFAULT_OVERSCAN}
@@ -1274,6 +1290,41 @@ const DataTableInner = <TRow extends DataTableRowModel>({
                   rowHeights={rowHeights}
                   onStartRowResize={handleStartRowResize}
                 />
+
+                {stickyDraftRow && Boolean(dataSource.createRow) ? (
+                  <tfoot
+                    className="sticky bottom-0 z-20"
+                    style={{
+                      display: "grid",
+                      background: "var(--dt-row-bg)",
+                      boxShadow: "0 -1px 0 0 var(--dt-border-color)"
+                    }}
+                  >
+                    <DraftRow
+                      rowIndex={displayedRows.length}
+                      top={0}
+                      size={minHeight}
+                      sticky
+                      draftRowId={DRAFT_ROW_ID}
+                      draftRow={draftRow}
+                      draftEditingColumnId={draftEditingColumnId}
+                      visibleLeafColumnsInUiOrder={visibleLeafColumnsInUiOrder}
+                      columnById={columnById}
+                      columnRenderLayout={columnRenderLayout}
+                      visibleDataColumnIndexById={visibleDataColumnIndexById}
+                      fixedTrackStyle={fixedTrackStyle}
+                      isDraftValuePresent={hasDraftCellValue}
+                      onBeginDraftEdit={handleBeginDraftEdit}
+                      onCommitDraftCell={commitDraftCell}
+                      onCancelDraftEdit={cancelDraftCellEdit}
+                      onSubmitDraftRow={() => {
+                        void commitDraftRow();
+                      }}
+                      onDiscardDraftRow={clearDraftRow}
+                      actionsColumnId={ACTIONS_COLUMN_ID}
+                    />
+                  </tfoot>
+                ) : null}
               </table>
             </div>
           </div>

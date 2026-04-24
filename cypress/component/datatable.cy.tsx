@@ -1043,6 +1043,43 @@ function MultiSelectFilterHarness({ tableId }: { tableId: string }): JSX.Element
   );
 }
 
+function EmptySelectFilterHarness({ tableId }: { tableId: string }): JSX.Element {
+  const rows = useMemo<ReadonlyArray<TaskRow>>(
+    () => [
+      { id: "1", title: "Missing status", status: "", amount: 10 },
+      { id: "2", title: "Todo item", status: "todo", amount: 20 }
+    ],
+    []
+  );
+
+  const dataSource = useMemo<DataTableDataSource<TaskRow>>(
+    () => ({
+      useRows: (query) => ({
+        rows: applyServerQuery(rows, query),
+        hasMore: false,
+        isLoading: false,
+        isLoadingMore: false,
+        error: null,
+        loadMore: () => undefined,
+        refresh: () => undefined
+      })
+    }),
+    [rows]
+  );
+
+  return (
+    <div className="p-4">
+      <DataTable
+        tableId={tableId}
+        columns={columns}
+        dataSource={dataSource}
+        getRowId={(row) => row.id}
+        features={{ columnFilter: true, rowSelect: false, rowActions: false, infiniteScroll: false, virtualization: false }}
+      />
+    </div>
+  );
+}
+
 function MultiSelectHarness({ tableId }: { tableId: string }): JSX.Element {
   const [rows, setRows] = useState<ReadonlyArray<MultiSelectRow>>([{ id: "1", tags: ["urgent", "backend"] }]);
 
@@ -1659,7 +1696,7 @@ describe("DataTable component", () => {
 
     cy.get("[data-column-menu-trigger='status']").first().click({ force: true });
     cy.get("[role='dialog'][aria-label='Status options']").within(() => {
-      cy.contains("Operator: in").should("exist");
+      cy.get("[data-dt-column-menu-filter-select='true']").should("have.value", "in");
       cy.contains("label", "To do").find("input").check({ force: true });
     });
 
@@ -1673,7 +1710,7 @@ describe("DataTable component", () => {
 
     cy.get("[data-column-menu-trigger='tags']").first().click({ force: true });
     cy.get("[role='dialog'][aria-label='Tags options']").within(() => {
-      cy.contains("Operator: in").should("exist");
+      cy.get("[data-dt-column-menu-filter-select='true']").should("have.value", "in");
       cy.contains("label", "Ops").find("input").check({ force: true });
     });
 
@@ -1681,6 +1718,34 @@ describe("DataTable component", () => {
     cy.contains("Urgent Ops").should("exist");
     cy.contains("Backend only").should("not.exist");
     cy.get("th[data-column-id='tags']").should("have.attr", "data-column-filter-active", "true");
+  });
+
+  it("keeps empty filters off text columns by default and enables them for select columns", () => {
+    cy.mount(<EmptySelectFilterHarness tableId="cypress-table-empty-filter-defaults" />);
+
+    cy.get("[data-column-menu-trigger='title']").first().click({ force: true });
+    cy.get("[role='dialog'][aria-label='Title options']").within(() => {
+      cy.get("select").find("option").then(($options) => {
+        const labels = [...$options].map((option) => option.textContent?.trim());
+        expect(labels).to.not.include("Is empty");
+        expect(labels).to.not.include("Is not empty");
+      });
+    });
+    cy.get("body").click(0, 0);
+
+    cy.get("[data-column-menu-trigger='status']").first().click({ force: true });
+    cy.get("[role='dialog'][aria-label='Status options']").within(() => {
+      cy.get("select").find("option").then(($options) => {
+        const labels = [...$options].map((option) => option.textContent?.trim());
+        expect(labels).to.include("Is empty");
+        expect(labels).to.include("Is not empty");
+      });
+      cy.contains("label", "(Empty)").find("input").check({ force: true });
+    });
+
+    cy.contains("Missing status").should("exist");
+    cy.contains("Todo item").should("not.exist");
+    cy.get("th[data-column-id='status']").should("have.attr", "data-column-filter-active", "true");
   });
 
   it("renders a grip drag handle on headers by default", () => {
@@ -2100,6 +2165,26 @@ describe("DataTable component", () => {
     cy.findByLabelText("Create row").click();
 
     cy.contains("Inline submit").should("exist");
+  });
+
+  it("renders the draft row in a sticky footer by default", () => {
+    cy.mount(<Harness tableId="cypress-table-sticky-draft-default" features={{ virtualization: false }} />);
+
+    cy.get("tfoot tr[data-row-id='__draft__']").should("exist");
+    cy.get("tbody tr[data-row-id='__draft__']").should("not.exist");
+    cy.get("tfoot").should("have.class", "sticky").and("have.class", "bottom-0");
+  });
+
+  it("renders the draft row inside the table body when stickyDraftRow is disabled", () => {
+    cy.mount(
+      <Harness
+        tableId="cypress-table-sticky-draft-disabled"
+        features={{ stickyDraftRow: false, virtualization: false }}
+      />
+    );
+
+    cy.get("tfoot tr[data-row-id='__draft__']").should("not.exist");
+    cy.get("tbody tr[data-row-id='__draft__']").should("exist");
   });
 
   it("pins draft row create and discard controls to the right when the grid is scrolled horizontally", () => {

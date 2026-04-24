@@ -1,5 +1,4 @@
 import { describe, expectTypeOf, it } from "vitest";
-import { z } from "zod";
 import type {
   CollaboratorCellCoord,
   CollaboratorPresence,
@@ -7,10 +6,13 @@ import type {
   ConvexPresenceConfig,
   DataTableColumn,
   DataTableDataSource,
+  DataTableFilter,
   DataTableFeatureFlags,
   DataTableProps,
   DataTableRowAction,
   DataTableToolbarState,
+  FilterOperator,
+  RowSchema,
   SelectOption
 } from "@talentum-ventures/convex-datatable";
 import { useConvexPresence } from "@talentum-ventures/convex-datatable/convex";
@@ -118,20 +120,20 @@ const invalidFeatureFlags: DataTableFeatureFlags = {
   autoSave: false
 };
 
+const rowSchema: RowSchema<InvoiceRow> = {
+  safeParse: (value) => ({
+    success: true,
+    data: value
+  })
+};
+
 const props: DataTableProps<InvoiceRow> = {
   tableId: "invoice-table",
   columns,
   getRowId: (row) => row.id,
   dataSource,
   features: featureFlags,
-  rowSchema: z.object({
-    id: z.string(),
-    description: z.string(),
-    amount: z.number(),
-    status: z.string(),
-    tags: z.array(z.string()),
-    createdAt: z.string()
-  }),
+  rowSchema,
   rowActions: [rowAction],
   surface: "plain",
   collaborators: [
@@ -270,5 +272,39 @@ describe("public api", () => {
     expectTypeOf(styledMultiSelectColumn.id).toEqualTypeOf<string>();
     expectTypeOf(invalidSelectColumn.id).toEqualTypeOf<string>();
     expectTypeOf(invalidOptionColumn.id).toEqualTypeOf<string>();
+  });
+
+  it("exposes empty-filter configuration and operators in the public types", () => {
+    const filter: DataTableFilter = {
+      columnId: "status",
+      op: "isEmpty",
+      value: null
+    };
+    const explicitTextColumn: DataTableColumn<InvoiceRow> = {
+      id: "description-empty",
+      field: "description",
+      header: "Description",
+      kind: "text",
+      allowEmptyFilter: true
+    };
+    const explicitSelectColumn: DataTableColumn<InvoiceRow> = {
+      id: "status-no-empty",
+      field: "status",
+      header: "Status",
+      kind: "select",
+      allowEmptyFilter: false,
+      options: [
+        {
+          value: "todo",
+          label: "To Do",
+          colorClass: "bg-amber-100 text-amber-700"
+        }
+      ]
+    };
+
+    expectTypeOf<FilterOperator>().toMatchTypeOf<DataTableFilter["op"]>();
+    expectTypeOf(filter.op).toEqualTypeOf<FilterOperator>();
+    expectTypeOf(explicitTextColumn.allowEmptyFilter).toEqualTypeOf<boolean | undefined>();
+    expectTypeOf(explicitSelectColumn.allowEmptyFilter).toEqualTypeOf<boolean | undefined>();
   });
 });

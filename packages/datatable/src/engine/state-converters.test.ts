@@ -37,6 +37,11 @@ describe("state converters", () => {
     expect(fromTanStackFilters(toTanStackFilters(filters))).toEqual(filters);
   });
 
+  it("round trips empty filters with null values", () => {
+    const filters = [{ columnId: "status", op: "isEmpty" as const, value: null }];
+    expect(fromTanStackFilters(toTanStackFilters(filters))).toEqual(filters);
+  });
+
   it("ignores invalid encoded tanstack values", () => {
     expect(fromTanStackFilters([{ id: "status", value: "todo" }])).toEqual([]);
   });
@@ -55,7 +60,8 @@ describe("state converters", () => {
       sorting: [{ columnId: "name", direction: "asc" }],
       filters: [
         { columnId: "status", op: "in", value: ["todo", "done"] },
-        { columnId: "amount", op: "gte", value: 100 }
+        { columnId: "amount", op: "gte", value: 100 },
+        { columnId: "note", op: "isNotEmpty", value: null }
       ],
       columnOrder: ["name", "status"],
       pinLeft: ["name"],

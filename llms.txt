@@ -34,7 +34,7 @@ The bundle does **not** include Tailwind preflight (global reset). It is emitted
 
 ### DataTable<TRow>
 
-The main component. Renders a full-featured data grid with toolbar, headers, scrollable virtualized body, and optional draft row.
+The main component. Renders a full-featured data grid with toolbar, headers, scrollable virtualized body, and optional draft row. When row creation is enabled, the draft row is sticky at the bottom of the viewport by default.
 
 Required props:
 - `tableId: string` — unique identifier for persistence keys
@@ -133,6 +133,7 @@ All flags are optional booleans. Unspecified flags use these defaults:
 | undo | false | Ctrl+Z/Ctrl+Shift+Z undo/redo |
 | infiniteScroll | true | Auto load more on scroll |
 | virtualization | true | Only render visible rows |
+| stickyDraftRow | true | Keep the add-row draft pinned to the bottom of the viewport |
 
 ## Row Actions
 

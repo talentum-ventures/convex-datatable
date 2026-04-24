@@ -201,11 +201,14 @@ export function useTableState({
   });
 
   useEffect(() => {
-    if (columnOrder.length > 0) {
-      return;
-    }
-    setColumnOrder([...dataColumnIds]);
-  }, [columnOrder.length, dataColumnIds]);
+    setColumnOrder((current) => {
+      if (current.length > 0) {
+        return current;
+      }
+
+      return [...dataColumnIds];
+    });
+  }, [dataColumnIds]);
 
   const onSortingChange = useCallback((updater: Updater<SortingState>) => {
     setSorting((current) => applyUpdater(updater, current));

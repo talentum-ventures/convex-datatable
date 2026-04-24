@@ -26,7 +26,7 @@ export function MultiSelectMenuEditor<TRow extends DataTableRowModel>({
   const searchRef = useRef<HTMLInputElement | null>(null);
   const searchEffectPrimedRef = useRef(false);
   const portalRoot = typeof document === "undefined" ? null : document.body;
-  const dropdownStyle = useDropdownPosition(wrapperRef);
+  const dropdownStyle = useDropdownPosition(wrapperRef, dialogRef);
   const finalizedRef = useRef(false);
   const options = resolveOptions(column, row);
   const [search, setSearch] = useState("");

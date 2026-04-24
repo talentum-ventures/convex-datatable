@@ -101,7 +101,7 @@ This 426-line file defines the entire public type surface. Key types:
 - **`DataTableColumn<TRow>`** — discriminated union of 9 column kinds (`text`, `longText`, `number`, `currency`, `select`, `multiselect`, `link`, `date`, `reactNode`)
 - **`DataTableDataSource<TRow>`** — hook-based data interface (`useRows`, optional `createRow`, `updateRows`, `deleteRows`, `restoreRows`)
 - **`DataTableQueryState`** — query state passed to `useRows` (`sorting`, `filters`, `pageSize`, `cursor`)
-- **`DataTableFeatureFlags`** — 19 independent boolean toggles
+- **`DataTableFeatureFlags`** — 20 independent boolean toggles
 - **`DataTableThemeTokens`** — 12 CSS theme tokens
 - **`DataTableRowAction<TRow>`** — per-row action menu items
 - **`RowSchema<TRow>`** — structural `safeParse` interface for row validation
@@ -144,10 +144,11 @@ DataTable (data-table.tsx)
     │       └── table
     │           ├── TableHeader (sort, filter, pin, reorder, resize)
     │           │   └── ColumnMenu (portaled dropdown)
-    │           └── TableBody (virtualized)
+    │           ├── TableBody (virtualized)
     │               ├── MemoRow (per visible row)
     │               │   └── DataCell (per cell, handles editing, selection, collaborator outlines)
-    │               └── DraftRow (when rowAdd is enabled)
+    │               └── DraftRow (when rowAdd is enabled and `stickyDraftRow` is disabled)
+    │           └── sticky footer DraftRow (default when rowAdd is enabled)
     ├── Error/Loading messages
     └── <style> (focus ring)
 ```
@@ -179,7 +180,7 @@ DataTable (data-table.tsx)
 | `STORAGE_WRITE_DEBOUNCE_MS` | `250` |
 | `DELETE_UNDO_MS` | `4000` |
 
-**Default Feature Flags:** `columnResize: true`, `rowResize: true`, `columnReorder: true`, `columnPinning: true`, `columnVisibility: true`, `columnFilter: true`, `columnSort: true`, `rowDelete: false`, `rowSelect: true`, `rowAdd: false`, `rowActions: true`, `editing: false`, `cellSelect: true`, `clipboardCopy: true`, `clipboardPaste: true`, `undo: false`, `autoSave: true`, `infiniteScroll: true`, `virtualization: true`.
+**Default Feature Flags:** `columnResize: true`, `rowResize: true`, `columnReorder: true`, `columnPinning: true`, `columnVisibility: true`, `columnFilter: true`, `columnSort: true`, `rowDelete: false`, `rowSelect: true`, `rowAdd: false`, `rowActions: true`, `editing: false`, `cellSelect: true`, `clipboardCopy: true`, `clipboardPaste: true`, `undo: false`, `infiniteScroll: true`, `virtualization: true`, `stickyDraftRow: true`.
 
 **Default Theme Tokens:** IBM Plex Sans font, 14px radius, light gradient headers, white rows, blue active cell ring, blue selection background. See `defaults.ts` for exact values.
 
@@ -218,7 +219,7 @@ Tests live next to source files as `*.test.ts`. Key test areas:
 | `selection/clipboard` | Range normalization, TSV serialize/parse, paste matrix expansion |
 | `persistence/query-codec` | URL encode/decode round-trips, merge logic, invalid entries |
 | `convex/use-convex-presence` | Presence color resolution, filtering, heartbeat debounce |
-| `ui/data-table` | `canHandleGridPaste`, surface variants, `onActiveCellChange`, column menu |
+| `ui/data-table` | `canHandleGridPaste`, surface variants, `onActiveCellChange`, column menu, sticky draft row placement |
 | `ui/column-layout` | Layout computation (widths, fill, max, pinned offsets) |
 
 ### Type Tests (`tests/types/public-api.test.ts`)
