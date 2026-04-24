@@ -666,7 +666,7 @@ function HorizontalScrollHarness({ tableId }: { tableId: string }): JSX.Element 
       { id: "2", title: "Ship", status: "done", amount: 20 }
     ],
     []
-  );
+  ); 
 
   const dataSource = useMemo<DataTableDataSource<TaskRow>>(
     () => ({
