@@ -2187,6 +2187,31 @@ describe("DataTable component", () => {
     cy.get("tbody tr[data-row-id='__draft__']").should("exist");
   });
 
+  it("advances sticky draft row editing to the next column after Enter", () => {
+    cy.mount(<Harness tableId="cypress-table-sticky-draft-enter-advance" features={{ virtualization: false }} />);
+
+    cy.contains("Add row").click();
+    cy.findByLabelText("Edit Title").type("Keyboard draft{enter}");
+
+    cy.findByLabelText("Search Status options").should("have.focus");
+  });
+
+  it("advances body draft row editing to the next column after Tab", () => {
+    cy.mount(
+      <Harness
+        tableId="cypress-table-body-draft-tab-advance"
+        features={{ stickyDraftRow: false, virtualization: false }}
+      />
+    );
+
+    cy.contains("Add row").click();
+    cy.findByLabelText("Edit Title")
+      .type("Tabbed draft")
+      .trigger("keydown", { key: "Tab", code: "Tab", bubbles: true, cancelable: true });
+
+    cy.findByLabelText("Search Status options").should("have.focus");
+  });
+
   it("pins draft row create and discard controls to the right when the grid is scrolled horizontally", () => {
     cy.mount(<DraftRowHorizontalScrollHarness tableId="cypress-table-draft-row-pinned-actions" />);
 

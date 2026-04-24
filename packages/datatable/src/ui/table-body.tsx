@@ -51,6 +51,7 @@ export type TableBodyProps<TRow extends DataTableRowModel> = {
   isDraftValuePresent: (value: DataTableCellValue) => boolean;
   onBeginDraftEdit: (columnId: string) => void;
   onCommitDraftCell: (column: DataTableColumn<TRow>, value: DataTableCellValue) => void;
+  onCommitDraftCellAndAdvance: (column: DataTableColumn<TRow>, value: DataTableCellValue) => void;
   onCancelDraftEdit: () => void;
   onSubmitDraftRow: () => void;
   onDiscardDraftRow: () => void;
@@ -85,6 +86,7 @@ function TableBodyInner<TRow extends DataTableRowModel>({
   isDraftValuePresent,
   onBeginDraftEdit,
   onCommitDraftCell,
+  onCommitDraftCellAndAdvance,
   onCancelDraftEdit,
   onSubmitDraftRow,
   onDiscardDraftRow,
@@ -177,6 +179,7 @@ function TableBodyInner<TRow extends DataTableRowModel>({
               isDraftValuePresent={isDraftValuePresent}
               onBeginDraftEdit={onBeginDraftEdit}
               onCommitDraftCell={onCommitDraftCell}
+              onCommitDraftCellAndAdvance={onCommitDraftCellAndAdvance}
               onCancelDraftEdit={onCancelDraftEdit}
               onSubmitDraftRow={onSubmitDraftRow}
               onDiscardDraftRow={onDiscardDraftRow}

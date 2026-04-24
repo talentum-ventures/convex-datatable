@@ -68,6 +68,27 @@ function createMutableDataSource(rows: ReadonlyArray<TestRow>): DataTableDataSou
   };
 }
 
+function createMutableToolbarDataSource(
+  rows: ReadonlyArray<ToolbarRow>
+): DataTableDataSource<ToolbarRow> {
+  return {
+    useRows: () => ({
+      rows,
+      hasMore: false,
+      isLoading: false,
+      isLoadingMore: false,
+      error: null,
+      loadMore: () => undefined,
+      refresh: () => undefined
+    }),
+    createRow: async (draft) => ({
+      id: String(draft.id ?? "draft-row"),
+      name: String(draft.name ?? ""),
+      amount: Number(draft.amount ?? 0)
+    })
+  };
+}
+
 function ToolbarHarness({
   renderToolbar
 }: {
@@ -333,6 +354,50 @@ describe("DataTable draft row placement", () => {
 
     expect(container.querySelector("tfoot tr[data-row-id='__draft__']")).toBeNull();
     expect(container.querySelector("tbody tr[data-row-id='__draft__']")).not.toBeNull();
+  });
+
+  it("advances draft row editing to the next sticky footer column after Enter", async () => {
+    render(
+      createElement(DataTable<ToolbarRow>, {
+        tableId: "sticky-draft-enter-advance",
+        columns: toolbarColumns,
+        getRowId: (row: ToolbarRow) => row.id,
+        dataSource: createMutableToolbarDataSource([{ id: "row-1", name: "Alpha", amount: 10 }]),
+        features: { rowAdd: true, virtualization: false }
+      })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add row" }));
+    const nameEditor = await screen.findByRole("textbox", { name: "Edit Name" });
+    nameEditor.textContent = "Draft task";
+    fireEvent.input(nameEditor);
+    fireEvent.keyDown(nameEditor, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(screen.getByRole("textbox", { name: "Edit Amount" })).toBe(document.activeElement);
+    });
+  });
+
+  it("advances draft row editing to the next body column after Tab when stickyDraftRow is disabled", async () => {
+    render(
+      createElement(DataTable<ToolbarRow>, {
+        tableId: "body-draft-tab-advance",
+        columns: toolbarColumns,
+        getRowId: (row: ToolbarRow) => row.id,
+        dataSource: createMutableToolbarDataSource([{ id: "row-1", name: "Alpha", amount: 10 }]),
+        features: { rowAdd: true, stickyDraftRow: false, virtualization: false }
+      })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add row" }));
+    const nameEditor = await screen.findByRole("textbox", { name: "Edit Name" });
+    nameEditor.textContent = "Draft task";
+    fireEvent.input(nameEditor);
+    fireEvent.keyDown(nameEditor, { key: "Tab" });
+
+    await waitFor(() => {
+      expect(screen.getByRole("textbox", { name: "Edit Amount" })).toBe(document.activeElement);
+    });
   });
 });
 

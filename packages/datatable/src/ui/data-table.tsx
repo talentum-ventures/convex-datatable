@@ -640,6 +640,21 @@ const DataTableInner = <TRow extends DataTableRowModel>({
 
     return orderedColumns[0]?.id ?? null;
   }, [columnById, orderedColumns, visibleLeafColumnsInUiOrder]);
+  const getNextDraftColumnId = useCallback((currentColumnId: string): string | null => {
+    const dataColumnIds: string[] = [];
+    for (const column of visibleLeafColumnsInUiOrder) {
+      if (columnById.has(column.id)) {
+        dataColumnIds.push(column.id);
+      }
+    }
+
+    const currentIndex = dataColumnIds.indexOf(currentColumnId);
+    if (currentIndex < 0 || currentIndex >= dataColumnIds.length - 1) {
+      return null;
+    }
+
+    return dataColumnIds[currentIndex + 1] ?? null;
+  }, [columnById, visibleLeafColumnsInUiOrder]);
   const tableRows = table.getRowModel().rows;
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
   const tableBodyRef = useRef<TableBodyHandle | null>(null);
@@ -1141,6 +1156,16 @@ const DataTableInner = <TRow extends DataTableRowModel>({
     setEditingCell(null);
     setDraftEditingColumnId(columnId);
   }, [setDraftEditingColumnId, setEditingCell]);
+  const handleCommitDraftCellAndAdvance = useCallback((
+    column: DataTableColumn<TRow>,
+    value: DataTableCellValue
+  ) => {
+    commitDraftCell(column, value);
+    const nextColumnId = getNextDraftColumnId(column.id);
+    if (nextColumnId) {
+      setDraftEditingColumnId(nextColumnId);
+    }
+  }, [commitDraftCell, getNextDraftColumnId, setDraftEditingColumnId]);
   const handleStartRowResize = useCallback((rowId: RowId, clientY: number) => {
     setResizingRow({
       rowId,
@@ -1278,6 +1303,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
                   isDraftValuePresent={hasDraftCellValue}
                   onBeginDraftEdit={handleBeginDraftEdit}
                   onCommitDraftCell={commitDraftCell}
+                  onCommitDraftCellAndAdvance={handleCommitDraftCellAndAdvance}
                   onCancelDraftEdit={cancelDraftCellEdit}
                   onSubmitDraftRow={() => {
                     void commitDraftRow();
@@ -1316,6 +1342,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
                       isDraftValuePresent={hasDraftCellValue}
                       onBeginDraftEdit={handleBeginDraftEdit}
                       onCommitDraftCell={commitDraftCell}
+                      onCommitDraftCellAndAdvance={handleCommitDraftCellAndAdvance}
                       onCancelDraftEdit={cancelDraftCellEdit}
                       onSubmitDraftRow={() => {
                         void commitDraftRow();

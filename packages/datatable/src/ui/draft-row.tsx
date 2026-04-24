@@ -1,6 +1,6 @@
 import { Check, Pencil, X } from "lucide-react";
 import type { Column } from "@tanstack/react-table";
-import type { CSSProperties } from "react";
+import { useRef, type CSSProperties } from "react";
 import { cn } from "../core/cn";
 import type {
   DataTableCellValue,
@@ -56,6 +56,7 @@ export type DraftRowProps<TRow extends DataTableRowModel> = {
   isDraftValuePresent: (value: DataTableCellValue) => boolean;
   onBeginDraftEdit: (columnId: string) => void;
   onCommitDraftCell: (column: DataTableColumn<TRow>, value: DataTableCellValue) => void;
+  onCommitDraftCellAndAdvance: (column: DataTableColumn<TRow>, value: DataTableCellValue) => void;
   onCancelDraftEdit: () => void;
   onSubmitDraftRow: () => void;
   onDiscardDraftRow: () => void;
@@ -78,11 +79,13 @@ export function DraftRow<TRow extends DataTableRowModel>({
   isDraftValuePresent,
   onBeginDraftEdit,
   onCommitDraftCell,
+  onCommitDraftCellAndAdvance,
   onCancelDraftEdit,
   onSubmitDraftRow,
   onDiscardDraftRow,
   actionsColumnId
 }: DraftRowProps<TRow>): JSX.Element {
+  const shouldAdvanceDraftCellRef = useRef(false);
   const draftCandidateRow = draftRow as TRow;
   const hasDraftValues = Object.values(draftRow).some((value) => isDraftValuePresent(value));
   const hasActionsColumn = visibleLeafColumnsInUiOrder.some((column) => column.id === actionsColumnId);
@@ -193,6 +196,13 @@ export function DraftRow<TRow extends DataTableRowModel>({
               rowId: draftRowId,
               value,
               onCommit: (nextValue) => {
+                const shouldAdvance = shouldAdvanceDraftCellRef.current;
+                shouldAdvanceDraftCellRef.current = false;
+                if (shouldAdvance) {
+                  onCommitDraftCellAndAdvance(columnConfig, nextValue);
+                  return;
+                }
+
                 onCommitDraftCell(columnConfig, nextValue);
               },
               onCancel: onCancelDraftEdit
@@ -253,6 +263,15 @@ export function DraftRow<TRow extends DataTableRowModel>({
               }}
               onDoubleClick={() => {
                 onBeginDraftEdit(columnConfig.id);
+              }}
+              onKeyDownCapture={(event) => {
+                if (!isEditingDraftCell) {
+                  return;
+                }
+
+                const isCommitEnter =
+                  event.key === "Enter" && (columnConfig.kind !== "longText" || !event.shiftKey);
+                shouldAdvanceDraftCellRef.current = event.key === "Tab" || isCommitEnter;
               }}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === "F2") {
