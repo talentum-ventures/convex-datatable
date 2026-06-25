@@ -62,19 +62,7 @@ export function RowActions<TRow extends DataTableRowModel>({
   const CompactActionIcon = compactAction?.icon;
 
   return (
-    <div className="flex items-center justify-center gap-0.5 py-1">
-      {canDelete ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 w-7 px-0 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
-          aria-label={`Delete row ${rowId}`}
-          onClick={onDelete}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
-      ) : null}
-
+    <div className="flex w-full items-center justify-center gap-0.5 py-1">
       {compactAction && CompactActionIcon ? (
         <Button
           variant="ghost"
@@ -135,6 +123,18 @@ export function RowActions<TRow extends DataTableRowModel>({
             </div>
           ) : null}
         </div>
+      ) : null}
+
+      {canDelete ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 w-7 px-0 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+          aria-label={`Delete row ${rowId}`}
+          onClick={onDelete}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
       ) : null}
     </div>
   );

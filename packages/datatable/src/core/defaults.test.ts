@@ -6,7 +6,7 @@ describe("defaults", () => {
     expect(DEFAULT_FEATURE_FLAGS.columnResize).toBe(true);
     expect(DEFAULT_FEATURE_FLAGS.rowResize).toBe(true);
     expect(DEFAULT_FEATURE_FLAGS.columnReorder).toBe(true);
-    expect(DEFAULT_FEATURE_FLAGS.dragHandle).toBe(true);
+    expect(DEFAULT_FEATURE_FLAGS.dragHandle).toBe(false);
     expect(DEFAULT_FEATURE_FLAGS.columnPinning).toBe(true);
     expect(DEFAULT_FEATURE_FLAGS.columnVisibility).toBe(true);
     expect(DEFAULT_FEATURE_FLAGS.columnFilter).toBe(true);
@@ -30,7 +30,8 @@ describe("defaults", () => {
   });
 
   it("includes pinned surface theme tokens", () => {
-    expect(DEFAULT_THEME_TOKENS.pinnedHeaderBg).toMatch(/^linear-gradient/);
+    expect(DEFAULT_THEME_TOKENS.headerBg).toBe("hsl(0 0% 100% / 0.75)");
+    expect(DEFAULT_THEME_TOKENS.pinnedHeaderBg).toBe("hsl(0 0% 100% / 0.75)");
     expect(DEFAULT_THEME_TOKENS.pinnedRowBg).toBeTruthy();
     expect(DEFAULT_THEME_TOKENS.pinnedRowHoverBg).toBeTruthy();
   });

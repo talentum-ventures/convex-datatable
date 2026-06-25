@@ -84,6 +84,44 @@ describe("cell value clipboard helpers", () => {
     expect(expectValidParse(parseClipboardToCellValue(numberColumn, row, "99.5"))).toBe(99.5);
   });
 
+  it("serializes currency as raw numeric clipboard values", () => {
+    const currencyColumn: DataTableColumn<Row> = {
+      id: "amount",
+      field: "amount",
+      header: "Amount",
+      kind: "currency",
+      currency: "USD",
+      locale: "en-US"
+    };
+
+    expect(serializeCellForClipboard(currencyColumn, row, 1234.5)).toBe("1234.5");
+    expect(serializeCellForClipboard(currencyColumn, row, 1234.5)).not.toContain("$");
+  });
+
+  it("parses formatted currency clipboard values", () => {
+    const usCurrencyColumn: DataTableColumn<Row> = {
+      id: "amount",
+      field: "amount",
+      header: "Amount",
+      kind: "currency",
+      currency: "USD",
+      locale: "en-US"
+    };
+
+    const ptCurrencyColumn: DataTableColumn<Row> = {
+      id: "amount",
+      field: "amount",
+      header: "Amount",
+      kind: "currency",
+      currency: "BRL",
+      locale: "pt-BR"
+    };
+
+    expect(expectValidParse(parseClipboardToCellValue(usCurrencyColumn, row, "$1,234.50"))).toBe(1234.5);
+    expect(expectValidParse(parseClipboardToCellValue(usCurrencyColumn, row, "1234.5"))).toBe(1234.5);
+    expect(expectValidParse(parseClipboardToCellValue(ptCurrencyColumn, row, "1.234,56"))).toBe(1234.56);
+  });
+
   it("canonicalizes select values from labels and stored values", () => {
     const selectColumn: DataTableColumn<Row> = {
       id: "status",

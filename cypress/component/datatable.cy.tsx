@@ -28,6 +28,11 @@ type DateRow = {
   due: string;
 };
 
+type CurrencyRow = {
+  id: string;
+  amount: number;
+};
+
 type MultiSelectRow = {
   id: string;
   tags: ReadonlyArray<string>;
@@ -171,6 +176,18 @@ const dateColumns: ReadonlyArray<DataTableColumn<DateRow>> = [
     kind: "date",
     locale: "pt-BR",
     dateStyle: "medium",
+    isEditable: true
+  }
+];
+
+const currencyColumns: ReadonlyArray<DataTableColumn<CurrencyRow>> = [
+  {
+    id: "amount",
+    field: "amount",
+    header: "Budget",
+    kind: "currency",
+    currency: "USD",
+    locale: "en-US",
     isEditable: true
   }
 ];
@@ -1050,6 +1067,58 @@ function DateHarness({ tableId }: { tableId: string }): JSX.Element {
   );
 }
 
+function CurrencyHarness({ tableId }: { tableId: string }): JSX.Element {
+  const [rows, setRows] = useState<ReadonlyArray<CurrencyRow>>([{ id: "1", amount: 1234.5 }]);
+
+  const dataSource = useMemo<DataTableDataSource<CurrencyRow>>(
+    () => ({
+      useRows: () => ({
+        rows,
+        hasMore: false,
+        isLoading: false,
+        isLoadingMore: false,
+        error: null,
+        loadMore: () => undefined,
+        refresh: () => undefined
+      }),
+      updateRows: async (changes) => {
+        setRows((current) =>
+          current.map((row) => {
+            const patch = changes.find((entry) => entry.rowId === row.id)?.patch;
+            return patch
+              ? {
+                  ...row,
+                  ...patch
+                }
+              : row;
+          })
+        );
+      }
+    }),
+    [rows]
+  );
+
+  return (
+    <div className="w-[320px] p-4">
+      <DataTable
+        tableId={tableId}
+        columns={currencyColumns}
+        dataSource={dataSource}
+        getRowId={(row) => row.id}
+        features={{
+          editing: true,
+          clipboardPaste: true,
+          rowSelect: false,
+          rowActions: false,
+          infiniteScroll: false,
+          virtualization: false
+        }}
+      />
+      <output data-testid="amount-raw">{String(rows[0]?.amount ?? "")}</output>
+    </div>
+  );
+}
+
 function MultiSelectFilterHarness({ tableId }: { tableId: string }): JSX.Element {
   const rows = useMemo<ReadonlyArray<FilterableMultiSelectRow>>(
     () => [
@@ -1589,6 +1658,14 @@ describe("DataTable component", () => {
     cy.contains("Build UI").should("not.exist");
   });
 
+  it("renders custom checkbox visuals when a row is selected", () => {
+    cy.mount(<CustomToolbarHarness tableId="cypress-table-custom-checkbox" />);
+
+    cy.get("tr[data-row-id='1'] .dt-checkbox-box--checked").should("not.exist");
+    cy.findByLabelText("Select row 1").check({ force: true });
+    cy.get("tr[data-row-id='1'] .dt-checkbox-box--checked").should("exist");
+  });
+
   it("keeps managed utility columns around pinned data columns", () => {
     cy.mount(<Harness tableId="cypress-table-utility-column-order" />);
 
@@ -1678,7 +1755,7 @@ describe("DataTable component", () => {
     cy.mount(<CompactRowActionHarness tableId="cypress-table-compact-row-action" />);
 
     cy.findByLabelText("Open actions for row 1").should("not.exist");
-    cy.get("[data-row-id='1']").within(() => {
+    cy.get("tr[data-row-id='1']").within(() => {
       cy.findByRole("button", { name: "Archive" }).click();
     });
     cy.contains("Archived 1").should("exist");
@@ -1815,21 +1892,21 @@ describe("DataTable component", () => {
     cy.get("th[data-column-id='status']").should("have.attr", "data-column-filter-active", "true");
   });
 
-  it("renders a grip drag handle on headers by default", () => {
-    cy.mount(<Harness tableId="cypress-table-reorder-grip-default" />);
-
-    cy.get("th[data-column-id='title']").should("not.have.attr", "data-column-reorder-handle");
-    cy.get("th[data-column-id='title']").should("have.attr", "draggable", "false");
-    cy.get("th[data-column-id='title'] button[data-column-reorder-handle='title']").should("exist");
-  });
-
-  it("uses the whole header as the drag handle when dragHandle is disabled", () => {
-    cy.mount(<Harness tableId="cypress-table-reorder-no-grip" features={{ dragHandle: false }} />);
+  it("uses the whole header as the drag handle by default", () => {
+    cy.mount(<Harness tableId="cypress-table-reorder-whole-header-default" />);
 
     cy.get("th[data-column-id='title']")
       .should("have.attr", "data-column-reorder-handle", "title")
       .and("have.attr", "draggable", "true");
     cy.get("th[data-column-id='title'] button[data-column-reorder-handle]").should("not.exist");
+  });
+
+  it("renders a grip drag handle when dragHandle is enabled", () => {
+    cy.mount(<Harness tableId="cypress-table-reorder-grip" features={{ dragHandle: true }} />);
+
+    cy.get("th[data-column-id='title']").should("not.have.attr", "data-column-reorder-handle");
+    cy.get("th[data-column-id='title']").should("have.attr", "draggable", "false");
+    cy.get("th[data-column-id='title'] button[data-column-reorder-handle='title']").should("exist");
   });
 
   it("reorders columns via drag and drop in the same pin zone", () => {
@@ -1856,8 +1933,8 @@ describe("DataTable component", () => {
       });
   });
 
-  it("reorders columns via whole-header drag when dragHandle is disabled", () => {
-    cy.mount(<Harness tableId="cypress-table-reorder-whole-header" features={{ dragHandle: false }} />);
+  it("reorders columns via grip drag when dragHandle is enabled", () => {
+    cy.mount(<Harness tableId="cypress-table-reorder-grip-enabled" features={{ dragHandle: true }} />);
 
     cy.window().then((win) => {
       const dataTransfer = new win.DataTransfer();
@@ -1951,7 +2028,7 @@ describe("DataTable component", () => {
       });
   });
 
-  it("renders pinned columns with a darker header and body surface", () => {
+  it("renders pinned columns with distinct body surface and sticky header", () => {
     cy.mount(<AlignmentHarness tableId="cypress-table-pinned-surface" />);
 
     cy.get("[data-column-menu-trigger='title']").first().click({ force: true });
@@ -1961,13 +2038,7 @@ describe("DataTable component", () => {
       .should("have.attr", "data-pinned-state", "left")
       .then(($pinnedHeader) => {
         const pinnedHeaderStyle = getComputedStyle(expectNodeExists($pinnedHeader));
-
-        cy.get("th[data-column-id='status']")
-          .should("have.attr", "data-pinned-state", "center")
-          .then(($centerHeader) => {
-            const centerHeaderStyle = getComputedStyle(expectNodeExists($centerHeader));
-            expect(pinnedHeaderStyle.backgroundImage).to.not.equal(centerHeaderStyle.backgroundImage);
-          });
+        expect(pinnedHeaderStyle.backgroundColor).to.not.equal("rgba(0, 0, 0, 0)");
       });
 
     cy.get(`tr[data-row-id='1'] [role='gridcell'][data-column-id='title']`)
@@ -2437,6 +2508,40 @@ describe("DataTable component", () => {
     cy.get("[data-testid='due-raw']").should("have.text", "2026-02-02");
   });
 
+  it("copies currency cells as raw numeric clipboard values", () => {
+    cy.mount(<CurrencyHarness tableId="cypress-table-currency-copy" />);
+
+    cy.window().then((win) => {
+      const writeText = cy.stub().as("writeText");
+      Object.defineProperty(win.navigator, "clipboard", {
+        configurable: true,
+        value: {
+          writeText
+        }
+      });
+    });
+
+    cy.get("[role='gridcell'][data-column-id='amount']").first().click();
+    cy.contains("button", "Copy").click();
+
+    cy.get("@writeText").should("have.been.calledWith", "1234.5");
+  });
+
+  it("pastes formatted currency text into currency cells as numeric values", () => {
+    cy.mount(<CurrencyHarness tableId="cypress-table-currency-paste" />);
+
+    cy.get("[role='gridcell'][data-column-id='amount']").first().click();
+
+    cy.window().then((win) =>
+      cy.findByRole("grid").then(($grid) => {
+        const defaultPrevented = dispatchPlainTextPaste(win, expectNodeExists($grid), "$1,234.50");
+        expect(defaultPrevented).to.equal(true);
+      })
+    );
+
+    cy.get("[data-testid='amount-raw']").should("have.text", "1234.5");
+  });
+
   it("edits multiselect cells with badges and a listbox dialog", () => {
     cy.mount(<MultiSelectHarness tableId="cypress-table-multiselect-edit" />);
 
@@ -2793,18 +2898,10 @@ describe("DataTable component", () => {
     });
   });
 
-  it("keeps header backgrounds opaque while scrolling", () => {
+  it("keeps header cell backgrounds opaque while scrolling", () => {
     cy.mount(<VirtualizationHarness tableId="virtualization-regression-table-header" />);
 
     cy.findByRole("grid").scrollTo(0, 420);
-
-    cy.get("thead").then(($thead) => {
-      const style = getComputedStyle(expectNodeExists($thead));
-      expect(
-        style.backgroundImage !== "none" || style.backgroundColor !== "rgba(0, 0, 0, 0)",
-        "thead should render a painted background"
-      ).to.equal(true);
-    });
 
     cy.get("thead tr")
       .eq(0)

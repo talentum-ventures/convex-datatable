@@ -19,16 +19,18 @@ describe("demo app", () => {
     cy.get("[data-column-menu-trigger='status']").click();
     cy.contains("button", "Hide").click();
     cy.findByRole("columnheader", { name: /Status/i }).should("not.exist");
-    cy.contains("Hidden columns (1)").click();
-    cy.get("[data-hidden-column-row='status']").contains("button", "Show").click();
+    cy.contains("Hidden columns (1)").should("exist");
+    cy.get('button[title="Status"]').click();
     cy.findByRole("columnheader", { name: /Status/i }).should("exist");
     cy.contains("th", "Actions").should("not.exist");
-    cy.findByLabelText("Open actions for row 1").click();
-    cy.findByRole("menu", { name: "Actions for row 1" }).within(() => {
-      cy.findByRole("menuitem", { name: "Open" }).should("exist");
+    cy.findByLabelText("Open actions for row 1").should("not.exist");
+    cy.window().then((win) => {
+      cy.stub(win, "open").as("windowOpen");
     });
-    cy.get("body").click(0, 0);
-    cy.findByRole("menu", { name: "Actions for row 1" }).should("not.exist");
+    cy.get("tr[data-row-id='1']").within(() => {
+      cy.findByRole("button", { name: "Open" }).click();
+    });
+    cy.get("@windowOpen").should("have.been.called");
 
     cy.get("th[data-column-id='name']")
       .first()

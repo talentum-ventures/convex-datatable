@@ -453,8 +453,8 @@ const DataTableInner = <TRow extends DataTableRowModel>({
       cell: (context) => {
         const row = context.row.original;
         const rowId = getRowId(row);
-        return ( 
-          <div className="flex items-center justify-center py-1">
+        return (
+          <div className="flex w-full items-center justify-center py-1">
             <Checkbox
               aria-label={`Select row ${rowId}`}
               checked={Boolean(rowSelectionRef.current[rowId])}
@@ -1201,7 +1201,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
               "flex flex-1 min-h-0 flex-col",
               isPlainSurface
                 ? "rounded-none border-0 bg-transparent"
-                : "rounded-md border border-slate-200 bg-[linear-gradient(180deg,hsl(210_50%_98%),hsl(210_35%_97%))]"
+                : "rounded-md border border-slate-200 bg-white"
             )}
             onPaste={(event) => {
               const editingCell = cellStore.getEditingCell();
@@ -1236,7 +1236,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
               aria-colcount={visibleDataColumns.length}
             >
               <table
-                className="border-separate border-spacing-0 text-left"
+                className="border-separate border-spacing-0 text-left text-sm"
                 style={{
                   boxSizing: "border-box",
                   display: "grid",
@@ -1361,7 +1361,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
 
           {rowsResult.error ? <p className="mt-2 text-sm text-rose-600">{rowsResult.error}</p> : null}
           {rowsResult.isLoadingMore ? (
-            <p className="mt-2 inline-flex items-center gap-1 text-xs text-slate-500">
+            <p className="mt-2 inline-flex items-center gap-1 text-sm text-slate-500">
               <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
               Loading more rows...
             </p>

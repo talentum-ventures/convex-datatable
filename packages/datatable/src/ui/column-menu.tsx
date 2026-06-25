@@ -109,7 +109,7 @@ export function ColumnMenu<TRow extends DataTableRowModel>({
       style={style}
     >
       <div className="mb-2 border-b border-slate-200 pb-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <p className="text-sm font-semibold normal-case tracking-normal text-slate-500">
           {column.header}
         </p>
       </div>
@@ -195,7 +195,7 @@ export function ColumnMenu<TRow extends DataTableRowModel>({
       {canFilter ? (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <span className="text-sm font-semibold normal-case tracking-normal text-slate-500">
               Filter
             </span>
             <Button
@@ -223,13 +223,13 @@ export function ColumnMenu<TRow extends DataTableRowModel>({
               ))}
             </select>
           ) : (
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs font-medium text-slate-600">
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm font-medium text-slate-600">
               Operator: {filterOperators[0] ? operatorLabel(filterOperators[0]) : ""}
             </div>
           )}
 
           {hidesFilterInputs ? (
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-600">
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-600">
               {isEmptyOperator ? "Matches empty cells." : "Matches non-empty cells."}
             </div>
           ) : null}
@@ -237,7 +237,7 @@ export function ColumnMenu<TRow extends DataTableRowModel>({
           {showOptionFilters && !hidesFilterInputs ? (
             <div className="max-h-36 space-y-1 overflow-auto rounded-md border border-slate-200 p-2">
               {allowEmptyFilter ? (
-                <label className="flex items-center gap-2 text-xs text-slate-700">
+                <label className="flex items-center gap-2 text-sm text-slate-700">
                   <Checkbox
                     data-dt-column-menu-filter-checkbox="true"
                     checked={isEmptyOperator}
@@ -255,7 +255,7 @@ export function ColumnMenu<TRow extends DataTableRowModel>({
               {staticOptions.map((option) => (
                 <label
                   key={`${column.id}-${option.value}`}
-                  className="flex items-center gap-2 text-xs text-slate-700"
+                  className="flex items-center gap-2 text-sm text-slate-700"
                 >
                   <Checkbox
                     data-dt-column-menu-filter-checkbox="true"

@@ -132,10 +132,9 @@ function TableHeaderInner<TRow extends DataTableRowModel>({
 
   return (
     <thead
-      className="sticky top-0 z-30"
+      className="sticky top-0 z-30 backdrop-blur-[8px]"
       style={{
-        display: "grid",
-        background: "var(--dt-header-bg)"
+        display: "grid"
       }}
     >
       {table.getHeaderGroups().map((headerGroup) => (
@@ -223,10 +222,14 @@ function TableHeaderInner<TRow extends DataTableRowModel>({
                 data-column-filter-active={hasFilter ? "true" : "false"}
                 data-pinned-state={pinnedState || "center"}
                 className={cn(
-                  "group relative border-b border-r border-[var(--dt-border-color)] px-2 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600",
+                  "group relative border-b border-[var(--dt-border-color)] border-r border-r-[color-mix(in_srgb,var(--dt-border-color)_40%,transparent)] px-2 py-2 text-sm font-semibold normal-case tracking-normal text-slate-600",
                   wholeCellReorderDrag ? "cursor-grab active:cursor-grabbing" : "",
-                  isFirstRightPinned ? "border-l border-l-[var(--dt-border-color)]" : "",
-                  isActionHeader ? "border-l border-l-[var(--dt-border-color)]" : "",
+                  isFirstRightPinned
+                    ? "border-l border-l-[color-mix(in_srgb,var(--dt-border-color)_40%,transparent)]"
+                    : "",
+                  isActionHeader
+                    ? "border-l border-l-[color-mix(in_srgb,var(--dt-border-color)_40%,transparent)]"
+                    : "",
                   pinnedState
                     ? "sticky z-30 shadow-[var(--dt-pinned-shadow)] [background:var(--dt-pinned-header-bg)]"
                     : "[background:var(--dt-header-bg)]"

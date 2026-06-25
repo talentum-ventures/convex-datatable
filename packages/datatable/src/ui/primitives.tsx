@@ -1,4 +1,9 @@
-import { type ButtonHTMLAttributes, type InputHTMLAttributes, forwardRef } from "react";
+import {
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  forwardRef,
+  useId
+} from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../core/cn";
 
@@ -62,17 +67,45 @@ Input.displayName = "Input";
 export type CheckboxProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type">;
 
 export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
-  ({ className, ...props }, ref) => {
+  ({ className, checked, ...props }, ref) => {
+    const id = useId();
+    const isChecked = Boolean(checked);
+
     return (
-      <input
-        ref={ref}
-        type="checkbox"
-        className={cn(
-          "h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-2 focus:ring-sky-500",
-          className
-        )}
-        {...props}
-      />
+      <span className={cn("dt-checkbox relative inline-flex h-4 w-4 shrink-0", className)}>
+        <input
+          ref={ref}
+          id={id}
+          type="checkbox"
+          checked={checked}
+          className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          {...props}
+        />
+        <span
+          aria-hidden="true"
+          className={cn(
+            "dt-checkbox-box pointer-events-none flex h-4 w-4 items-center justify-center rounded border transition-colors",
+            isChecked && "dt-checkbox-box--checked"
+          )}
+        >
+          {isChecked ? (
+            <svg
+              className="dt-checkbox-icon h-2.5 w-2.5"
+              viewBox="0 0 10 10"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M1.5 5 L3.8 7.5 L8.5 2.5"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          ) : null}
+        </span>
+      </span>
     );
   }
 );
@@ -86,7 +119,7 @@ export type BadgeProps = {
 
 export function Badge({ className, children }: BadgeProps): JSX.Element {
   return (
-    <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", className)}>
+    <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-sm font-medium", className)}>
       {children}
     </span>
   );

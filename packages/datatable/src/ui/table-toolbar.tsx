@@ -69,7 +69,7 @@ function TableToolbarInner({
         ) : null}
 
         {isLoading ? (
-          <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+          <span className="inline-flex items-center gap-1 text-sm text-slate-500">
             <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
             Loading rows...
           </span>
@@ -87,7 +87,7 @@ function TableToolbarInner({
           </summary>
           <div className="absolute right-0 z-30 mt-2 max-h-72 w-[360px] overflow-auto rounded-md border border-slate-200 bg-white p-2 shadow-xl">
             <div className="mb-2 flex items-center justify-between border-b border-slate-200 px-2 pb-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Column visibility</span>
+              <span className="text-sm font-semibold normal-case tracking-normal text-slate-500">Column visibility</span>
               <Button
                 variant="ghost"
                 size="sm"
@@ -110,7 +110,7 @@ function TableToolbarInner({
                   <span className="text-sm text-slate-700">{column.header}</span>
                   <span
                     className={cn(
-                      "inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide",
+                      "inline-flex rounded-full px-2 py-0.5 text-sm font-semibold normal-case tracking-normal",
                       isVisible ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"
                     )}
                   >

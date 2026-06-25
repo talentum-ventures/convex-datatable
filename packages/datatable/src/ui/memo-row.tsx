@@ -69,9 +69,13 @@ const MemoRowInner = <TRow extends DataTableRowModel>({
           key={cell.id}
           data-pinned-state={pinned || "center"}
           className={cn(
-            "border-r border-b border-[var(--dt-border-color)] p-0 align-top",
-            isFirstRightPinned ? "border-l border-l-[var(--dt-border-color)]" : "",
-            isActionCell ? "relative overflow-visible border-l border-l-[var(--dt-border-color)]" : "",
+            "flex w-full min-w-0 items-center border-b border-[var(--dt-border-color)] border-r border-r-[color-mix(in_srgb,var(--dt-border-color)_40%,transparent)] p-0",
+            isFirstRightPinned
+              ? "border-l border-l-[color-mix(in_srgb,var(--dt-border-color)_40%,transparent)]"
+              : "",
+            isActionCell
+              ? "relative overflow-visible border-l border-l-[color-mix(in_srgb,var(--dt-border-color)_40%,transparent)]"
+              : "",
             isOpenActionMenuCell ? "z-40" : "",
             pinned
               ? isOpenActionMenuCell

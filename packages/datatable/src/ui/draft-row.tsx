@@ -152,9 +152,11 @@ export function DraftRow<TRow extends DataTableRowModel>({
               data-pinned-state={dataPinnedState}
               style={combinedStyle}
               className={cn(
-                "border-b border-l border-r border-slate-200 p-0 align-top",
-                isFirstRightPinned ? "border-l border-l-slate-200" : "",
-                "relative overflow-visible border-l border-l-slate-200",
+                "border-b border-[var(--dt-border-color)] border-l border-l-[color-mix(in_srgb,var(--dt-border-color)_40%,transparent)] border-r border-r-[color-mix(in_srgb,var(--dt-border-color)_40%,transparent)] p-0",
+                isFirstRightPinned
+                  ? "border-l border-l-[color-mix(in_srgb,var(--dt-border-color)_40%,transparent)]"
+                  : "",
+                "relative overflow-visible",
                 pinnedSurfaceClass
               )}
             >
@@ -176,8 +178,10 @@ export function DraftRow<TRow extends DataTableRowModel>({
               data-pinned-state={dataPinnedState}
               style={combinedStyle}
               className={cn(
-                "border-r border-b border-slate-200",
-                isFirstRightPinned ? "border-l border-l-slate-200" : "",
+                "border-b border-[var(--dt-border-color)] border-r border-r-[color-mix(in_srgb,var(--dt-border-color)_40%,transparent)] p-0",
+                isFirstRightPinned
+                  ? "border-l border-l-[color-mix(in_srgb,var(--dt-border-color)_40%,transparent)]"
+                  : "",
                 pinnedSurfaceClass
               )}
             />
@@ -241,8 +245,10 @@ export function DraftRow<TRow extends DataTableRowModel>({
             data-pinned-state={dataPinnedState}
             style={combinedStyle}
             className={cn(
-              "border-r border-b border-slate-200 p-0 align-top",
-              isFirstRightPinned ? "border-l border-l-slate-200" : "",
+              "border-b border-[var(--dt-border-color)] border-r border-r-[color-mix(in_srgb,var(--dt-border-color)_40%,transparent)] p-0",
+              isFirstRightPinned
+                ? "border-l border-l-[color-mix(in_srgb,var(--dt-border-color)_40%,transparent)]"
+                : "",
               pinnedSurfaceClass,
               isEditingDraftCell && "!z-30"
             )}

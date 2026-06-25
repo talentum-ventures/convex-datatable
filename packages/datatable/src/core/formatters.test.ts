@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatColumnValue, parseDateValue } from "./formatters";
+import { formatColumnValue, parseDateValue, parseTextNumber } from "./formatters";
 import type { DataTableColumn } from "./types";
 
 type Row = {
@@ -84,5 +84,14 @@ describe("formatters", () => {
 
     expect(formatColumnValue(selectColumn, "ship", currentRow)).toBe("Ship it");
     expect(formatColumnValue(multiSelectColumn, ["ship", "hire"], currentRow)).toBe("Ship it, Hire");
+  });
+
+  it("parses plain and formatted numeric text", () => {
+    expect(parseTextNumber("")).toBe(0);
+    expect(parseTextNumber("99.5")).toBe(99.5);
+    expect(parseTextNumber("$1,234.50")).toBe(1234.5);
+    expect(parseTextNumber("1,234.56")).toBe(1234.56);
+    expect(parseTextNumber("1.234,56", "pt-BR")).toBe(1234.56);
+    expect(parseTextNumber("1.234", "pt-BR")).toBe(1234);
   });
 });

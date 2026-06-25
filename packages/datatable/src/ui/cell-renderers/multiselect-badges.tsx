@@ -18,7 +18,7 @@ export function MultiSelectBadges({
   }
 
   return (
-    <div className="flex flex-wrap gap-1">
+    <div className="flex max-w-full flex-nowrap gap-1 overflow-hidden">
       {values.map((entry) => {
         const option = findOptionByValue(options, entry);
         const Icon = option?.icon;
@@ -26,7 +26,7 @@ export function MultiSelectBadges({
           <span
             key={`${columnId}-${entry}`}
             className={cn(
-              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+              "inline-flex max-w-full min-w-0 items-center gap-1 truncate rounded-full px-2 py-0.5 text-sm font-medium",
               option?.colorClass ?? "bg-slate-100 text-slate-700"
             )}
             style={option?.colorStyle}

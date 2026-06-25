@@ -114,7 +114,7 @@ const DataCellInner = <TRow extends DataTableRowModel>({
       data-column-index={columnIndex}
       data-has-collaborators={hasCollaborators ? "true" : "false"}
       className={cn(
-        "group relative box-border h-full min-h-10 w-full min-w-0 px-2 py-1 text-sm text-slate-800",
+        "group relative box-border flex h-full min-h-10 w-full min-w-0 items-center px-2 py-1 text-sm text-slate-800",
         shouldAllowOverflow ? "overflow-visible" : "overflow-hidden",
         hasCollaborators ? "z-20" : "",
         isEditing && (column.kind === "select" || column.kind === "multiselect" || column.kind === "date")
@@ -157,7 +157,7 @@ const DataCellInner = <TRow extends DataTableRowModel>({
             <span
               key={`${collaborator.userId}-label`}
               data-dt-collaborator-label={collaborator.userId}
-              className="max-w-[10rem] truncate rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white shadow-sm"
+              className="max-w-[10rem] truncate rounded px-1.5 py-0.5 text-sm font-semibold leading-none text-white"
               style={{ backgroundColor: collaborator.color }}
             >
               {collaborator.name}

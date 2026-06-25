@@ -210,8 +210,48 @@ export function formatColumnValue<TRow extends DataTableRowModel>(
   }
 }
 
-export function parseTextNumber(input: string): number {
-  const parsed = Number.parseFloat(input);
+export function parseTextNumber(input: string, locale?: string): number {
+  const trimmed = input.trim();
+  if (trimmed.length === 0) {
+    return 0;
+  }
+
+  let cleaned = trimmed.replace(/[^\d.,\-+]/g, "");
+  if (cleaned.length === 0) {
+    return 0;
+  }
+
+  const lastComma = cleaned.lastIndexOf(",");
+  const lastDot = cleaned.lastIndexOf(".");
+
+  if (lastComma >= 0 && lastDot >= 0) {
+    if (lastComma > lastDot) {
+      cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+    } else {
+      cleaned = cleaned.replace(/,/g, "");
+    }
+  } else if (lastComma >= 0) {
+    const parts = cleaned.split(",");
+    if (parts.length === 2 && (parts[1]?.length ?? 0) <= 2) {
+      cleaned = cleaned.replace(",", ".");
+    } else {
+      cleaned = cleaned.replace(/,/g, "");
+    }
+  } else if (lastDot >= 0) {
+    const parts = cleaned.split(".");
+    if (parts.length > 2) {
+      cleaned = cleaned.replace(/\./g, "");
+    } else if (
+      parts.length === 2 &&
+      (parts[1]?.length ?? 0) === 3 &&
+      locale &&
+      !locale.toLowerCase().startsWith("en-us")
+    ) {
+      cleaned = cleaned.replace(".", "");
+    }
+  }
+
+  const parsed = Number.parseFloat(cleaned);
   if (Number.isNaN(parsed)) {
     return 0;
   }

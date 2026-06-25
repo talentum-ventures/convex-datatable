@@ -9,18 +9,16 @@ export type OptionBadgeProps = {
 
 export function OptionBadge({
   option,
-  isSelected,
-  isActive
+  isSelected: _isSelected,
+  isActive: _isActive
 }: OptionBadgeProps): JSX.Element {
   const Icon = option.icon;
 
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+        "inline-flex max-w-full min-w-0 items-center gap-1 truncate rounded-full px-2 py-0.5 text-sm font-medium",
         option.colorClass ?? "",
-        isActive ? "ring-2 ring-slate-900/10 ring-offset-1 ring-offset-white" : "",
-        isSelected ? "shadow-[inset_0_0_0_1px_rgba(15,23,42,0.12)]" : ""
       )}
       style={option.colorStyle}
     >

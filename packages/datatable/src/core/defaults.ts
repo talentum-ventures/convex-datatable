@@ -13,7 +13,7 @@ export const DEFAULT_FEATURE_FLAGS: Required<DataTableFeatureFlags> = {
   columnResize: true,
   rowResize: true,
   columnReorder: true,
-  dragHandle: true,
+  dragHandle: false,
   columnPinning: true,
   columnVisibility: true,
   columnFilter: true,
@@ -33,11 +33,11 @@ export const DEFAULT_FEATURE_FLAGS: Required<DataTableFeatureFlags> = {
 };
 
 export const DEFAULT_THEME_TOKENS: DataTableThemeTokens = {
-  fontFamily: "'IBM Plex Sans', 'Avenir Next', 'Segoe UI', sans-serif",
+  fontFamily: "'Geist', ui-sans-serif, system-ui, sans-serif",
   radius: "14px",
   borderColor: "hsl(215 18% 85%)",
-  headerBg: "linear-gradient(180deg, hsl(210 33% 98%), hsl(210 35% 95%))",
-  pinnedHeaderBg: "linear-gradient(180deg, hsl(210 28% 96%), hsl(210 28% 92.5%))",
+  headerBg: "hsl(0 0% 100% / 0.75)",
+  pinnedHeaderBg: "hsl(0 0% 100% / 0.75)",
   rowBg: "hsl(0 0% 100%)",
   rowHoverBg: "hsl(206 45% 97%)",
   pinnedRowBg: "hsl(210 20% 97%)",

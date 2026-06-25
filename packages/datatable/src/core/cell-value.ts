@@ -112,6 +112,10 @@ export function serializeCellForClipboard<TRow extends DataTableRowModel>(
     return "";
   }
 
+  if (column.kind === "number" || column.kind === "currency") {
+    return typeof value === "number" ? String(value) : "";
+  }
+
   return formatColumnValue(
     column,
     toFormattableValue(value),
@@ -179,10 +183,14 @@ export function parseClipboardToCellValue<TRow extends DataTableRowModel>(
       };
     }
     case "number":
-    case "currency":
       return {
         ok: true,
         value: parseTextNumber(text)
+      };
+    case "currency":
+      return {
+        ok: true,
+        value: parseTextNumber(text, column.locale)
       };
     case "multiselect": {
       if (text.trim().length === 0) {

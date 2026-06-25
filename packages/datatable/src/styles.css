@@ -1,3 +1,32 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.dt-checkbox-box,
+[data-dt-column-menu-root] .dt-checkbox-box,
+[data-dt-editor-dialog] .dt-checkbox-box {
+  border-color: var(--dt-border-color);
+  background-color: var(--dt-row-bg);
+}
+
+.dt-checkbox-box--checked,
+[data-dt-column-menu-root] .dt-checkbox-box--checked,
+[data-dt-editor-dialog] .dt-checkbox-box--checked {
+  border-color: var(--dt-active-cell-ring);
+  background-color: var(--dt-active-cell-ring);
+  color: #fff;
+}
+
+.dt-checkbox input:focus-visible + .dt-checkbox-box,
+[data-dt-column-menu-root] .dt-checkbox input:focus-visible + .dt-checkbox-box,
+[data-dt-editor-dialog] .dt-checkbox input:focus-visible + .dt-checkbox-box {
+  outline: 2px solid var(--dt-active-cell-ring);
+  outline-offset: 2px;
+}
+
+.dt-checkbox input:disabled + .dt-checkbox-box,
+[data-dt-column-menu-root] .dt-checkbox input:disabled + .dt-checkbox-box,
+[data-dt-editor-dialog] .dt-checkbox input:disabled + .dt-checkbox-box {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
