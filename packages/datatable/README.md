@@ -32,6 +32,18 @@ node_modules/@talentum-ventures/convex-datatable/dist/**/*.js
 
 Scanning installed package files is toolchain-dependent, so the explicit CSS import remains the default recommendation for non-Tailwind apps. Using both import and content scanning is safe thanks to the cascade layer.
 
+## Toasts (Sonner)
+
+The library uses [Sonner](https://sonner.emilkowal.ski/) for validation errors, clipboard feedback, row CRUD status, and delete undo. Mount `<Toaster />` once in your app root:
+
+```tsx
+import { Toaster } from "sonner";
+
+<Toaster richColors closeButton />
+```
+
+Sonner is a runtime dependency of this package. The library calls `toast.*` imperatively from internal hooks (not via `DataTable` props). This package is not built on shadcn/ui or Radix Toast — Sonner provides the imperative API and action-button support (e.g. delete undo) that a publishable hook-driven library needs. [shadcn/ui recommends Sonner](https://ui.shadcn.com/docs/components/sonner) over its deprecated legacy Toast component.
+
 ## Minimal Usage
 
 ```tsx

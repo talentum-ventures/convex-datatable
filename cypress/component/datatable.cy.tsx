@@ -1,12 +1,14 @@
 /// <reference types="@testing-library/cypress" />
 
 import { useMemo, useState } from "react";
+import { Archive } from "lucide-react";
 import {
   DataTable,
   type CollaboratorPresence,
   type DataTableColumn,
   type DataTableDataSource,
   type DataTableFeatureFlags,
+  type DataTableProps,
   type DataTableRowAction
 } from "@talentum-ventures/convex-datatable";
 import { Toaster, toast } from "sonner";
@@ -406,7 +408,7 @@ function Harness({
 }: {
   tableId: string;
   features?: DataTableFeatureFlags;
-  rowActions?: ReadonlyArray<DataTableRowAction<TaskRow>>;
+  rowActions?: DataTableProps<TaskRow>["rowActions"];
 }): JSX.Element {
   const [rows, setRows] = useState<ReadonlyArray<TaskRow>>([
     { id: "1", title: "Build UI", status: "todo", amount: 10 },
@@ -500,6 +502,49 @@ function RowActionsHarness({ tableId }: { tableId: string }): JSX.Element {
         isDisabled: (row) => row.status === "done",
         onSelect: ({ rowId }) => {
           toast.message(`Locked ${rowId}`);
+        }
+      }
+    ],
+    []
+  );
+
+  return (
+    <div className="p-4">
+      <Harness tableId={tableId} rowActions={rowActions} />
+      <Toaster />
+    </div>
+  );
+}
+
+function CompactRowActionHarness({ tableId }: { tableId: string }): JSX.Element {
+  const rowActions = useMemo(
+    () => ({
+      id: "archive",
+      label: "Archive",
+      icon: Archive,
+      onSelect: ({ rowId }: { rowId: string }) => {
+        toast.message(`Archived ${rowId}`);
+      }
+    }),
+    []
+  );
+
+  return (
+    <div className="p-4">
+      <Harness tableId={tableId} rowActions={rowActions} />
+      <Toaster />
+    </div>
+  );
+}
+
+function SingleMenuRowActionHarness({ tableId }: { tableId: string }): JSX.Element {
+  const rowActions = useMemo<ReadonlyArray<DataTableRowAction<TaskRow>>>(
+    () => [
+      {
+        id: "archive",
+        label: "Archive",
+        onSelect: ({ rowId }) => {
+          toast.message(`Archived ${rowId}`);
         }
       }
     ],
@@ -1626,6 +1671,28 @@ describe("DataTable component", () => {
     cy.findByLabelText("Open actions for row 1").click();
     cy.findByRole("menuitem", { name: "Archive" }).click();
     cy.findByRole("menu", { name: "Actions for row 1" }).should("not.exist");
+    cy.contains("Archived 1").should("exist");
+  });
+
+  it("renders a bare compact row action as a direct icon button", () => {
+    cy.mount(<CompactRowActionHarness tableId="cypress-table-compact-row-action" />);
+
+    cy.findByLabelText("Open actions for row 1").should("not.exist");
+    cy.get("[data-row-id='1']").within(() => {
+      cy.findByRole("button", { name: "Archive" }).click();
+    });
+    cy.contains("Archived 1").should("exist");
+  });
+
+  it("keeps a one-item rowActions array in the overflow menu", () => {
+    cy.mount(<SingleMenuRowActionHarness tableId="cypress-table-single-menu-row-action" />);
+
+    cy.findByLabelText("Open actions for row 1").click();
+    cy.findByRole("menu", { name: "Actions for row 1" }).within(() => {
+      cy.findByRole("menuitem", { name: "Archive" }).should("exist");
+    });
+
+    cy.findByRole("menuitem", { name: "Archive" }).click();
     cy.contains("Archived 1").should("exist");
   });
 

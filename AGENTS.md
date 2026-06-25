@@ -246,6 +246,8 @@ Each workspace package has its own `AGENTS.md` with scoped rules:
 ### Runtime (library)
 `@tanstack/react-table`, `@tanstack/react-virtual`, `@tanstack/store`, `class-variance-authority`, `clsx`, `lucide-react`, `sonner`, `tailwind-merge`, `zod`
 
+**Sonner toasts** — imperative feedback from hooks (`use-table-rows`, `use-table-clipboard`, `use-table-keyboard`). Not shadcn/Radix Toast; the library has no shadcn component stack. Consumers mount `<Toaster />` from `sonner` in the host app. Delete undo uses Sonner `action` buttons when `restoreRows` is available.
+
 ### Peer
 `react` ^18.3.1, `react-dom` ^18.3.1, `convex` ^1.32.0 (optional)
 

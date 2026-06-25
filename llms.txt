@@ -30,6 +30,13 @@ import "@talentum-ventures/convex-datatable/styles.css";
 
 The bundle does **not** include Tailwind preflight (global reset). It is emitted inside **`@layer datatable`**, so typical host CSS / Tailwind output stays higher in the cascade than the library’s utilities regardless of `<link>` order. Tailwind hosts can instead add `node_modules/@talentum-ventures/convex-datatable/dist/**/*.js` to `content` for one combined build; using both approaches together is also safe.
 
+## Toasts
+
+- Uses **Sonner** (not shadcn/Radix Toast). Imperative toasts from internal hooks for validation, clipboard, row CRUD, and undo/redo errors.
+- Host app must mount `<Toaster />` from `sonner` once (see demo `apps/demo/src/main.tsx`). Sonner is a runtime dependency; toasts are not configured via `DataTable` props.
+- Row delete undo uses Sonner `toast.message({ action: { label: "Undo", ... } })` when `dataSource.restoreRows` is provided.
+- Rationale: publishable library with hook-driven notifications; no shadcn/Radix stack. shadcn/ui deprecated its legacy Toast in favor of Sonner.
+
 ## Components
 
 ### DataTable<TRow>
@@ -44,7 +51,7 @@ Required props:
 
 Optional props:
 - `features?: DataTableFeatureFlags` — toggles merged with defaults
-- `rowActions?: ReadonlyArray<DataTableRowAction<TRow>>` — per-row context menu items
+- `rowActions?: DataTableRowActionWithIcon<TRow> | ReadonlyArray<DataTableRowAction<TRow>>` — bare object = compact icon button (icon required); array = overflow menu
 - `rowSchema?: RowSchema<TRow>` — validation schema for draft rows (Zod-compatible `safeParse` interface)
 - `minRowHeight?: number` — minimum row height in px (default 40)
 - `pageSize?: number` — rows per page (default 50)
@@ -137,7 +144,16 @@ All flags are optional booleans. Unspecified flags use these defaults:
 
 ## Row Actions
 
+`rowActions` accepts either a bare object or an array:
+
+- **Bare object** (`DataTableRowActionWithIcon<TRow>`): renders a direct icon button; `label` is shown on hover; `icon` is required.
+- **Array** (`ReadonlyArray<DataTableRowAction<TRow>>`): renders the overflow menu, including when the array has one item; `icon` is optional per item.
+
 ```ts
+type DataTableRowActionWithIcon<TRow> = DataTableRowAction<TRow> & {
+  icon: ComponentType<{ className?: string }>;
+};
+
 type DataTableRowAction<TRow> = {
   id: string;
   label: string;

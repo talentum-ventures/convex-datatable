@@ -307,6 +307,10 @@ export type DataTableRowAction<TRow extends DataTableRowModel> = {
   onSelect: (ctx: DataTableRowActionContext<TRow>) => void | Promise<void>;
 };
 
+export type DataTableRowActionWithIcon<TRow extends DataTableRowModel> = DataTableRowAction<TRow> & {
+  icon: ComponentType<{ className?: string | undefined }>;
+};
+
 export type DataTableThemeTokens = {
   fontFamily: string;
   radius: string;
@@ -417,7 +421,9 @@ export type DataTableProps<TRow extends DataTableRowModel> = {
   dataSource: DataTableDataSource<TRow>;
   rowSchema?: RowSchema<TRow>;
   features?: DataTableFeatureFlags;
-  rowActions?: ReadonlyArray<DataTableRowAction<TRow>>;
+  rowActions?:
+    | DataTableRowActionWithIcon<TRow>
+    | ReadonlyArray<DataTableRowAction<TRow>>;
   minRowHeight?: number;
   pageSize?: number;
   theme?: Partial<DataTableThemeTokens>;

@@ -68,7 +68,7 @@ import { useRowHeights } from "../virtual/row-heights";
 import { scrollCellIntoView } from "../virtual/scroll";
 import { computeColumnLayout } from "./column-layout";
 import { DraftRow } from "./draft-row";
-import { RowActions } from "./row-actions";
+import { RowActions, resolveRowActionsInput } from "./row-actions";
 import { TableBody, type TableBodyHandle } from "./table-body";
 import { TableHeader } from "./table-header";
 import { TableToolbar } from "./table-toolbar";
@@ -223,7 +223,9 @@ const DataTableInner = <TRow extends DataTableRowModel>({
     return rowIds;
   }, [collaborators]);
   const deleteEnabled = mergedFeatures.rowDelete && Boolean(dataSource.deleteRows);
-  const customRowActionsEnabled = mergedFeatures.rowActions && (rowActions?.length ?? 0) > 0;
+  const resolvedRowActions = useMemo(() => resolveRowActionsInput(rowActions), [rowActions]);
+  const customRowActionsEnabled =
+    mergedFeatures.rowActions && resolvedRowActions.actions.length > 0;
   const hasActionColumn = deleteEnabled || customRowActionsEnabled;
   const {
     sorting,
@@ -372,7 +374,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
         const row = context.row.original;
         const rowId = getRowId(row);
         const visibleRowActions = customRowActionsEnabled
-          ? (rowActions ?? []).filter((action) => action.isVisible?.(row) ?? true)
+          ? resolvedRowActions.actions.filter((action) => action.isVisible?.(row) ?? true)
           : [];
         const isMenuOpen = rowActionMenuRowIdRef.current === rowId;
         return (
@@ -380,6 +382,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
             row={row}
             rowId={rowId}
             rowActions={visibleRowActions}
+            presentation={resolvedRowActions.presentation}
             isMenuOpen={isMenuOpen}
             canDelete={deleteEnabled}
             onDelete={() => {
@@ -405,7 +408,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
     deleteEnabled,
     getRowId,
     hasActionColumn,
-    rowActions,
+    resolvedRowActions,
     setRowActionMenuRowId
   ]);
 

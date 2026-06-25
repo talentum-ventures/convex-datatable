@@ -6,7 +6,7 @@ import {
   type DataTableColumn,
   type DataTableDataSource,
   type DataTableQueryState,
-  type DataTableRowAction,
+  type DataTableRowActionWithIcon,
   type DataTableToolbarState
 } from "@talentum-ventures/convex-datatable";
 import { z } from "zod";
@@ -358,16 +358,15 @@ export function InMemoryPage(): JSX.Element {
     []
   );
 
-  const rowActions = useMemo<ReadonlyArray<DataTableRowAction<DemoRow>>>(
-    () => [
-      {
-        id: "open",
-        label: "Open",
-        onSelect: ({ row }) => {
-          window.open(row.website, "_blank", "noreferrer");
-        }
+  const rowActions = useMemo<DataTableRowActionWithIcon<DemoRow>>(
+    () => ({
+      id: "open",
+      label: "Open",
+      icon: Globe,
+      onSelect: ({ row }) => {
+        window.open(row.website, "_blank", "noreferrer");
       }
-    ],
+    }),
     []
   );
 

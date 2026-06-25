@@ -22,6 +22,7 @@ export type {
   DataTableQueryState,
   DataTableRowAction,
   DataTableRowActionContext,
+  DataTableRowActionWithIcon,
   DataTableToolbarState,
   DataTableThemeTokens,
   DataTableRowModel,

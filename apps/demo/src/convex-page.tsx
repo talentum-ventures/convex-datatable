@@ -9,7 +9,7 @@ import {
   type DataTableColumn,
   type DataTableFeatureFlags,
   type DataTableQueryState,
-  type DataTableRowAction
+  type DataTableRowActionWithIcon
 } from "@talentum-ventures/convex-datatable";
 import { useConvexDataSource, useConvexPresence } from "@talentum-ventures/convex-datatable/convex";
 import { z } from "zod";
@@ -308,16 +308,15 @@ export function ConvexPage(): JSX.Element {
     []
   );
 
-  const rowActions = useMemo<ReadonlyArray<DataTableRowAction<ConvexDemoRow>>>(
-    () => [
-      {
-        id: "inspect",
-        label: "Inspect endpoint",
-        onSelect: ({ row }) => {
-          window.open(row.endpoint, "_blank", "noreferrer");
-        }
+  const rowActions = useMemo<DataTableRowActionWithIcon<ConvexDemoRow>>(
+    () => ({
+      id: "inspect",
+      label: "Inspect endpoint",
+      icon: Globe,
+      onSelect: ({ row }) => {
+        window.open(row.endpoint, "_blank", "noreferrer");
       }
-    ],
+    }),
     []
   );
 

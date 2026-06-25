@@ -10,6 +10,7 @@ import type {
   DataTableFeatureFlags,
   DataTableProps,
   DataTableRowAction,
+  DataTableRowActionWithIcon,
   DataTableToolbarState,
   FilterOperator,
   RowSchema,
@@ -90,6 +91,17 @@ const rowAction: DataTableRowAction<InvoiceRow> = {
   }
 };
 
+const ArchiveIcon = (): null => null;
+
+const compactRowAction: DataTableRowActionWithIcon<InvoiceRow> = {
+  id: "open",
+  label: "Open",
+  icon: ArchiveIcon,
+  onSelect: ({ rowId }) => {
+    expectTypeOf(rowId).toEqualTypeOf<string>();
+  }
+};
+
 const dataSource: DataTableDataSource<InvoiceRow> = {
   useRows: () => ({
     rows: [],
@@ -161,6 +173,40 @@ describe("public api", () => {
     expectTypeOf(props.getRowId).returns.toEqualTypeOf<string>();
     expectTypeOf(props.columns).toEqualTypeOf<ReadonlyArray<DataTableColumn<InvoiceRow>>>();
     expectTypeOf(invalidFeatureFlags).toEqualTypeOf<DataTableFeatureFlags>();
+  });
+
+  it("accepts compact bare rowActions with icon and menu arrays without icon", () => {
+    const compactProps: DataTableProps<InvoiceRow> = {
+      tableId: "invoice-table-compact",
+      columns,
+      getRowId: (row) => row.id,
+      dataSource,
+      rowActions: compactRowAction
+    };
+
+    expectTypeOf(compactProps.rowActions).toEqualTypeOf<
+      | DataTableRowActionWithIcon<InvoiceRow>
+      | ReadonlyArray<DataTableRowAction<InvoiceRow>>
+      | undefined
+    >();
+    expectTypeOf(props.rowActions).toEqualTypeOf<
+      | DataTableRowActionWithIcon<InvoiceRow>
+      | ReadonlyArray<DataTableRowAction<InvoiceRow>>
+      | undefined
+    >();
+  });
+
+  it("rejects bare compact rowActions without icon", () => {
+    const invalidCompactProps: DataTableProps<InvoiceRow> = {
+      tableId: "invoice-table-invalid-compact",
+      columns,
+      getRowId: (row) => row.id,
+      dataSource,
+      // @ts-expect-error compact rowActions bare object requires icon
+      rowActions: rowAction
+    };
+
+    expectTypeOf(invalidCompactProps).toEqualTypeOf<DataTableProps<InvoiceRow>>();
   });
 
   it("keeps Convex adapter config typed", () => {

@@ -11,6 +11,8 @@ A production-ready, fully typed React data-grid component with Airtable-style ed
 
 - [Features](#features)
 - [Installation](#installation)
+  - [Styling](#styling)
+  - [Toasts (Sonner)](#toasts-sonner)
 - [Quick Start](#quick-start)
 - [Components](#components)
   - [DataTable](#datatable)
@@ -125,6 +127,39 @@ export default {
 ```
 
 > The explicit CSS import is the default recommendation because content-scanning `node_modules` is toolchain-dependent.
+
+### Toasts (Sonner)
+
+The library uses [Sonner](https://sonner.emilkowal.ski/) for user feedback — validation errors, copy/paste status, row add/delete, and undo failures. Toasts are triggered imperatively from internal hooks; you do not configure them via `DataTable` props.
+
+Mount a `<Toaster />` once in your app root (same pattern as the demo):
+
+```tsx
+import { Toaster } from "sonner";
+
+export function App() {
+  return (
+    <>
+      {/* your app */}
+      <Toaster richColors closeButton />
+    </>
+  );
+}
+```
+
+#### Why Sonner instead of shadcn/Radix Toast?
+
+This package is **not** built on shadcn/ui. It ships its own lightweight UI primitives (CVA + Tailwind) and does not include Radix UI or copied shadcn components.
+
+Sonner fits a **publishable library** that fires notifications from deep internal hooks (`use-table-rows`, `use-table-clipboard`, `use-table-keyboard`):
+
+- **Imperative API** — hooks call `toast.success()`, `toast.error()`, and `toast.message()` without React context or a toast hook wired through the public API.
+- **Action buttons** — row delete uses `toast.message({ action: { label: "Undo", ... } })` for inline restore when `dataSource.restoreRows` is provided.
+- **Small dependency surface** — one runtime dependency instead of bundling or peer-requiring Radix Toast + shadcn toast components.
+
+[shadcn/ui has deprecated its legacy Radix-based Toast](https://ui.shadcn.com/docs/components/sonner) in favor of Sonner for new projects, so this choice aligns with the current shadcn ecosystem as well.
+
+Sonner is bundled as a dependency of `@talentum-ventures/convex-datatable`; you only need to render `<Toaster />` in your app.
 
 ---
 
@@ -637,10 +672,21 @@ Feature flags are independent toggles merged with defaults. Pass only the flags 
 
 ## Row Actions
 
-Define per-row action menu items:
+Define per-row actions as either a **bare object** (compact icon button) or an **array** (overflow menu):
 
 ```tsx
-const rowActions: DataTableRowAction<MyRow>[] = [
+import { Eye } from "lucide-react";
+
+// Compact: direct icon button; label shown on hover; icon required
+const compactRowAction: DataTableRowActionWithIcon<MyRow> = {
+  id: "view",
+  label: "View details",
+  icon: Eye,
+  onSelect: ({ row, rowId }) => navigate(`/rows/${rowId}`)
+};
+
+// Menu: overflow menu (including when the array has one item); icon optional per item
+const menuRowActions: DataTableRowAction<MyRow>[] = [
   {
     id: "view",
     label: "View details",
@@ -658,7 +704,8 @@ const rowActions: DataTableRowAction<MyRow>[] = [
   }
 ];
 
-<DataTable rowActions={rowActions} ... />
+<DataTable rowActions={compactRowAction} ... />
+<DataTable rowActions={menuRowActions} ... />
 ```
 
 `**DataTableRowAction<TRow>`:**
@@ -668,7 +715,7 @@ const rowActions: DataTableRowAction<MyRow>[] = [
 | ------------ | ----------------------------------------------- | -------- | ------------------------------------------------ |
 | `id`         | `string`                                        | Yes      | Unique action identifier.                        |
 | `label`      | `string`                                        | Yes      | Display text in the menu.                        |
-| `icon`       | `ComponentType`                                 | No       | Icon component (e.g. from `lucide-react`).       |
+| `icon`       | `ComponentType`                                 | No       | Icon component (e.g. from `lucide-react`). Required when `rowActions` is a bare object. |
 | `variant`    | `"default" | "destructive"`                     | No       | Visual style. Destructive actions render in red. |
 | `isVisible`  | `(row: TRow) => boolean`                        | No       | Hide the action for certain rows.                |
 | `isDisabled` | `(row: TRow) => boolean`                        | No       | Disable the action for certain rows.             |
@@ -1076,7 +1123,9 @@ type DataTableProps<TRow extends DataTableRowModel> = {
   dataSource: DataTableDataSource<TRow>;
   rowSchema?: RowSchema<TRow>;
   features?: DataTableFeatureFlags;
-  rowActions?: ReadonlyArray<DataTableRowAction<TRow>>;
+  rowActions?:
+    | DataTableRowActionWithIcon<TRow>
+    | ReadonlyArray<DataTableRowAction<TRow>>;
   minRowHeight?: number;
   pageSize?: number;
   theme?: Partial<DataTableThemeTokens>;
@@ -1097,7 +1146,7 @@ type DataTableProps<TRow extends DataTableRowModel> = {
 | `dataSource`         | `DataTableDataSource<TRow>`     | Yes      | —                                       | Data fetching and mutation interface.                 |
 | `rowSchema`          | `RowSchema<TRow>`               | No       | —                                       | Schema for validating draft rows.                     |
 | `features`           | `DataTableFeatureFlags`         | No       | See [defaults](#feature-flags)          | Feature toggles (merged with defaults).               |
-| `rowActions`         | `DataTableRowAction<TRow>[]`    | No       | —                                       | Per-row action menu items.                            |
+| `rowActions`         | `DataTableRowActionWithIcon<TRow> \| DataTableRowAction<TRow>[]` | No       | —                                       | Bare object = compact icon button; array = overflow menu. |
 | `minRowHeight`       | `number`                        | No       | `40`                                    | Minimum row height in pixels.                         |
 | `pageSize`           | `number`                        | No       | `50`                                    | Rows per page for pagination.                         |
 | `theme`              | `Partial<DataTableThemeTokens>` | No       | See [defaults](#theme-tokens-reference) | Partial theme overrides.                              |

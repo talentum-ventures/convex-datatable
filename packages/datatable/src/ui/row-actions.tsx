@@ -1,11 +1,43 @@
 import { MoreVertical, Trash2 } from "lucide-react";
+import { cn } from "../core/cn";
+import type {
+  DataTableProps,
+  DataTableRowAction,
+  DataTableRowActionWithIcon,
+  DataTableRowModel,
+  RowId
+} from "../core/types";
 import { Button } from "./primitives";
-import type { DataTableRowAction, DataTableRowModel, RowId } from "../core/types";
+
+export type RowActionsPresentation = "compact" | "menu";
+
+function isRowActionsArray<TRow extends DataTableRowModel>(
+  rowActions: NonNullable<DataTableProps<TRow>["rowActions"]>
+): rowActions is ReadonlyArray<DataTableRowAction<TRow>> {
+  return Array.isArray(rowActions);
+}
+
+export function resolveRowActionsInput<TRow extends DataTableRowModel>(
+  rowActions: DataTableProps<TRow>["rowActions"]
+): {
+  presentation: RowActionsPresentation;
+  actions: ReadonlyArray<DataTableRowAction<TRow>>;
+} {
+  if (rowActions == null) {
+    return { presentation: "menu", actions: [] };
+  }
+  if (isRowActionsArray(rowActions)) {
+    return { presentation: "menu", actions: rowActions };
+  }
+  const compactRowAction: DataTableRowActionWithIcon<TRow> = rowActions;
+  return { presentation: "compact", actions: [compactRowAction] };
+}
 
 export type RowActionsProps<TRow extends DataTableRowModel> = {
   row: TRow;
   rowId: RowId;
   rowActions: ReadonlyArray<DataTableRowAction<TRow>>;
+  presentation: RowActionsPresentation;
   isMenuOpen: boolean;
   canDelete: boolean;
   onDelete: () => void;
@@ -17,6 +49,7 @@ export function RowActions<TRow extends DataTableRowModel>({
   row,
   rowId,
   rowActions,
+  presentation,
   isMenuOpen,
   canDelete,
   onDelete,
@@ -24,6 +57,9 @@ export function RowActions<TRow extends DataTableRowModel>({
   onActionSelect
 }: RowActionsProps<TRow>): JSX.Element {
   const hasCustomActions = rowActions.length > 0;
+  const compactAction =
+    presentation === "compact" && rowActions.length === 1 ? rowActions[0] : null;
+  const CompactActionIcon = compactAction?.icon;
 
   return (
     <div className="flex items-center justify-center gap-0.5 py-1">
@@ -39,7 +75,27 @@ export function RowActions<TRow extends DataTableRowModel>({
         </Button>
       ) : null}
 
-      {hasCustomActions ? (
+      {compactAction && CompactActionIcon ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            "h-7 w-7 px-0",
+            compactAction.variant === "destructive" &&
+              "text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+          )}
+          aria-label={compactAction.label}
+          title={compactAction.label}
+          disabled={compactAction.isDisabled?.(row) ?? false}
+          onClick={() => {
+            void onActionSelect(compactAction);
+          }}
+        >
+          <CompactActionIcon className="h-3.5 w-3.5" />
+        </Button>
+      ) : null}
+
+      {!compactAction && hasCustomActions ? (
         <div className="relative" data-dt-row-action-menu-root="true">
           <Button
             variant="ghost"
