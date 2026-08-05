@@ -117,7 +117,13 @@ export type UseTableRowsResult<TRow extends DataTableRowModel> = {
   onStartEdit: (rowId: RowId, columnId: string) => void;
   onCancelEdit: () => void;
   getEditingDraftValue: (rowId: RowId, columnId: string) => DataTableCellValue | null;
-  onEditingDraftChange: (rowId: RowId, columnId: string, value: DataTableCellValue) => void;
+  getEditingDraftCaretOffset: (rowId: RowId, columnId: string) => number | null;
+  onEditingDraftChange: (
+    rowId: RowId,
+    columnId: string,
+    value: DataTableCellValue,
+    caretOffset?: number
+  ) => void;
   commitCellEdit: CellCommit<TRow>;
   deleteRowsNow: (rowsToDelete: ReadonlyArray<TRow>) => Promise<void>;
   commitDraftRow: (nextDraftRow?: Partial<TRow>) => Promise<void>;
@@ -144,6 +150,7 @@ export function useTableRows<TRow extends DataTableRowModel>({
     row: TRow;
     columnId: string;
     draftValue: DataTableCellValue | null;
+    caretOffset: number | null;
   };
 
   const [optimisticRows, setOptimisticRows] = useState<Record<RowId, TRow>>({});
@@ -156,7 +163,10 @@ export function useTableRows<TRow extends DataTableRowModel>({
   const previousDefaultDraftRowRef = useRef<Partial<TRow>>(cloneDraftRow(defaultDraftRow));
   const editingCellRef = useRef<EditingCellState>(null);
   const editingSnapshotRef = useRef<Record<RowId, EditingSnapshot>>({});
+  const getRowIdRef = useRef(getRowId);
+  const mergedRowsRef = useRef<ReadonlyArray<TRow>>([]);
 
+  getRowIdRef.current = getRowId;
   draftRowRef.current = draftRow;
 
   useEffect(() => {
@@ -199,7 +209,7 @@ export function useTableRows<TRow extends DataTableRowModel>({
   const mergedRows = useMemo(() => {
     const rows: TRow[] = [];
     for (const sourceRow of sourceRows) {
-      const rowId = getRowId(sourceRow);
+      const rowId = getRowIdRef.current(sourceRow);
       if (deletedRowIds.has(rowId)) {
         continue;
       }
@@ -207,7 +217,9 @@ export function useTableRows<TRow extends DataTableRowModel>({
       rows.push(optimisticRows[rowId] ?? editingSnapshotRef.current[rowId]?.row ?? sourceRow);
     }
     return rows;
-  }, [deletedRowIds, getRowId, optimisticRows, sourceRows]);
+  }, [deletedRowIds, optimisticRows, sourceRows]);
+
+  mergedRowsRef.current = mergedRows;
 
   useEffect(() => {
     if (!rowActionMenuRowId) {
@@ -242,20 +254,23 @@ export function useTableRows<TRow extends DataTableRowModel>({
   }, [rowActionMenuRowId]);
 
   const onStartEdit = useCallback((rowId: RowId, columnId: string) => {
-    const currentRow = mergedRows.find((candidateRow) => getRowId(candidateRow) === rowId);
+    const currentRow = mergedRowsRef.current.find(
+      (candidateRow) => getRowIdRef.current(candidateRow) === rowId
+    );
 
     if (currentRow) {
       editingSnapshotRef.current[rowId] = {
         row: currentRow,
         columnId,
-        draftValue: null
+        draftValue: null,
+        caretOffset: null
       };
     }
 
     editingCellRef.current = { rowId, columnId };
     setDraftEditingColumnId(null);
     setEditingCell({ rowId, columnId });
-  }, [getRowId, mergedRows, setEditingCell]);
+  }, [setEditingCell]);
 
   const onCancelEdit = useCallback(() => {
     const editingCell = editingCellRef.current;
@@ -276,13 +291,30 @@ export function useTableRows<TRow extends DataTableRowModel>({
     return snapshot.draftValue;
   }, []);
 
-  const onEditingDraftChange = useCallback((rowId: RowId, columnId: string, value: DataTableCellValue) => {
+  const getEditingDraftCaretOffset = useCallback((rowId: RowId, columnId: string): number | null => {
+    const snapshot = editingSnapshotRef.current[rowId];
+    if (snapshot?.columnId !== columnId) {
+      return null;
+    }
+
+    return snapshot.caretOffset;
+  }, []);
+
+  const onEditingDraftChange = useCallback((
+    rowId: RowId,
+    columnId: string,
+    value: DataTableCellValue,
+    caretOffset?: number
+  ) => {
     const snapshot = editingSnapshotRef.current[rowId];
     if (snapshot?.columnId !== columnId) {
       return;
     }
 
     snapshot.draftValue = value;
+    if (caretOffset !== undefined) {
+      snapshot.caretOffset = caretOffset;
+    }
   }, []);
 
   const commitCellEdit = useCallback<CellCommit<TRow>>(async ({ row, rowId, column, value }) => {
@@ -347,8 +379,8 @@ export function useTableRows<TRow extends DataTableRowModel>({
       return;
     }
 
-    const rowIds = rowsToDelete.map((row) => getRowId(row));
-    const snapshotEntries = rowsToDelete.map((row) => [getRowId(row), row] as const);
+    const rowIds = rowsToDelete.map((row) => getRowIdRef.current(row));
+    const snapshotEntries = rowsToDelete.map((row) => [getRowIdRef.current(row), row] as const);
     const snapshot = asRecord(snapshotEntries);
 
     setDeletedRows((current) => ({ ...current, ...snapshot }));
@@ -397,7 +429,7 @@ export function useTableRows<TRow extends DataTableRowModel>({
             }
           : undefined
     });
-  }, [dataSource, getRowId, rowDeleteEnabled]);
+  }, [dataSource, rowDeleteEnabled]);
 
   const commitDraftRow = useCallback(async (nextDraftRow?: Partial<TRow>) => {
     if (!rowAddEnabled || !dataSource.createRow) {
@@ -477,6 +509,7 @@ export function useTableRows<TRow extends DataTableRowModel>({
     onStartEdit,
     onCancelEdit,
     getEditingDraftValue,
+    getEditingDraftCaretOffset,
     onEditingDraftChange,
     commitCellEdit,
     deleteRowsNow,

@@ -3,7 +3,9 @@ import { cn } from "../../core/cn";
 import type { DataTableRowModel } from "../../core/types";
 import {
   focusEditableAtEnd,
+  focusEditableAtOffset,
   parseEditorValue,
+  readCaretOffset,
   readEditableText,
   setEditableText,
   type DefaultEditorProps
@@ -18,13 +20,17 @@ export function InlineContentEditor<TRow extends DataTableRowModel>({
   row,
   onCommit,
   restoredDraft,
+  restoredCaretOffset,
   onDraftChange,
   onCancel,
   initialText
 }: InlineContentEditorProps<TRow>): JSX.Element {
   const initialDraftText = restoredDraft ?? initialText;
+  const isRestoredDraft = restoredDraft !== undefined && restoredDraft !== null;
   const editorRef = useRef<HTMLDivElement | null>(null);
   const initialTextRef = useRef(initialDraftText);
+  const isRestoredDraftRef = useRef(isRestoredDraft);
+  const restoredCaretOffsetRef = useRef(restoredCaretOffset);
   const draftRef = useRef(initialDraftText);
   const finalizedRef = useRef(false);
   const columnRef = useRef(column);
@@ -46,6 +52,17 @@ export function InlineContentEditor<TRow extends DataTableRowModel>({
     }
 
     setEditableText(node, initialTextRef.current);
+
+    // Fresh edits focus at end; remounts mid-edit restore the prior caret.
+    if (isRestoredDraftRef.current) {
+      const offset =
+        typeof restoredCaretOffsetRef.current === "number"
+          ? restoredCaretOffsetRef.current
+          : initialTextRef.current.length;
+      focusEditableAtOffset(node, offset);
+      return;
+    }
+
     focusEditableAtEnd(node);
   }, []);
 
@@ -85,8 +102,9 @@ export function InlineContentEditor<TRow extends DataTableRowModel>({
             : ""
         )}
         onInput={(event) => {
-          draftRef.current = readEditableText(event.currentTarget);
-          onDraftChangeRef.current?.(draftRef.current);
+          const target = event.currentTarget;
+          draftRef.current = readEditableText(target);
+          onDraftChangeRef.current?.(draftRef.current, readCaretOffset(target));
         }}
         onBlur={() => {
           commit();

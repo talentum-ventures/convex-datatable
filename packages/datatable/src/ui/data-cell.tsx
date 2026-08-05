@@ -31,6 +31,7 @@ export type DataCellProps<TRow extends DataTableRowModel> = {
   rowId: RowId;
   value: DataTableCellValue;
   restoredDraft?: string | null;
+  restoredCaretOffset?: number | null;
   rowIndex: number;
   columnIndex: number;
   enableEditing: boolean;
@@ -39,6 +40,7 @@ export type DataCellProps<TRow extends DataTableRowModel> = {
     rowId: RowId;
     columnId: string;
     value: DataTableCellValue;
+    caretOffset?: number;
   }) => void;
   onCancelEdit: () => void;
   onStartEdit: (rowId: RowId, columnId: string) => void;
@@ -52,6 +54,7 @@ const DataCellInner = <TRow extends DataTableRowModel>({
   rowId,
   value,
   restoredDraft,
+  restoredCaretOffset,
   rowIndex,
   columnIndex,
   enableEditing,
@@ -88,10 +91,16 @@ const DataCellInner = <TRow extends DataTableRowModel>({
           onCommit({ row, rowId, column, value: nextValue });
         },
         ...(restoredDraft !== undefined ? { restoredDraft } : {}),
+        ...(restoredCaretOffset !== undefined ? { restoredCaretOffset } : {}),
         ...(onDraftChange
           ? {
-              onDraftChange: (nextValue: DataTableCellValue) => {
-                onDraftChange({ rowId, columnId: column.id, value: nextValue });
+              onDraftChange: (nextValue: DataTableCellValue, caretOffset?: number) => {
+                onDraftChange({
+                  rowId,
+                  columnId: column.id,
+                  value: nextValue,
+                  ...(caretOffset !== undefined ? { caretOffset } : {})
+                });
               }
             }
           : {}),

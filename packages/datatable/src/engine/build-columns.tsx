@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import type { ColumnDef, Table } from "@tanstack/react-table";
 import type {
   CellCoord,
@@ -23,7 +23,13 @@ export type BuildColumnsArgs<TRow extends DataTableRowModel> = {
   onStartEdit: (rowId: RowId, columnId: string) => void;
   onCommit: CellCommit<TRow>;
   getEditingDraftValue?: (rowId: RowId, columnId: string) => DataTableCellValue | null;
-  onEditingDraftChange?: (rowId: RowId, columnId: string, value: DataTableCellValue) => void;
+  getEditingDraftCaretOffset?: (rowId: RowId, columnId: string) => number | null;
+  onEditingDraftChange?: (
+    rowId: RowId,
+    columnId: string,
+    value: DataTableCellValue,
+    caretOffset?: number
+  ) => void;
   onCancelEdit: () => void;
   onCellSelect: (coord: CellCoord) => void;
   onRangeSelect: (coord: CellCoord) => void;
@@ -36,12 +42,33 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
   onStartEdit,
   onCommit,
   getEditingDraftValue,
+  getEditingDraftCaretOffset,
   onEditingDraftChange,
   onCancelEdit,
   onCellSelect,
   onRangeSelect,
   enableEditing
 }: BuildColumnsArgs<TRow>): ReadonlyArray<ColumnDef<TRow, DataTableCellValue>> {
+  const getRowIdRef = useRef(getRowId);
+  const onStartEditRef = useRef(onStartEdit);
+  const onCommitRef = useRef(onCommit);
+  const getEditingDraftValueRef = useRef(getEditingDraftValue);
+  const getEditingDraftCaretOffsetRef = useRef(getEditingDraftCaretOffset);
+  const onEditingDraftChangeRef = useRef(onEditingDraftChange);
+  const onCancelEditRef = useRef(onCancelEdit);
+  const onCellSelectRef = useRef(onCellSelect);
+  const onRangeSelectRef = useRef(onRangeSelect);
+
+  getRowIdRef.current = getRowId;
+  onStartEditRef.current = onStartEdit;
+  onCommitRef.current = onCommit;
+  getEditingDraftValueRef.current = getEditingDraftValue;
+  getEditingDraftCaretOffsetRef.current = getEditingDraftCaretOffset;
+  onEditingDraftChangeRef.current = onEditingDraftChange;
+  onCancelEditRef.current = onCancelEdit;
+  onCellSelectRef.current = onCellSelect;
+  onRangeSelectRef.current = onRangeSelect;
+
   return useMemo(() => {
     let cachedVisibleDataIds = "";
     let cachedVisibleDataIndexById: Record<string, number> = {};
@@ -83,11 +110,13 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
         enableHiding: column.isHideable ?? true,
         cell: (context) => {
           const row = context.row.original;
-          const rowId = getRowId(row);
+          const rowId = getRowIdRef.current(row);
           const value = context.getValue();
           const dynamicColumnIndex = visibleDataIndexById(context.table)[column.id] ?? 0;
-          const draftValue = getEditingDraftValue?.(rowId, column.id);
+          const draftValue = getEditingDraftValueRef.current?.(rowId, column.id);
           const restoredDraft = typeof draftValue === "string" ? draftValue : null;
+          const restoredCaretOffset =
+            getEditingDraftCaretOffsetRef.current?.(rowId, column.id) ?? null;
 
           return (
             <DataCell
@@ -98,24 +127,32 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
               rowIndex={context.row.index}
               columnIndex={Math.max(dynamicColumnIndex, 0)}
               enableEditing={enableEditing}
-              onCommit={onCommit}
-              onCancelEdit={onCancelEdit}
-              onStartEdit={onStartEdit}
-              onCellSelect={onCellSelect}
-              onRangeSelect={onRangeSelect}
+              onCommit={onCommitRef.current}
+              onCancelEdit={onCancelEditRef.current}
+              onStartEdit={onStartEditRef.current}
+              onCellSelect={onCellSelectRef.current}
+              onRangeSelect={onRangeSelectRef.current}
               {...(restoredDraft !== null ? { restoredDraft } : {})}
-              {...(onEditingDraftChange
+              {...(restoredDraft !== null ? { restoredCaretOffset } : {})}
+              {...(onEditingDraftChangeRef.current
                 ? {
                     onDraftChange: ({
                       rowId: nextRowId,
                       columnId,
-                      value: nextValue
+                      value: nextValue,
+                      caretOffset
                     }: {
                       rowId: RowId;
                       columnId: string;
                       value: DataTableCellValue;
+                      caretOffset?: number;
                     }) => {
-                      onEditingDraftChange(nextRowId, columnId, nextValue);
+                      onEditingDraftChangeRef.current?.(
+                        nextRowId,
+                        columnId,
+                        nextValue,
+                        caretOffset
+                      );
                     }
                   }
                 : {})}
@@ -136,16 +173,5 @@ export function useColumnDefs<TRow extends DataTableRowModel>({
 
       return definition;
     });
-  }, [
-    columns,
-    enableEditing,
-    getEditingDraftValue,
-    getRowId,
-    onCancelEdit,
-    onCellSelect,
-    onCommit,
-    onEditingDraftChange,
-    onRangeSelect,
-    onStartEdit
-  ]);
+  }, [columns, enableEditing]);
 }

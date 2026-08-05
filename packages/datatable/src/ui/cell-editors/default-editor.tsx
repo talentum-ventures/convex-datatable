@@ -11,6 +11,7 @@ export function DefaultEditor<TRow extends DataTableRowModel>({
   value,
   onCommit,
   restoredDraft,
+  restoredCaretOffset,
   onDraftChange,
   onCancel
 }: DefaultEditorProps<TRow>): JSX.Element {
@@ -62,6 +63,7 @@ export function DefaultEditor<TRow extends DataTableRowModel>({
       onCommit={onCommit}
       onCancel={onCancel}
       {...(restoredDraft !== undefined ? { restoredDraft } : {})}
+      {...(restoredCaretOffset !== undefined ? { restoredCaretOffset } : {})}
       {...(onDraftChange ? { onDraftChange } : {})}
     />
   );

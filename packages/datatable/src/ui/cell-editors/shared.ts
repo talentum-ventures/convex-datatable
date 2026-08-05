@@ -12,7 +12,8 @@ export type DefaultEditorProps<TRow extends DataTableRowModel> = {
   value: DataTableCellValue;
   onCommit: (value: DataTableCellValue) => void;
   restoredDraft?: string | null;
-  onDraftChange?: (value: DataTableCellValue) => void;
+  restoredCaretOffset?: number | null;
+  onDraftChange?: (value: DataTableCellValue, caretOffset?: number) => void;
   onCancel: () => void;
 };
 
@@ -92,6 +93,48 @@ export function focusEditableAtEnd(node: HTMLDivElement): void {
   const range = document.createRange();
   range.selectNodeContents(node);
   range.collapse(false);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+export function readCaretOffset(node: HTMLDivElement): number {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) {
+    return readEditableText(node).length;
+  }
+
+  const range = selection.getRangeAt(0);
+  if (!node.contains(range.startContainer)) {
+    return readEditableText(node).length;
+  }
+
+  const preCaretRange = range.cloneRange();
+  preCaretRange.selectNodeContents(node);
+  preCaretRange.setEnd(range.startContainer, range.startOffset);
+  return preCaretRange.toString().length;
+}
+
+export function focusEditableAtOffset(node: HTMLDivElement, offset: number): void {
+  node.focus({ preventScroll: true });
+
+  const selection = window.getSelection();
+  if (!selection) {
+    return;
+  }
+
+  const textNode = node.firstChild;
+  const textLength = textNode?.textContent?.length ?? 0;
+  const clamped = Math.max(0, Math.min(offset, textLength));
+  const range = document.createRange();
+
+  if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+    range.setStart(textNode, clamped);
+    range.collapse(true);
+  } else {
+    range.selectNodeContents(node);
+    range.collapse(clamped > 0);
+  }
+
   selection.removeAllRanges();
   selection.addRange(range);
 }
