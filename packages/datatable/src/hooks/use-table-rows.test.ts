@@ -22,6 +22,7 @@ vi.mock("sonner", () => ({
 type TestRow = DataTableRowModel & {
   id: string;
   title: string;
+  status?: string;
 };
 
 const columns: ReadonlyArray<DataTableColumn<TestRow>> = [
@@ -29,6 +30,13 @@ const columns: ReadonlyArray<DataTableColumn<TestRow>> = [
     id: "title",
     field: "title",
     header: "Title",
+    kind: "text",
+    isEditable: true
+  },
+  {
+    id: "status",
+    field: "status",
+    header: "Status",
     kind: "text",
     isEditable: true
   }
@@ -65,31 +73,35 @@ function useTestTableRows(
   rowsRefresh: () => void,
   rowSchema?: RowSchema<TestRow>,
   sourceRows: ReadonlyArray<TestRow> = [],
-  defaultDraftRow?: Partial<TestRow>
+  defaultDraftRow?: Partial<TestRow>,
+  undoEnabled = false
 ) {
   const [, setEditingCell] = useState<EditingCellState>(null);
   const undoStack = useUndoStack<TestRow>();
 
-  return useTableRows<TestRow>({
-    sourceRows,
-    getRowId: (row) => row.id,
-    orderedColumns: columns,
-    rowSchema,
-    dataSource,
-    rowsRefresh,
-    rowDeleteEnabled: false,
-    rowAddEnabled: true,
-    ...(defaultDraftRow ? { defaultDraftRow } : {}),
-    undoEnabled: false,
-    setEditingCell,
+  return {
+    ...useTableRows<TestRow>({
+      sourceRows,
+      getRowId: (row) => row.id,
+      orderedColumns: columns,
+      rowSchema,
+      dataSource,
+      rowsRefresh,
+      rowDeleteEnabled: false,
+      rowAddEnabled: true,
+      ...(defaultDraftRow ? { defaultDraftRow } : {}),
+      undoEnabled,
+      setEditingCell,
+      undoStack
+    }),
     undoStack
-  });
+  };
 }
 
 describe("useTableRows", () => {
-  it("keeps the editing row snapshot and draft value until editing ends", () => {
-    const initialRow = { id: "row-1", title: "Alpha" };
-    const serverUpdatedRow = { id: "row-1", title: "Server update" };
+  it("keeps the editing draft while applying remote updates to other fields", () => {
+    const initialRow = { id: "row-1", title: "Alpha", status: "open" };
+    const serverUpdatedOtherField = { id: "row-1", title: "Alpha", status: "done" };
     const { result, rerender } = renderHook(
       ({ sourceRows }: { sourceRows: ReadonlyArray<TestRow> }) =>
         useTestTableRows(createDataSource({}), vi.fn(), undefined, sourceRows),
@@ -108,25 +120,58 @@ describe("useTableRows", () => {
     expect(result.current.getEditingDraftValue("row-1", "title")).toBe("Alpha draft");
 
     rerender({
-      sourceRows: [serverUpdatedRow]
+      sourceRows: [serverUpdatedOtherField]
     });
 
-    expect(result.current.mergedRows).toEqual([initialRow]);
+    expect(result.current.getEditingDraftValue("row-1", "title")).toBe("Alpha draft");
+    expect(result.current.mergedRows).toEqual([
+      {
+        id: "row-1",
+        title: "Alpha draft",
+        status: "done"
+      }
+    ]);
 
     act(() => {
       result.current.onCancelEdit();
     });
 
     rerender({
-      sourceRows: [serverUpdatedRow]
+      sourceRows: [serverUpdatedOtherField]
     });
 
     expect(result.current.getEditingDraftValue("row-1", "title")).toBeNull();
-    expect(result.current.mergedRows).toEqual([serverUpdatedRow]);
+    expect(result.current.mergedRows).toEqual([serverUpdatedOtherField]);
   });
 
-  it("clears the editing draft snapshot after a manual commit", async () => {
-    const row = { id: "row-1", title: "Alpha" };
+  it("keeps the local draft when the same cell updates remotely mid-edit", () => {
+    const initialRow = { id: "row-1", title: "Alpha", status: "open" };
+    const serverUpdatedSameCell = { id: "row-1", title: "Server update", status: "open" };
+    const { result, rerender } = renderHook(
+      ({ sourceRows }: { sourceRows: ReadonlyArray<TestRow> }) =>
+        useTestTableRows(createDataSource({}), vi.fn(), undefined, sourceRows),
+      {
+        initialProps: {
+          sourceRows: [initialRow]
+        }
+      }
+    );
+
+    act(() => {
+      result.current.onStartEdit("row-1", "title");
+      result.current.onEditingDraftChange("row-1", "title", "Alpha draft");
+    });
+
+    rerender({
+      sourceRows: [serverUpdatedSameCell]
+    });
+
+    expect(result.current.getEditingDraftValue("row-1", "title")).toBe("Alpha draft");
+    expect(result.current.mergedRows[0]?.title).toBe("Alpha draft");
+  });
+
+  it("clears the editing draft snapshot after a manual commit and stores a field patch", async () => {
+    const row = { id: "row-1", title: "Alpha", status: "open" };
     const updateRows = vi.fn(async () => undefined);
     const { result } = renderHook(() =>
       useTestTableRows(createDataSource({ updateRows }), vi.fn(), undefined, [row])
@@ -149,10 +194,106 @@ describe("useTableRows", () => {
     expect(result.current.getEditingDraftValue("row-1", "title")).toBeNull();
     expect(result.current.optimisticRows).toEqual({
       "row-1": {
-        id: "row-1",
         title: "Beta"
       }
     });
+    expect(result.current.mergedRows).toEqual([
+      {
+        id: "row-1",
+        title: "Beta",
+        status: "open"
+      }
+    ]);
+  });
+
+  it("records undo against the pre-edit snapshot when commit receives an overlaid draft row", async () => {
+    const row = { id: "row-1", title: "Alpha", status: "open" };
+    const updateRows = vi.fn(async () => undefined);
+    const { result } = renderHook(() =>
+      useTestTableRows(createDataSource({ updateRows }), vi.fn(), undefined, [row], undefined, true)
+    );
+
+    act(() => {
+      result.current.onStartEdit("row-1", "title");
+      result.current.onEditingDraftChange("row-1", "title", "Beta");
+    });
+
+    const overlaidRow = result.current.mergedRows[0];
+    expect(overlaidRow).toEqual({
+      id: "row-1",
+      title: "Beta",
+      status: "open"
+    });
+    if (!overlaidRow) {
+      throw new Error("Expected overlaid merged row");
+    }
+
+    await act(async () => {
+      await result.current.commitCellEdit({
+        row: overlaidRow,
+        rowId: "row-1",
+        column: titleColumn,
+        value: "Beta"
+      });
+    });
+
+    const undoEntry = result.current.undoStack.popUndo();
+    expect(undoEntry).toEqual({
+      changes: [
+        {
+          rowId: "row-1",
+          previousRow: row,
+          nextRow: {
+            id: "row-1",
+            title: "Beta",
+            status: "open"
+          }
+        }
+      ]
+    });
+  });
+
+  it("drops optimistic patches once the source row catches up so later remote fields appear", async () => {
+    const row = { id: "row-1", title: "Alpha", status: "open" };
+    const updateRows = vi.fn(async () => undefined);
+    const { result, rerender } = renderHook(
+      ({ sourceRows }: { sourceRows: ReadonlyArray<TestRow> }) =>
+        useTestTableRows(createDataSource({ updateRows }), vi.fn(), undefined, sourceRows),
+      {
+        initialProps: {
+          sourceRows: [row]
+        }
+      }
+    );
+
+    await act(async () => {
+      await result.current.commitCellEdit({
+        row,
+        rowId: "row-1",
+        column: titleColumn,
+        value: "Beta"
+      });
+    });
+
+    expect(result.current.optimisticRows["row-1"]).toEqual({ title: "Beta" });
+
+    rerender({
+      sourceRows: [{ id: "row-1", title: "Beta", status: "open" }]
+    });
+
+    expect(result.current.optimisticRows).toEqual({});
+
+    rerender({
+      sourceRows: [{ id: "row-1", title: "Beta", status: "done" }]
+    });
+
+    expect(result.current.mergedRows).toEqual([
+      {
+        id: "row-1",
+        title: "Beta",
+        status: "done"
+      }
+    ]);
   });
 
   it("commits the draft row even when the row schema requires server-generated fields", async () => {
@@ -282,5 +423,4 @@ describe("useTableRows", () => {
     });
     expect(result.current.hasTouchedDraftRow).toBe(true);
   });
-
 });

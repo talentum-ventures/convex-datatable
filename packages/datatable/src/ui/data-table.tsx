@@ -1010,6 +1010,8 @@ const DataTableInner = <TRow extends DataTableRowModel>({
     getRowId,
     moveActiveCell,
     setEditingCell,
+    onStartEdit,
+    onCancelEdit,
     copySelection,
     undoStack,
     updateRows: dataSource.updateRows,

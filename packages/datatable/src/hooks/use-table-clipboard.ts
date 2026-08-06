@@ -101,7 +101,7 @@ export type UseTableClipboardArgs<TRow extends DataTableRowModel> = {
   cellSelectEnabled: boolean;
   undoEnabled: boolean;
   undoStack: UseUndoStackResult<TRow>;
-  setOptimisticRows: Dispatch<SetStateAction<Record<RowId, TRow>>>;
+  setOptimisticRows: Dispatch<SetStateAction<Record<RowId, Partial<TRow>>>>;
 };
 
 export type UseTableClipboardResult = {
@@ -291,7 +291,8 @@ export function useTableClipboard<TRow extends DataTableRowModel>({
       return;
     }
 
-    const optimisticUpdate: Record<RowId, TRow> = {};
+    const optimisticUpdate: Record<RowId, Partial<TRow>> = {};
+    const nextRowsById: Record<RowId, TRow> = {};
     const groupedPatches: RowPatch<TRow>[] = [];
     let appliedCells = 0;
 
@@ -311,7 +312,8 @@ export function useTableClipboard<TRow extends DataTableRowModel>({
         continue;
       }
 
-      optimisticUpdate[rowId] = next;
+      optimisticUpdate[rowId] = patch;
+      nextRowsById[rowId] = next;
       groupedPatches.push({ rowId, patch });
       appliedCells += Object.keys(patch).length;
     }
@@ -327,7 +329,7 @@ export function useTableClipboard<TRow extends DataTableRowModel>({
 
     const undoEntry: UndoEntry<TRow> | null = undoEnabled
       ? {
-          changes: Object.entries(optimisticUpdate).map(([rowId, nextRow]) => {
+          changes: Object.entries(nextRowsById).map(([rowId, nextRow]) => {
             const previousRow = previousRows.get(rowId);
             if (!previousRow) {
               throw new Error(`Missing previous row snapshot for ${rowId}`);
@@ -346,10 +348,16 @@ export function useTableClipboard<TRow extends DataTableRowModel>({
       undoStack.pushUndo(undoEntry);
     }
 
-    setOptimisticRows((current) => ({
-      ...current,
-      ...optimisticUpdate
-    }));
+    setOptimisticRows((current) => {
+      const next = { ...current };
+      for (const [rowId, patch] of Object.entries(optimisticUpdate)) {
+        next[rowId] = {
+          ...next[rowId],
+          ...patch
+        };
+      }
+      return next;
+    });
 
     try {
       await updateRows(groupedPatches);
@@ -372,10 +380,15 @@ export function useTableClipboard<TRow extends DataTableRowModel>({
 
       setOptimisticRows((current) => {
         const next = { ...current };
-        for (const rowId of Object.keys(optimisticUpdate)) {
-          const previous = previousRows.get(rowId);
-          if (previous) {
-            next[rowId] = previous;
+        for (const [rowId, patch] of Object.entries(optimisticUpdate)) {
+          const remaining = { ...(next[rowId] ?? {}) } as Partial<TRow>;
+          for (const key of Object.keys(patch)) {
+            delete remaining[key as keyof TRow];
+          }
+          if (Object.keys(remaining).length === 0) {
+            delete next[rowId];
+          } else {
+            next[rowId] = remaining;
           }
         }
         return next;

@@ -11,20 +11,31 @@ import type { CellStore } from "../core/cell-store";
 import type { UseUndoStackResult, UndoEntry } from "./use-undo-stack";
 import { isEditableKeyboardTarget } from "./use-table-clipboard";
 
+function mergePatchesIntoOptimistic<TRow extends DataTableRowModel>(
+  current: Record<RowId, Partial<TRow>>,
+  patches: ReadonlyArray<RowPatch<TRow>>
+): Record<RowId, Partial<TRow>> {
+  const next = { ...current };
+  for (const { rowId, patch } of patches) {
+    next[rowId] = {
+      ...next[rowId],
+      ...patch
+    };
+  }
+  return next;
+}
+
 function buildUndoSnapshotUpdate<TRow extends DataTableRowModel>(
   entry: UndoEntry<TRow>,
   direction: "previous" | "next"
 ): {
-  optimisticUpdate: Record<RowId, TRow>;
   patches: ReadonlyArray<RowPatch<TRow>>;
 } {
-  const optimisticUpdate: Record<RowId, TRow> = {};
   const patches: RowPatch<TRow>[] = [];
 
   for (const change of entry.changes) {
     const row = direction === "previous" ? change.previousRow : change.nextRow;
     const sourceRow = direction === "previous" ? change.nextRow : change.previousRow;
-    optimisticUpdate[change.rowId] = row;
     patches.push({
       rowId: change.rowId,
       patch: diffRows(sourceRow, row)
@@ -32,7 +43,6 @@ function buildUndoSnapshotUpdate<TRow extends DataTableRowModel>(
   }
 
   return {
-    optimisticUpdate,
     patches
   };
 }
@@ -48,10 +58,12 @@ export type UseTableKeyboardArgs<TRow extends DataTableRowModel> = {
   getRowId: (row: TRow) => RowId;
   moveActiveCell: (rowDelta: number, columnDelta: number, expandSelection: boolean) => void;
   setEditingCell: Dispatch<SetStateAction<EditingCellState>>;
+  onStartEdit: (rowId: RowId, columnId: string) => void;
+  onCancelEdit: () => void;
   copySelection: () => Promise<void>;
   undoStack: UseUndoStackResult<TRow>;
   updateRows: ((changes: ReadonlyArray<RowPatch<TRow>>) => Promise<void>) | undefined;
-  setOptimisticRows: Dispatch<SetStateAction<Record<RowId, TRow>>>;
+  setOptimisticRows: Dispatch<SetStateAction<Record<RowId, Partial<TRow>>>>;
 };
 
 export type UseTableKeyboardResult = {
@@ -69,6 +81,8 @@ export function useTableKeyboard<TRow extends DataTableRowModel>({
   getRowId,
   moveActiveCell,
   setEditingCell,
+  onStartEdit,
+  onCancelEdit,
   copySelection,
   undoStack,
   updateRows,
@@ -117,12 +131,16 @@ export function useTableKeyboard<TRow extends DataTableRowModel>({
         return;
       }
 
-      setEditingCell({ rowId: getRowId(row), columnId: column.id });
+      onStartEdit(getRowId(row), column.id);
       return;
     }
 
     if (event.key === "Escape") {
-      setEditingCell(null);
+      if (editingCell) {
+        onCancelEdit();
+      } else {
+        setEditingCell(null);
+      }
       return;
     }
 
@@ -138,12 +156,9 @@ export function useTableKeyboard<TRow extends DataTableRowModel>({
       }
 
       event.preventDefault();
-      const { optimisticUpdate, patches } = buildUndoSnapshotUpdate(entry, "previous");
+      const { patches } = buildUndoSnapshotUpdate(entry, "previous");
 
-      setOptimisticRows((current) => ({
-        ...current,
-        ...optimisticUpdate
-      }));
+      setOptimisticRows((current) => mergePatchesIntoOptimistic(current, patches));
 
       if (!updateRows) {
         return;
@@ -153,11 +168,8 @@ export function useTableKeyboard<TRow extends DataTableRowModel>({
         await updateRows(patches);
       } catch (error) {
         undoStack.popRedo();
-        const rollbackUpdate = buildUndoSnapshotUpdate(entry, "next").optimisticUpdate;
-        setOptimisticRows((current) => ({
-          ...current,
-          ...rollbackUpdate
-        }));
+        const rollbackPatches = buildUndoSnapshotUpdate(entry, "next").patches;
+        setOptimisticRows((current) => mergePatchesIntoOptimistic(current, rollbackPatches));
         toast.error(`Undo failed: ${String(error)}`);
       }
       return;
@@ -170,12 +182,9 @@ export function useTableKeyboard<TRow extends DataTableRowModel>({
       }
 
       event.preventDefault();
-      const { optimisticUpdate, patches } = buildUndoSnapshotUpdate(entry, "next");
+      const { patches } = buildUndoSnapshotUpdate(entry, "next");
 
-      setOptimisticRows((current) => ({
-        ...current,
-        ...optimisticUpdate
-      }));
+      setOptimisticRows((current) => mergePatchesIntoOptimistic(current, patches));
 
       if (!updateRows) {
         return;
@@ -185,11 +194,8 @@ export function useTableKeyboard<TRow extends DataTableRowModel>({
         await updateRows(patches);
       } catch (error) {
         undoStack.popUndo();
-        const rollbackUpdate = buildUndoSnapshotUpdate(entry, "previous").optimisticUpdate;
-        setOptimisticRows((current) => ({
-          ...current,
-          ...rollbackUpdate
-        }));
+        const rollbackPatches = buildUndoSnapshotUpdate(entry, "previous").patches;
+        setOptimisticRows((current) => mergePatchesIntoOptimistic(current, rollbackPatches));
         toast.error(`Redo failed: ${String(error)}`);
       }
       return;
@@ -213,6 +219,8 @@ export function useTableKeyboard<TRow extends DataTableRowModel>({
     editingEnabled,
     getRowId,
     moveActiveCell,
+    onCancelEdit,
+    onStartEdit,
     setEditingCell,
     setOptimisticRows,
     undoEnabled,

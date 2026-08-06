@@ -9,7 +9,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import type { CellCommit } from "../engine/column-def-builder";
-import { setColumnValue } from "../core/column-utils";
+import { getColumnValue, setColumnValue } from "../core/column-utils";
 import { validateCell, validateRow } from "../core/validation";
 import type {
   DataTableCellValue,
@@ -44,7 +44,7 @@ function cloneDraftRow<TRow extends DataTableRowModel>(
   return draftRow ? { ...draftRow } : {};
 }
 
-function areCellValuesEqual(left: DataTableCellValue, right: DataTableCellValue): boolean {
+export function areCellValuesEqual(left: DataTableCellValue, right: DataTableCellValue): boolean {
   if (Object.is(left, right)) {
     return true;
   }
@@ -61,6 +61,89 @@ function areCellValuesEqual(left: DataTableCellValue, right: DataTableCellValue)
   }
 
   return false;
+}
+
+function mergeOptimisticPatch<TRow extends DataTableRowModel>(
+  sourceRow: TRow,
+  patch: Partial<TRow> | undefined
+): TRow {
+  if (!patch || Object.keys(patch).length === 0) {
+    return sourceRow;
+  }
+
+  return {
+    ...sourceRow,
+    ...patch
+  } as TRow;
+}
+
+function applyEditingOverlay<TRow extends DataTableRowModel>(
+  row: TRow,
+  snapshot: {
+    row: TRow;
+    columnId: string;
+    draftValue: DataTableCellValue | null;
+  },
+  columns: ReadonlyArray<DataTableColumn<TRow>>
+): TRow {
+  const column = columns.find((candidate) => candidate.id === snapshot.columnId);
+  if (!column) {
+    return row;
+  }
+
+  const value =
+    snapshot.draftValue !== null ? snapshot.draftValue : getColumnValue(snapshot.row, column);
+
+  return {
+    ...row,
+    [column.field]: value
+  } as TRow;
+}
+
+function reconcileOptimisticPatches<TRow extends DataTableRowModel>(
+  patches: Record<RowId, Partial<TRow>>,
+  sourceRows: ReadonlyArray<TRow>,
+  getRowId: (row: TRow) => RowId
+): Record<RowId, Partial<TRow>> {
+  if (Object.keys(patches).length === 0) {
+    return patches;
+  }
+
+  const sourceById = new Map<RowId, TRow>();
+  for (const sourceRow of sourceRows) {
+    sourceById.set(getRowId(sourceRow), sourceRow);
+  }
+
+  let changed = false;
+  const next: Record<RowId, Partial<TRow>> = {};
+
+  for (const [rowId, patch] of Object.entries(patches)) {
+    const sourceRow = sourceById.get(rowId);
+    if (!sourceRow) {
+      next[rowId] = patch;
+      continue;
+    }
+
+    const remaining: Partial<TRow> = {};
+    for (const key of Object.keys(patch) as Array<keyof TRow>) {
+      if (!areCellValuesEqual(sourceRow[key], patch[key])) {
+        remaining[key] = patch[key];
+      } else {
+        changed = true;
+      }
+    }
+
+    if (Object.keys(remaining).length > 0) {
+      next[rowId] = remaining;
+      if (Object.keys(remaining).length !== Object.keys(patch).length) {
+        changed = true;
+      }
+    } else {
+      changed = true;
+    }
+  }
+
+  return changed ? next : patches;
 }
 
 function areDraftRowsEqual<TRow extends DataTableRowModel>(
@@ -103,8 +186,9 @@ export type UseTableRowsArgs<TRow extends DataTableRowModel> = {
 };
 
 export type UseTableRowsResult<TRow extends DataTableRowModel> = {
-  optimisticRows: Record<RowId, TRow>;
-  setOptimisticRows: Dispatch<SetStateAction<Record<RowId, TRow>>>;
+  /** Pending field patches overlaid on source rows until the server catches up. */
+  optimisticRows: Record<RowId, Partial<TRow>>;
+  setOptimisticRows: Dispatch<SetStateAction<Record<RowId, Partial<TRow>>>>;
   deletedRows: Record<RowId, TRow>;
   mergedRows: ReadonlyArray<TRow>;
   rowActionMenuRowId: RowId | null;
@@ -153,20 +237,23 @@ export function useTableRows<TRow extends DataTableRowModel>({
     caretOffset: number | null;
   };
 
-  const [optimisticRows, setOptimisticRows] = useState<Record<RowId, TRow>>({});
+  const [optimisticRows, setOptimisticRows] = useState<Record<RowId, Partial<TRow>>>({});
   const [deletedRows, setDeletedRows] = useState<Record<RowId, TRow>>({});
   const [rowActionMenuRowId, setRowActionMenuRowId] = useState<RowId | null>(null);
   const [draftRow, setDraftRow] = useState<Partial<TRow>>(() => cloneDraftRow(defaultDraftRow));
   const [draftEditingColumnId, setDraftEditingColumnId] = useState<string | null>(null);
+  const [editingDraftRevision, setEditingDraftRevision] = useState(0);
   const draftRowRef = useRef<Partial<TRow>>(draftRow);
   const touchedDraftFieldsRef = useRef<Set<string>>(new Set());
   const previousDefaultDraftRowRef = useRef<Partial<TRow>>(cloneDraftRow(defaultDraftRow));
   const editingCellRef = useRef<EditingCellState>(null);
   const editingSnapshotRef = useRef<Record<RowId, EditingSnapshot>>({});
   const getRowIdRef = useRef(getRowId);
+  const orderedColumnsRef = useRef(orderedColumns);
   const mergedRowsRef = useRef<ReadonlyArray<TRow>>([]);
 
   getRowIdRef.current = getRowId;
+  orderedColumnsRef.current = orderedColumns;
   draftRowRef.current = draftRow;
 
   useEffect(() => {
@@ -206,18 +293,30 @@ export function useTableRows<TRow extends DataTableRowModel>({
 
   const deletedRowIds = useMemo(() => new Set(Object.keys(deletedRows)), [deletedRows]);
 
+  useEffect(() => {
+    setOptimisticRows((current) =>
+      reconcileOptimisticPatches(current, sourceRows, getRowIdRef.current)
+    );
+  }, [sourceRows]);
+
   const mergedRows = useMemo(() => {
     const rows: TRow[] = [];
+    const columns = orderedColumnsRef.current;
     for (const sourceRow of sourceRows) {
       const rowId = getRowIdRef.current(sourceRow);
       if (deletedRowIds.has(rowId)) {
         continue;
       }
 
-      rows.push(optimisticRows[rowId] ?? editingSnapshotRef.current[rowId]?.row ?? sourceRow);
+      let row = mergeOptimisticPatch(sourceRow, optimisticRows[rowId]);
+      const snapshot = editingSnapshotRef.current[rowId];
+      if (snapshot) {
+        row = applyEditingOverlay(row, snapshot, columns);
+      }
+      rows.push(row);
     }
     return rows;
-  }, [deletedRowIds, optimisticRows, sourceRows]);
+  }, [deletedRowIds, editingDraftRevision, optimisticRows, sourceRows]);
 
   mergedRowsRef.current = mergedRows;
 
@@ -315,16 +414,24 @@ export function useTableRows<TRow extends DataTableRowModel>({
     if (caretOffset !== undefined) {
       snapshot.caretOffset = caretOffset;
     }
+
+    // Force mergedRows to recompute so virtualized remounts keep the draft cell value.
+    setEditingDraftRevision((current) => current + 1);
   }, []);
 
   const commitCellEdit = useCallback<CellCommit<TRow>>(async ({ row, rowId, column, value }) => {
-    const cellValidation = validateCell(column, row, value);
+    // `row` may already include the editing draft overlay from mergedRows.
+    // Prefer the pre-edit snapshot so undo previousRow stays the true prior value.
+    const snapshot = editingSnapshotRef.current[rowId];
+    const baseRow = snapshot?.columnId === column.id ? snapshot.row : row;
+
+    const cellValidation = validateCell(column, baseRow, value);
     if (!cellValidation.ok) {
       toast.error(cellValidation.message ?? "Invalid cell value");
       return;
     }
 
-    const updateResult = setColumnValue(row, rowId, column, value);
+    const updateResult = setColumnValue(baseRow, rowId, column, value);
     const rowValidation = validateRow(rowSchema, updateResult.nextRow);
     if (!rowValidation.ok) {
       toast.error(rowValidation.message ?? "Invalid row state");
@@ -336,7 +443,7 @@ export function useTableRows<TRow extends DataTableRowModel>({
           changes: [
             {
               rowId,
-              previousRow: row,
+              previousRow: baseRow,
               nextRow: updateResult.nextRow
             }
           ]
@@ -349,7 +456,10 @@ export function useTableRows<TRow extends DataTableRowModel>({
 
     setOptimisticRows((current) => ({
       ...current,
-      [rowId]: updateResult.nextRow
+      [rowId]: {
+        ...current[rowId],
+        ...updateResult.patch.patch
+      }
     }));
     delete editingSnapshotRef.current[rowId];
     editingCellRef.current = null;
@@ -367,7 +477,15 @@ export function useTableRows<TRow extends DataTableRowModel>({
       }
       setOptimisticRows((current) => {
         const next = { ...current };
-        delete next[rowId];
+        const remaining = { ...(next[rowId] ?? {}) } as Partial<TRow>;
+        for (const key of Object.keys(updateResult.patch.patch)) {
+          delete remaining[key as keyof TRow];
+        }
+        if (Object.keys(remaining).length === 0) {
+          delete next[rowId];
+        } else {
+          next[rowId] = remaining;
+        }
         return next;
       });
       toast.error(`Failed to update row: ${String(error)}`);
