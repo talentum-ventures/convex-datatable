@@ -10,6 +10,7 @@ import {
 import { toast } from "sonner";
 import type { CellCommit } from "../engine/column-def-builder";
 import { getColumnValue, setColumnValue } from "../core/column-utils";
+import { DELETE_UNDO_MS } from "../core/defaults";
 import { validateCell, validateRow } from "../core/validation";
 import type {
   DataTableCellValue,
@@ -300,6 +301,7 @@ export function useTableRows<TRow extends DataTableRowModel>({
   }, [sourceRows]);
 
   const mergedRows = useMemo(() => {
+    void editingDraftRevision;
     const rows: TRow[] = [];
     const columns = orderedColumnsRef.current;
     for (const sourceRow of sourceRows) {
@@ -518,6 +520,7 @@ export function useTableRows<TRow extends DataTableRowModel>({
     }
 
     toast.message(`${rowIds.length} row${rowIds.length > 1 ? "s" : ""} deleted`, {
+      duration: DELETE_UNDO_MS,
       action:
         dataSource.restoreRows
           ? {

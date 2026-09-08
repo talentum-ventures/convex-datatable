@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_FEATURE_FLAGS, DEFAULT_PAGE_SIZE, DEFAULT_THEME_TOKENS } from "./defaults";
+import { DELETE_UNDO_MS, DEFAULT_FEATURE_FLAGS, DEFAULT_PAGE_SIZE, DEFAULT_THEME_TOKENS } from "./defaults";
 
 describe("defaults", () => {
   it("uses productive-safe feature profile", () => {
@@ -23,6 +23,10 @@ describe("defaults", () => {
     expect(DEFAULT_FEATURE_FLAGS.editing).toBe(false);
     expect(DEFAULT_FEATURE_FLAGS.clipboardPaste).toBe(true);
     expect(DEFAULT_FEATURE_FLAGS.undo).toBe(false);
+  });
+
+  it("gives delete undo toasts four seconds", () => {
+    expect(DELETE_UNDO_MS).toBe(4000);
   });
 
   it("defaults infinite page size to 50", () => {

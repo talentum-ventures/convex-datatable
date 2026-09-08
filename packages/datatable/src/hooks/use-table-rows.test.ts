@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { toast } from "sonner";
+import { DELETE_UNDO_MS } from "../core/defaults";
 import { useUndoStack } from "./use-undo-stack";
 import { useTableRows } from "./use-table-rows";
 import type {
@@ -51,6 +53,8 @@ function createDataSource(
   options: {
     createRow?: NonNullable<DataTableDataSource<TestRow>["createRow"]>;
     updateRows?: NonNullable<DataTableDataSource<TestRow>["updateRows"]>;
+    deleteRows?: NonNullable<DataTableDataSource<TestRow>["deleteRows"]>;
+    restoreRows?: NonNullable<DataTableDataSource<TestRow>["restoreRows"]>;
   }
 ): DataTableDataSource<TestRow> {
   return {
@@ -64,7 +68,9 @@ function createDataSource(
       refresh: () => undefined
     }),
     ...(options.createRow ? { createRow: options.createRow } : {}),
-    ...(options.updateRows ? { updateRows: options.updateRows } : {})
+    ...(options.updateRows ? { updateRows: options.updateRows } : {}),
+    ...(options.deleteRows ? { deleteRows: options.deleteRows } : {}),
+    ...(options.restoreRows ? { restoreRows: options.restoreRows } : {})
   };
 }
 
@@ -74,7 +80,8 @@ function useTestTableRows(
   rowSchema?: RowSchema<TestRow>,
   sourceRows: ReadonlyArray<TestRow> = [],
   defaultDraftRow?: Partial<TestRow>,
-  undoEnabled = false
+  undoEnabled = false,
+  rowDeleteEnabled = false
 ) {
   const [, setEditingCell] = useState<EditingCellState>(null);
   const undoStack = useUndoStack<TestRow>();
@@ -87,7 +94,7 @@ function useTestTableRows(
       rowSchema,
       dataSource,
       rowsRefresh,
-      rowDeleteEnabled: false,
+      rowDeleteEnabled,
       rowAddEnabled: true,
       ...(defaultDraftRow ? { defaultDraftRow } : {}),
       undoEnabled,
@@ -422,5 +429,34 @@ describe("useTableRows", () => {
       title: "Custom title"
     });
     expect(result.current.hasTouchedDraftRow).toBe(true);
+  });
+
+  it("offers an undo toast after deleting rows when restoreRows is available", async () => {
+    const row = { id: "row-1", title: "Alpha", status: "open" };
+    const deleteRows = vi.fn(async () => undefined);
+    const restoreRows = vi.fn(async () => undefined);
+    const { result } = renderHook(() =>
+      useTestTableRows(
+        createDataSource({ deleteRows, restoreRows }),
+        vi.fn(),
+        undefined,
+        [row],
+        undefined,
+        false,
+        true
+      )
+    );
+
+    await act(async () => {
+      await result.current.deleteRowsNow([row]);
+    });
+
+    expect(deleteRows).toHaveBeenCalledWith(["row-1"]);
+    expect(toast.message).toHaveBeenCalledWith("1 row deleted", {
+      duration: DELETE_UNDO_MS,
+      action: expect.objectContaining({
+        label: "Undo"
+      })
+    });
   });
 });

@@ -593,6 +593,11 @@ describe("DataTable toolbar rendering", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Delete from custom toolbar" }));
 
+    expect(screen.getByRole("alertdialog", { name: "Delete row?" })).toBeTruthy();
+    expect(screen.queryByText("Alpha")).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
     await waitFor(() => {
       expect(screen.queryByText("Alpha")).toBeNull();
     });
@@ -607,5 +612,21 @@ describe("DataTable toolbar rendering", () => {
 
     expect(screen.queryByText("Copy")).toBeNull();
     expect(screen.queryByText("Add row")).toBeNull();
+  });
+
+  it("asks for confirmation before deleting a row and keeps the row when cancelled", async () => {
+    render(createElement(ToolbarHarness));
+
+    fireEvent.click(screen.getByLabelText("Delete row row-1"));
+
+    expect(screen.getByRole("alertdialog", { name: "Delete row?" })).toBeTruthy();
+    expect(screen.queryByText("Alpha")).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("alertdialog", { name: "Delete row?" })).toBeNull();
+    });
+    expect(screen.queryByText("Alpha")).not.toBeNull();
   });
 });

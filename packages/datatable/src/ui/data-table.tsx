@@ -67,6 +67,7 @@ import { useRowObservers } from "../hooks/use-row-observers";
 import { useRowHeights } from "../virtual/row-heights";
 import { scrollCellIntoView } from "../virtual/scroll";
 import { computeColumnLayout } from "./column-layout";
+import { ConfirmDialog, deleteConfirmationCopy } from "./confirm-dialog";
 import { DraftRow } from "./draft-row";
 import { RowActions, resolveRowActionsInput } from "./row-actions";
 import { TableBody, type TableBodyHandle } from "./table-body";
@@ -223,6 +224,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
     return rowIds;
   }, [collaborators]);
   const deleteEnabled = mergedFeatures.rowDelete && Boolean(dataSource.deleteRows);
+  const [pendingDeleteRows, setPendingDeleteRows] = useState<ReadonlyArray<TRow> | null>(null);
   const resolvedRowActions = useMemo(() => resolveRowActionsInput(rowActions), [rowActions]);
   const customRowActionsEnabled =
     mergedFeatures.rowActions && resolvedRowActions.actions.length > 0;
@@ -389,7 +391,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
             canDelete={deleteEnabled}
             onDelete={() => {
               setRowActionMenuRowId(null);
-              void deleteRowsNow([row]);
+              setPendingDeleteRows([row]);
             }}
             onToggleMenu={() => {
               setRowActionMenuRowId((current) => (current === rowId ? null : rowId));
@@ -406,7 +408,6 @@ const DataTableInner = <TRow extends DataTableRowModel>({
     return column;
   }, [
     customRowActionsEnabled,
-    deleteRowsNow,
     deleteEnabled,
     getRowId,
     hasActionColumn,
@@ -1094,8 +1095,26 @@ const DataTableInner = <TRow extends DataTableRowModel>({
     stickyDraftRow
   ]);
   const handleDeleteSelected = useCallback(() => {
-    void deleteRowsNow(selectedRows);
-  }, [deleteRowsNow, selectedRows]);
+    if (selectedRows.length === 0) {
+      return;
+    }
+    setPendingDeleteRows(selectedRows);
+  }, [selectedRows]);
+  const handleConfirmDelete = useCallback(() => {
+    if (!pendingDeleteRows) {
+      return;
+    }
+    const rowsToDelete = pendingDeleteRows;
+    setPendingDeleteRows(null);
+    void deleteRowsNow(rowsToDelete);
+  }, [deleteRowsNow, pendingDeleteRows]);
+  const handleCancelDelete = useCallback(() => {
+    setPendingDeleteRows(null);
+  }, []);
+  const pendingDeleteCopy = deleteConfirmationCopy(
+    pendingDeleteRows?.length ?? 0,
+    Boolean(dataSource.restoreRows)
+  );
   const handleCopySelection = useCallback(() => {
     void copySelection();
   }, [copySelection]);
@@ -1369,6 +1388,16 @@ const DataTableInner = <TRow extends DataTableRowModel>({
               <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
               Loading more rows...
             </p>
+          ) : null}
+
+          {pendingDeleteRows ? (
+            <ConfirmDialog
+              title={pendingDeleteCopy.title}
+              description={pendingDeleteCopy.description}
+              confirmLabel="Delete"
+              onConfirm={handleConfirmDelete}
+              onCancel={handleCancelDelete}
+            />
           ) : null}
 
           <style>{`

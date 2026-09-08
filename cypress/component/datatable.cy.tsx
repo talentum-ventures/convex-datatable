@@ -349,6 +349,12 @@ function expectNodeExists<T extends Element>($nodes: JQuery<T>): T {
   return first;
 }
 
+function confirmDeleteDialog(): void {
+  cy.findByRole("alertdialog").within(() => {
+    cy.findByRole("button", { name: /^Delete$/ }).click();
+  });
+}
+
 function assertHeaderBodyColumnAlignment(columnId: string, rowId: string): void {
   cy.get(`th[data-column-id='${columnId}']`)
     .first()
@@ -488,6 +494,7 @@ function Harness({
 
   return (
     <div className="p-4">
+      <Toaster />
       <DataTable
         tableId={tableId}
         columns={columns}
@@ -1655,6 +1662,7 @@ describe("DataTable component", () => {
     cy.findByTestId("custom-hidden-count").should("have.text", "0");
 
     cy.contains("button", "Delete from custom toolbar").click();
+    confirmDeleteDialog();
     cy.contains("Build UI").should("not.exist");
   });
 
@@ -2249,6 +2257,7 @@ describe("DataTable component", () => {
     });
 
     cy.findByLabelText("Delete row 1").click();
+    confirmDeleteDialog();
     cy.get("tr[data-row-id='1']").should("not.exist");
 
     cy.get("tbody").should(($tbody) => {
@@ -2292,7 +2301,25 @@ describe("DataTable component", () => {
 
     cy.findByLabelText("Select row 1").check({ force: true });
     cy.contains("Delete selected").click();
+    confirmDeleteDialog();
     cy.contains("Build UI").should("not.exist");
+  });
+
+  it("asks for confirmation before deleting a row and restores it from undo", () => {
+    cy.mount(<Harness tableId="cypress-table-delete-confirm" />);
+
+    cy.findByLabelText("Delete row 1").click();
+    cy.findByRole("alertdialog", { name: "Delete row?" }).should("exist");
+    cy.contains("Build UI").should("exist");
+    cy.findByRole("button", { name: "Cancel" }).click();
+    cy.findByRole("alertdialog").should("not.exist");
+    cy.contains("Build UI").should("exist");
+
+    cy.findByLabelText("Delete row 1").click();
+    confirmDeleteDialog();
+    cy.contains("Build UI").should("not.exist");
+    cy.contains("button", "Undo").click();
+    cy.contains("Build UI").should("exist");
   });
 
   it("creates a row directly from the draft row controls", () => {
@@ -2448,29 +2475,21 @@ describe("DataTable component", () => {
     cy.contains("Done").should("exist");
   });
 
-  it("edits a date cell directly from the native picker", () => {
+  it("edits a date cell from the calendar picker without committing month navigation", () => {
     cy.mount(<DateHarness tableId="cypress-table-date-edit" />);
 
     cy.get("[role='gridcell'][data-column-id='due']").dblclick();
-    cy.findByLabelText("Edit Due")
-      .should("have.attr", "type", "date")
-      .then(($input) => {
-        const input = $input[0];
-        if (!(input instanceof HTMLInputElement)) {
-          throw new Error("Expected a date input");
-        }
+    cy.findByRole("dialog", { name: "Edit Due" }).should("exist");
+    cy.get("[data-dt-date-month='true']").should("contain", "março de 2026");
+    cy.get("[data-testid='due-raw']").should("have.text", "2026-03-05");
 
-        const view = input.ownerDocument.defaultView;
-        if (!view) {
-          throw new Error("Expected a window for the date input");
-        }
+    cy.findByLabelText("Next month").click();
+    cy.findByRole("dialog", { name: "Edit Due" }).should("exist");
+    cy.get("[data-dt-date-month='true']").should("contain", "abril de 2026");
+    cy.get("[data-testid='due-raw']").should("have.text", "2026-03-05");
 
-        input.focus();
-        input.value = "2026-04-09";
-        input.dispatchEvent(new view.Event("input", { bubbles: true }));
-        input.dispatchEvent(new view.Event("change", { bubbles: true }));
-      });
-    cy.findByLabelText("Edit Due").should("not.exist");
+    cy.get("[data-dt-date='2026-04-09']").click();
+    cy.findByRole("dialog", { name: "Edit Due" }).should("not.exist");
     cy.get("[data-testid='due-raw']").should("have.text", "2026-04-09");
   });
 
