@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { ConfirmDialog, deleteConfirmationCopy } from "./confirm-dialog";
+import { ConfirmDialog, deleteConfirmationCopy } from "./delete-confirmation";
 
 describe("deleteConfirmationCopy", () => {
   it("describes a single delete that can be undone", () => {

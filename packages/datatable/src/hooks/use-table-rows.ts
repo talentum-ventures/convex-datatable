@@ -16,6 +16,7 @@ import type {
   DataTableCellValue,
   DataTableColumn,
   DataTableDataSource,
+  DataTableDeleteCommitResult,
   DataTableRowModel,
   EditingCellState,
   RowId,
@@ -210,7 +211,10 @@ export type UseTableRowsResult<TRow extends DataTableRowModel> = {
     caretOffset?: number
   ) => void;
   commitCellEdit: CellCommit<TRow>;
-  deleteRowsNow: (rowsToDelete: ReadonlyArray<TRow>) => Promise<void>;
+  deleteRowsNow: (
+    rowsToDelete: ReadonlyArray<TRow>,
+    options?: { notify?: boolean }
+  ) => Promise<DataTableDeleteCommitResult>;
   commitDraftRow: (nextDraftRow?: Partial<TRow>) => Promise<void>;
   commitDraftCell: (column: DataTableColumn<TRow>, value: DataTableCellValue) => void;
   cancelDraftCellEdit: () => void;
@@ -494,9 +498,14 @@ export function useTableRows<TRow extends DataTableRowModel>({
     }
   }, [dataSource, rowSchema, setEditingCell, undoEnabled, undoStack]);
 
-  const deleteRowsNow = useCallback(async (rowsToDelete: ReadonlyArray<TRow>) => {
+  const deleteRowsNow = useCallback(async (
+    rowsToDelete: ReadonlyArray<TRow>,
+    options?: { notify?: boolean }
+  ): Promise<DataTableDeleteCommitResult> => {
+    const notify = options?.notify ?? true;
+
     if (!rowDeleteEnabled || !dataSource.deleteRows || rowsToDelete.length === 0) {
-      return;
+      return { undo: null };
     }
 
     const rowIds = rowsToDelete.map((row) => getRowIdRef.current(row));
@@ -515,41 +524,55 @@ export function useTableRows<TRow extends DataTableRowModel>({
         }
         return next;
       });
-      toast.error(`Failed to delete rows: ${String(error)}`);
-      return;
+      if (notify) {
+        toast.error(`Failed to delete rows: ${String(error)}`);
+        return { undo: null };
+      }
+      throw error;
     }
 
-    toast.message(`${rowIds.length} row${rowIds.length > 1 ? "s" : ""} deleted`, {
-      duration: DELETE_UNDO_MS,
-      action:
-        dataSource.restoreRows
+    const restoreRows = dataSource.restoreRows;
+    const undo = restoreRows
+      ? async () => {
+          const toRestore = rowIds
+            .map((rowId) => snapshot[rowId])
+            .filter((row): row is TRow => Boolean(row));
+
+          setDeletedRows((current) => {
+            const next = { ...current };
+            for (const rowId of rowIds) {
+              delete next[rowId];
+            }
+            return next;
+          });
+
+          try {
+            await restoreRows(toRestore);
+          } catch (error) {
+            if (notify) {
+              toast.error(`Failed to restore rows: ${String(error)}`);
+              return;
+            }
+            throw error;
+          }
+        }
+      : null;
+
+    if (notify) {
+      toast.message(`${rowIds.length} row${rowIds.length > 1 ? "s" : ""} deleted`, {
+        duration: DELETE_UNDO_MS,
+        action: undo
           ? {
               label: "Undo",
               onClick: () => {
-                const toRestore = rowIds
-                  .map((rowId) => snapshot[rowId])
-                  .filter((row): row is TRow => Boolean(row));
-
-                setDeletedRows((current) => {
-                  const next = { ...current };
-                  for (const rowId of rowIds) {
-                    delete next[rowId];
-                  }
-                  return next;
-                });
-
-                const restorePromise = dataSource.restoreRows
-                  ? dataSource.restoreRows(toRestore)
-                  : null;
-                if (restorePromise) {
-                  void restorePromise.catch((error) => {
-                    toast.error(`Failed to restore rows: ${String(error)}`);
-                  });
-                }
+                void undo();
               }
             }
           : undefined
-    });
+      });
+    }
+
+    return { undo };
   }, [dataSource, rowDeleteEnabled]);
 
   const commitDraftRow = useCallback(async (nextDraftRow?: Partial<TRow>) => {

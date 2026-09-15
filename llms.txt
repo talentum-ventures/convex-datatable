@@ -32,9 +32,9 @@ The bundle does **not** include Tailwind preflight (global reset). It is emitted
 
 ## Toasts
 
-- Uses **Sonner** (not shadcn/Radix Toast). Imperative toasts from internal hooks for validation, clipboard, row CRUD, and undo/redo errors.
-- Host app must mount `<Toaster />` from `sonner` once (see demo `apps/demo/src/main.tsx`). Sonner is a runtime dependency; toasts are not configured via `DataTable` props.
-- Row delete undo uses Sonner `toast.message({ action: { label: "Undo", ... } })` when `dataSource.restoreRows` is provided.
+- Uses **Sonner** (not shadcn/Radix Toast) for library-owned feedback: validation, clipboard, row create/update, and undo/redo errors.
+- Host app must mount `<Toaster />` from `sonner` once (see demo `apps/demo/src/main.tsx`) if it relies on those library toasts. Sonner is a runtime dependency.
+- Row delete confirmation and delete toasts should be injected via `onDeleteRows`. `commit()` performs the optimistic delete and returns `{ undo }` when `dataSource.restoreRows` is provided; the host shows its own dialog and toast. If `onDeleteRows` is omitted, the library still shows a Sonner undo toast after an immediate delete.
 - Rationale: publishable library with hook-driven notifications; no shadcn/Radix stack. shadcn/ui deprecated its legacy Toast in favor of Sonner.
 
 ## Components
@@ -60,6 +60,7 @@ Optional props:
 - `className?: string` — additional CSS class
 - `collaborators?: ReadonlyArray<CollaboratorPresence>` — other users' presence data
 - `onActiveCellChange?: (cell: CollaboratorCellCoord | null) => void` — callback for presence
+- `onDeleteRows?: (request: DataTableDeleteRequest<TRow>) => void` — host-owned delete confirmation; call `request.commit()` after the user confirms
 - `onError?: (message: string) => void` — error callback
 
 ### DataTableContainer
@@ -129,7 +130,7 @@ All flags are optional booleans. Unspecified flags use these defaults:
 | columnVisibility | true | Show/hide columns from toolbar |
 | columnFilter | true | Per-column filtering |
 | columnSort | true | Column sorting |
-| rowDelete | false | Delete rows with undo toast |
+| rowDelete | false | Enable delete triggers; inject confirmation/toasts via `onDeleteRows` |
 | rowSelect | true | Row selection checkboxes |
 | rowAdd | false | "Add row" button and draft row |
 | rowActions | true | Row action overflow menu |
@@ -377,6 +378,12 @@ function DeploymentTable() {
         getRowId={(r) => r.id}
         dataSource={dataSource}
         features={{ editing: true, rowAdd: true, rowDelete: true, undo: true }}
+        onDeleteRows={({ rows, commit }) => {
+          if (!window.confirm(`Delete ${rows.length} row(s)?`)) {
+            return;
+          }
+          void commit();
+        }}
         collaborators={presence.collaborators}
         onActiveCellChange={presence.onActiveCellChange}
       />

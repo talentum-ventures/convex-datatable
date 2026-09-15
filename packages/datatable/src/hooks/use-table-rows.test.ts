@@ -459,4 +459,38 @@ describe("useTableRows", () => {
       })
     });
   });
+
+  it("skips library toasts when notify is disabled and returns undo to the caller", async () => {
+    const row = { id: "row-1", title: "Alpha", status: "open" };
+    const deleteRows = vi.fn(async () => undefined);
+    const restoreRows = vi.fn(async () => undefined);
+    vi.mocked(toast.message).mockClear();
+    vi.mocked(toast.error).mockClear();
+    const { result } = renderHook(() =>
+      useTestTableRows(
+        createDataSource({ deleteRows, restoreRows }),
+        vi.fn(),
+        undefined,
+        [row],
+        undefined,
+        false,
+        true
+      )
+    );
+
+    let commitResult: { undo: (() => Promise<void>) | null } | undefined;
+    await act(async () => {
+      commitResult = await result.current.deleteRowsNow([row], { notify: false });
+    });
+
+    expect(deleteRows).toHaveBeenCalledWith(["row-1"]);
+    expect(toast.message).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(commitResult?.undo).toEqual(expect.any(Function));
+
+    await act(async () => {
+      await commitResult?.undo?.();
+    });
+    expect(restoreRows).toHaveBeenCalledWith([row]);
+  });
 });

@@ -74,6 +74,8 @@ All public exports are defined in `packages/datatable/src/index.ts`. This is the
 **Types:** All types from `core/types.ts` (50+ exported types)
 **Constants:** `DEFAULT_FEATURE_FLAGS`, `DEFAULT_THEME_TOKENS`, `DEFAULT_PAGE_SIZE`
 **Persistence utilities:** `encodePersistedStateToUrl`, `decodePersistedStateFromUrl`, `mergePersistedState`, `storageKey`
+
+Row deletion: `rowDelete` enables the triggers; hosts inject confirmation UI and toasts with `onDeleteRows`. `commit()` runs the optimistic delete via `dataSource.deleteRows` and returns `{ undo }` when `restoreRows` is available.
 ### Package Exports (package.json)
 
 | Path | Maps to |
@@ -246,7 +248,7 @@ Each workspace package has its own `AGENTS.md` with scoped rules:
 ### Runtime (library)
 `@tanstack/react-table`, `@tanstack/react-virtual`, `@tanstack/store`, `class-variance-authority`, `clsx`, `lucide-react`, `sonner`, `tailwind-merge`, `zod`
 
-**Sonner toasts** — imperative feedback from hooks (`use-table-rows`, `use-table-clipboard`, `use-table-keyboard`). Not shadcn/Radix Toast; the library has no shadcn component stack. Consumers mount `<Toaster />` from `sonner` in the host app. Delete undo uses Sonner `action` buttons when `restoreRows` is available.
+**Sonner toasts** — imperative feedback from hooks (`use-table-rows`, `use-table-clipboard`, `use-table-keyboard`). Not shadcn/Radix Toast; the library has no shadcn component stack. Consumers mount `<Toaster />` from `sonner` in the host app. Row delete confirmation and delete toasts should be injected with `onDeleteRows`; the fallback path still uses a Sonner undo action when `restoreRows` is available.
 
 ### Peer
 `react` ^18.3.1, `react-dom` ^18.3.1, `convex` ^1.32.0 (optional)

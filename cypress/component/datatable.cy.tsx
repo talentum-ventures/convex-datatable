@@ -13,6 +13,7 @@ import {
 } from "@talentum-ventures/convex-datatable";
 import { Toaster, toast } from "sonner";
 import { applyServerQuery } from "../../apps/demo/src/demo-query";
+import { useDeleteRowsConfirmation } from "../../apps/demo/src/delete-confirmation";
 
 type TaskRow = {
   id: string;
@@ -492,6 +493,8 @@ function Harness({
     [rows]
   );
 
+  const { onDeleteRows, dialog } = useDeleteRowsConfirmation<TaskRow>(true);
+
   return (
     <div className="p-4">
       <Toaster />
@@ -501,8 +504,10 @@ function Harness({
         dataSource={dataSource}
         getRowId={(row) => row.id}
         features={tableFeatures}
+        onDeleteRows={onDeleteRows}
         {...(rowActions !== undefined ? { rowActions } : {})}
       />
+      {dialog}
       <output data-testid="title-raw">{rows[0]?.title ?? ""}</output>
       <output data-testid="status-raw">{rows[0]?.status ?? ""}</output>
       <output data-testid="amount-raw">{String(rows[0]?.amount ?? "")}</output>
@@ -1009,6 +1014,8 @@ function VirtualizedDeleteMeasuredRowsHarness({ tableId }: { tableId: string }):
     [rows]
   );
 
+  const { onDeleteRows, dialog } = useDeleteRowsConfirmation<TaskRow>(false);
+
   return (
     <div className="w-[360px] p-4">
       <DataTable
@@ -1017,7 +1024,9 @@ function VirtualizedDeleteMeasuredRowsHarness({ tableId }: { tableId: string }):
         dataSource={dataSource}
         getRowId={(row) => row.id}
         features={{ rowDelete: true, rowSelect: false, rowActions: false, infiniteScroll: false }}
+        onDeleteRows={onDeleteRows}
       />
+      {dialog}
     </div>
   );
 }
@@ -1339,6 +1348,8 @@ function CustomToolbarHarness({ tableId }: { tableId: string }): JSX.Element {
     [rows]
   );
 
+  const { onDeleteRows, dialog } = useDeleteRowsConfirmation<TaskRow>(false);
+
   return (
     <div className="p-4">
       <DataTable
@@ -1353,6 +1364,7 @@ function CustomToolbarHarness({ tableId }: { tableId: string }): JSX.Element {
           columnVisibility: true,
           virtualization: false
         }}
+        onDeleteRows={onDeleteRows}
         renderToolbar={(state) => (
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={() => state.deleteSelected()}>
@@ -1368,6 +1380,7 @@ function CustomToolbarHarness({ tableId }: { tableId: string }): JSX.Element {
           </div>
         )}
       />
+      {dialog}
     </div>
   );
 }

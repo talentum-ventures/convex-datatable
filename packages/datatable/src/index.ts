@@ -14,6 +14,8 @@ export type {
   DataTableColumn,
   DataTableColumnKind,
   DataTableDataSource,
+  DataTableDeleteCommitResult,
+  DataTableDeleteRequest,
   DataTableFeatureFlags,
   DataTableFilter,
   DataTableFilterValue,

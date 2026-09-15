@@ -15,6 +15,7 @@ import { useConvexDataSource, useConvexPresence } from "@talentum-ventures/conve
 import { z } from "zod";
 import { getStoredConvexUser } from "./convex-user";
 import { type ConvexDemoRow } from "./convex-data";
+import { useDeleteRowsConfirmation } from "./delete-confirmation";
 
 const CONVEX_TABLE_ID = "demo-convex-deployments";
 const PRESENCE_STALE_AFTER_MS = 30_000;
@@ -381,6 +382,7 @@ export function ConvexPage(): JSX.Element {
   );
 
   const dataSource = useConvexDataSource<ConvexDemoRow>(dataSourceConfig);
+  const { onDeleteRows, dialog } = useDeleteRowsConfirmation<ConvexDemoRow>(true);
 
   const getRowId = useCallback((row: ConvexDemoRow) => row.id, []);
 
@@ -461,7 +463,9 @@ export function ConvexPage(): JSX.Element {
           collaborators={presence.collaborators}
           onActiveCellChange={presence.onActiveCellChange}
           theme={theme}
+          onDeleteRows={onDeleteRows}
         />
+        {dialog}
       </DataTableContainer>
     </div>
   );

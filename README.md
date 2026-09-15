@@ -27,6 +27,7 @@ A production-ready, fully typed React data-grid component with Airtable-style ed
   - [Full CRUD Data Source](#full-crud-data-source)
   - [Query State](#query-state)
 - [Feature Flags](#feature-flags)
+  - [Row deletion](#row-deletion)
 - [Row Actions](#row-actions)
 - [Row Schema Validation](#row-schema-validation)
 - [Theming](#theming)
@@ -154,7 +155,7 @@ This package is **not** built on shadcn/ui. It ships its own lightweight UI prim
 Sonner fits a **publishable library** that fires notifications from deep internal hooks (`use-table-rows`, `use-table-clipboard`, `use-table-keyboard`):
 
 - **Imperative API** — hooks call `toast.success()`, `toast.error()`, and `toast.message()` without React context or a toast hook wired through the public API.
-- **Action buttons** — row delete uses `toast.message({ action: { label: "Undo", ... } })` for inline restore when `dataSource.restoreRows` is provided.
+- **Action buttons** — if you omit `onDeleteRows`, the fallback delete path still uses `toast.message({ action: { label: "Undo", ... } })` when `dataSource.restoreRows` is provided. Prefer `onDeleteRows` so the host owns confirmation and toasts.
 - **Small dependency surface** — one runtime dependency instead of bundling or peer-requiring Radix Toast + shadcn toast components.
 
 [shadcn/ui has deprecated its legacy Radix-based Toast](https://ui.shadcn.com/docs/components/sonner) in favor of Sonner for new projects, so this choice aligns with the current shadcn ecosystem as well.
@@ -654,7 +655,7 @@ Feature flags are independent toggles merged with defaults. Pass only the flags 
 | `columnVisibility` | `true`  | Show/hide columns from the toolbar.                                                |
 | `columnFilter`     | `true`  | Per-column filtering via the column menu.                                          |
 | `columnSort`       | `true`  | Click headers or use the column menu to sort.                                      |
-| `rowDelete`        | `false` | Enable row deletion with undo toast. Requires `dataSource.deleteRows`.             |
+| `rowDelete`        | `false` | Enable row deletion triggers. Requires `dataSource.deleteRows`. Hosts should inject confirmation and toasts via `onDeleteRows`. |
 | `rowSelect`        | `true`  | Show row selection checkboxes.                                                     |
 | `rowAdd`           | `false` | Show "Add row" button and draft row. Requires `dataSource.createRow`.              |
 | `rowActions`       | `true`  | Show the row action overflow menu.                                                 |
@@ -667,6 +668,35 @@ Feature flags are independent toggles merged with defaults. Pass only the flags 
 | `virtualization`   | `true`  | Only render visible rows for large datasets (via `@tanstack/react-virtual`).       |
 | `stickyDraftRow`   | `true`  | Keep the add-row draft pinned to the bottom of the viewport instead of the body.   |
 
+
+### Row deletion
+
+`rowDelete` only enables the delete triggers (toolbar and per-row trash button). Confirmation UI and success/error toasts belong to the host:
+
+```tsx
+<DataTable
+  features={{ rowDelete: true }}
+  onDeleteRows={({ rows, commit }) => {
+    if (!window.confirm(`Delete ${rows.length} row(s)?`)) {
+      return;
+    }
+
+    void commit()
+      .then(({ undo }) => {
+        toast.message("Rows deleted", {
+          action: undo
+            ? { label: "Undo", onClick: () => { void undo(); } }
+            : undefined
+        });
+      })
+      .catch((error) => {
+        toast.error(String(error));
+      });
+  }}
+/>
+```
+
+`commit()` applies the table's optimistic delete and calls `dataSource.deleteRows`. It does not show a dialog or toast. If `onDeleteRows` is omitted, deletion runs immediately and the library shows its own Sonner undo toast when `restoreRows` is provided.
 
 ---
 
@@ -1132,6 +1162,9 @@ type DataTableProps<TRow extends DataTableRowModel> = {
   surface?: "default" | "plain";
   className?: string;
   collaborators?: ReadonlyArray<CollaboratorPresence>;
+  defaultDraftRow?: Partial<TRow>;
+  renderToolbar?: (state: DataTableToolbarState) => ReactNode;
+  onDeleteRows?: (request: DataTableDeleteRequest<TRow>) => void;
   onActiveCellChange?: (cell: CollaboratorCellCoord | null) => void;
   onError?: DataTableOnError;
 };
@@ -1153,6 +1186,7 @@ type DataTableProps<TRow extends DataTableRowModel> = {
 | `surface`            | `"default" | "plain"`           | No       | `"default"`                             | Container visual style.                               |
 | `className`          | `string`                        | No       | —                                       | Additional CSS class on the table root.               |
 | `collaborators`      | `CollaboratorPresence[]`        | No       | —                                       | Other users' presence data.                           |
+| `onDeleteRows`       | `(request: DataTableDeleteRequest<TRow>) => void` | No       | —                                       | Host-owned delete confirmation. Call `request.commit()` after the user confirms. |
 | `onActiveCellChange` | `(cell | null) => void`         | No       | —                                       | Callback when the local user's active cell changes.   |
 | `onError`            | `(message: string) => void`     | No       | —                                       | Error callback for persistence and validation errors. |
 

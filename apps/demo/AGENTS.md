@@ -7,6 +7,7 @@ Demonstrate the DataTable package with realistic configuration and interactions.
 - Keep demo rows and data source deterministic.
 - Keep all supported column kinds represented.
 - Exercise key feature flags in demo usage (`editing`, `rowAdd`, `rowDelete`, `clipboardPaste`).
+- Row delete confirmation and toasts live in the demo (`delete-confirmation.tsx`) and are injected through `onDeleteRows`. Do not move that dialog back into the library.
 
 ## CSS integration
 

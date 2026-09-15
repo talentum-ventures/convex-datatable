@@ -17,6 +17,7 @@ Reusable DataTable implementation and public API.
 - Never export TanStack types from public surface.
 - Row schema contract is structural (`safeParse`) to avoid cross-package zod identity coupling.
 - Treat `stickyDraftRow` as part of the public `DataTableFeatureFlags` contract; row creation stays sticky by default unless consumers explicitly disable it.
+- `rowDelete` only enables delete triggers. Confirmation UI and toasts belong to the host via `onDeleteRows`; `commit()` performs the optimistic delete without showing library UI.
 
 ## CSS Build
 

@@ -11,6 +11,7 @@ import {
 } from "@talentum-ventures/convex-datatable";
 import { z } from "zod";
 import { applyServerQuery } from "./demo-query";
+import { useDeleteRowsConfirmation } from "./delete-confirmation";
 
 type DemoRow = {
   id: string;
@@ -510,6 +511,8 @@ export function InMemoryPage(): JSX.Element {
     [limit, rows]
   );
 
+  const { onDeleteRows, dialog } = useDeleteRowsConfirmation<DemoRow>(true);
+
   return (
     <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-hidden sm:gap-5">
       <section className="space-y-1 sm:space-y-2">
@@ -531,7 +534,9 @@ export function InMemoryPage(): JSX.Element {
           features={features}
           theme={theme}
           renderToolbar={renderDemoToolbar}
+          onDeleteRows={onDeleteRows}
         />
+        {dialog}
       </DataTableContainer>
     </div>
   );

@@ -351,6 +351,15 @@ export type DataTableDataSource<TRow extends DataTableRowModel> = {
 
 export type DataTableOnError = (message: string) => void;
 
+export type DataTableDeleteCommitResult = {
+  undo: (() => Promise<void>) | null;
+};
+
+export type DataTableDeleteRequest<TRow extends DataTableRowModel> = {
+  rows: ReadonlyArray<TRow>;
+  commit: () => Promise<DataTableDeleteCommitResult>;
+};
+
 export type DataTableToolbarState = {
   canAddRow: boolean;
   addRow: () => void;
@@ -432,6 +441,7 @@ export type DataTableProps<TRow extends DataTableRowModel> = {
   collaborators?: ReadonlyArray<CollaboratorPresence>;
   defaultDraftRow?: Partial<TRow>;
   renderToolbar?: (state: DataTableToolbarState) => ReactNode;
+  onDeleteRows?: (request: DataTableDeleteRequest<TRow>) => void;
   onActiveCellChange?: (cell: CollaboratorCellCoord | null) => void;
   onError?: DataTableOnError;
 };

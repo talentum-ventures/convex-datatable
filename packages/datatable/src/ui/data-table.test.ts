@@ -1,10 +1,11 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { createElement, useMemo, useState } from "react";
+import { createElement, Fragment, useMemo, useState } from "react";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type {
   CollaboratorCellCoord,
   DataTableColumn,
   DataTableDataSource,
+  DataTableDeleteRequest,
   DataTableProps
 } from "../core/types";
 import { DataTable, canHandleGridPaste, shouldCenterHeaderContent } from "./data-table";
@@ -90,14 +91,17 @@ function createMutableToolbarDataSource(
 }
 
 function ToolbarHarness({
-  renderToolbar
+  renderToolbar,
+  injectDeleteConfirmation = true
 }: {
   renderToolbar?: DataTableProps<ToolbarRow>["renderToolbar"];
+  injectDeleteConfirmation?: boolean;
 }): JSX.Element {
   const [rows, setRows] = useState<ReadonlyArray<ToolbarRow>>([
     { id: "row-1", name: "Alpha", amount: 10 },
     { id: "row-2", name: "Beta", amount: 20 }
   ]);
+  const [pendingDelete, setPendingDelete] = useState<DataTableDeleteRequest<ToolbarRow> | null>(null);
 
   const dataSource = useMemo<DataTableDataSource<ToolbarRow>>(
     () => ({
@@ -126,19 +130,67 @@ function ToolbarHarness({
     [rows]
   );
 
-  return createElement(DataTable<ToolbarRow>, {
-    tableId: "toolbar-harness",
-    columns: toolbarColumns,
-    getRowId: (row: ToolbarRow) => row.id,
-    dataSource,
-    features: {
-      rowAdd: true,
-      rowDelete: true,
-      columnVisibility: true,
-      virtualization: false
-    },
-    ...(renderToolbar ? { renderToolbar } : {})
-  });
+  return createElement(
+    Fragment,
+    null,
+    createElement(DataTable<ToolbarRow>, {
+      tableId: "toolbar-harness",
+      columns: toolbarColumns,
+      getRowId: (row: ToolbarRow) => row.id,
+      dataSource,
+      features: {
+        rowAdd: true,
+        rowDelete: true,
+        columnVisibility: true,
+        virtualization: false
+      },
+      ...(injectDeleteConfirmation
+        ? {
+            onDeleteRows: (request: DataTableDeleteRequest<ToolbarRow>) => {
+              setPendingDelete(request);
+            }
+          }
+        : {}),
+      ...(renderToolbar ? { renderToolbar } : {})
+    }),
+    pendingDelete
+      ? createElement(
+          "div",
+          {
+            role: "alertdialog",
+            "aria-labelledby": "toolbar-delete-title",
+            "aria-modal": true
+          },
+          createElement(
+            "h2",
+            { id: "toolbar-delete-title" },
+            pendingDelete.rows.length > 1 ? `Delete ${pendingDelete.rows.length} rows?` : "Delete row?"
+          ),
+          createElement(
+            "button",
+            {
+              type: "button",
+              onClick: () => {
+                setPendingDelete(null);
+              }
+            },
+            "Cancel"
+          ),
+          createElement(
+            "button",
+            {
+              type: "button",
+              onClick: () => {
+                const request = pendingDelete;
+                setPendingDelete(null);
+                void request.commit();
+              }
+            },
+            "Delete"
+          )
+        )
+      : null
+  );
 }
 
 const originalResizeObserver = globalThis.ResizeObserver;
@@ -628,5 +680,16 @@ describe("DataTable toolbar rendering", () => {
       expect(screen.queryByRole("alertdialog", { name: "Delete row?" })).toBeNull();
     });
     expect(screen.queryByText("Alpha")).not.toBeNull();
+  });
+
+  it("deletes immediately when onDeleteRows is omitted", async () => {
+    render(createElement(ToolbarHarness, { injectDeleteConfirmation: false }));
+
+    fireEvent.click(screen.getByLabelText("Delete row row-1"));
+
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByText("Alpha")).toBeNull();
+    });
   });
 });

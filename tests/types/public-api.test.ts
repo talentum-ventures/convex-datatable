@@ -6,6 +6,8 @@ import type {
   ConvexPresenceConfig,
   DataTableColumn,
   DataTableDataSource,
+  DataTableDeleteCommitResult,
+  DataTableDeleteRequest,
   DataTableFilter,
   DataTableFeatureFlags,
   DataTableProps,
@@ -165,6 +167,10 @@ const props: DataTableProps<InvoiceRow> = {
   renderToolbar: (state) => {
     expectTypeOf(state).toEqualTypeOf<DataTableToolbarState>();
     return state.hiddenColumns.length;
+  },
+  onDeleteRows: (request) => {
+    expectTypeOf(request).toEqualTypeOf<DataTableDeleteRequest<InvoiceRow>>();
+    expectTypeOf(request.commit).returns.toEqualTypeOf<Promise<DataTableDeleteCommitResult>>();
   }
 };
 

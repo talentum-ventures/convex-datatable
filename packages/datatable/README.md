@@ -34,7 +34,7 @@ Scanning installed package files is toolchain-dependent, so the explicit CSS imp
 
 ## Toasts (Sonner)
 
-The library uses [Sonner](https://sonner.emilkowal.ski/) for validation errors, clipboard feedback, row CRUD status, and delete undo. Mount `<Toaster />` once in your app root:
+The library uses [Sonner](https://sonner.emilkowal.ski/) for validation errors, clipboard feedback, and row create/update status. Row delete confirmation and delete toasts should be injected via `onDeleteRows` so the host can use its own dialog and toast stack. Mount `<Toaster />` once in your app root if you still rely on library toasts:
 
 ```tsx
 import { Toaster } from "sonner";

@@ -1,12 +1,17 @@
-import { useLayoutEffect, useRef } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Button } from "./primitives";
+import { toast } from "sonner";
+import type {
+  DataTableDeleteRequest,
+  DataTableRowModel
+} from "@talentum-ventures/convex-datatable";
+
+const DELETE_TOAST_MS = 4000;
 
 export type ConfirmDialogProps = {
   title: string;
   description: string;
   confirmLabel: string;
-  cancelLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -34,7 +39,6 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel,
-  cancelLabel = "Cancel",
   onConfirm,
   onCancel
 }: ConfirmDialogProps): JSX.Element | null {
@@ -88,26 +92,83 @@ export function ConfirmDialog({
           {description}
         </p>
         <div className="mt-4 flex justify-end gap-2">
-          <Button
+          <button
             ref={cancelRef}
             type="button"
-            variant="secondary"
-            size="sm"
+            className="inline-flex h-8 items-center justify-center rounded-md bg-slate-100 px-3 text-sm font-medium text-slate-800 hover:bg-slate-200"
             onClick={onCancel}
           >
-            {cancelLabel}
-          </Button>
-          <Button
+            Cancel
+          </button>
+          <button
             type="button"
-            variant="destructive"
-            size="sm"
+            className="inline-flex h-8 items-center justify-center rounded-md bg-rose-600 px-3 text-sm font-medium text-white hover:bg-rose-700"
             onClick={onConfirm}
           >
             {confirmLabel}
-          </Button>
+          </button>
         </div>
       </div>
     </div>,
     portalRoot
   );
+}
+
+export function useDeleteRowsConfirmation<TRow extends DataTableRowModel>(
+  canUndo: boolean
+): {
+  onDeleteRows: (request: DataTableDeleteRequest<TRow>) => void;
+  dialog: JSX.Element | null;
+} {
+  const [pending, setPending] = useState<DataTableDeleteRequest<TRow> | null>(null);
+
+  const onDeleteRows = useCallback((request: DataTableDeleteRequest<TRow>) => {
+    setPending(request);
+  }, []);
+
+  const handleCancel = useCallback(() => {
+    setPending(null);
+  }, []);
+
+  const handleConfirm = useCallback(() => {
+    if (!pending) {
+      return;
+    }
+
+    const request = pending;
+    setPending(null);
+    void request
+      .commit()
+      .then(({ undo }) => {
+        toast.message(`${request.rows.length} row${request.rows.length > 1 ? "s" : ""} deleted`, {
+          duration: DELETE_TOAST_MS,
+          action: undo
+            ? {
+                label: "Undo",
+                onClick: () => {
+                  void undo().catch((error) => {
+                    toast.error(`Failed to restore rows: ${String(error)}`);
+                  });
+                }
+              }
+            : undefined
+        });
+      })
+      .catch((error) => {
+        toast.error(`Failed to delete rows: ${String(error)}`);
+      });
+  }, [pending]);
+
+  const copy = deleteConfirmationCopy(pending?.rows.length ?? 0, canUndo);
+  const dialog = pending ? (
+    <ConfirmDialog
+      title={copy.title}
+      description={copy.description}
+      confirmLabel="Delete"
+      onConfirm={handleConfirm}
+      onCancel={handleCancel}
+    />
+  ) : null;
+
+  return { onDeleteRows, dialog };
 }
