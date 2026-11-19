@@ -17,6 +17,11 @@ export type DefaultEditorProps<TRow extends DataTableRowModel> = {
   onCancel: () => void;
 };
 
+/** Editors that render a popover and must not be clipped by their cell. */
+export function editorOverflowsCell(kind: DataTableColumn<DataTableRowModel>["kind"]): boolean {
+  return kind === "select" || kind === "multiselect" || kind === "date";
+}
+
 export function parseEditorValue<TRow extends DataTableRowModel>(
   column: DataTableColumn<TRow>,
   raw: string,

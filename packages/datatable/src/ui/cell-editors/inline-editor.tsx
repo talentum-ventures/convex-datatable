@@ -97,8 +97,9 @@ export function InlineContentEditor<TRow extends DataTableRowModel>({
         spellCheck={column.kind === "text" || column.kind === "longText"}
         className={cn(
           "h-full min-h-8 w-full cursor-text whitespace-pre-wrap break-words bg-transparent text-sm text-slate-900 outline-none",
-          column.kind === "text" || column.kind === "number" || column.kind === "currency" || column.kind === "link"
-            ? "whitespace-nowrap"
+          // Text wraps like its rendered value; single-line kinds scroll within the cell.
+          column.kind === "number" || column.kind === "currency" || column.kind === "link"
+            ? "overflow-hidden whitespace-nowrap"
             : ""
         )}
         onInput={(event) => {

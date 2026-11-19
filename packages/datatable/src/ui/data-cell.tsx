@@ -24,6 +24,7 @@ import {
   renderEditableIndicator,
   renderEditIndicator
 } from "../engine/column-def-builder.js";
+import { editorOverflowsCell } from "./cell-editors/shared.js";
 
 export type DataCellProps<TRow extends DataTableRowModel> = {
   column: DataTableColumn<TRow>;
@@ -77,9 +78,7 @@ const DataCellInner = <TRow extends DataTableRowModel>({
   };
   const canEdit = enableEditing && (column.isEditable ?? false);
   const hasCollaborators = collaboratorsInCell.length > 0;
-  const shouldAllowOverflow = hasCollaborators || (
-    isEditing && (column.kind === "select" || column.kind === "multiselect" || column.kind === "date")
-  );
+  const shouldAllowOverflow = hasCollaborators || (isEditing && editorOverflowsCell(column.kind));
 
   const content = isEditing
     ? renderColumnEditor({
