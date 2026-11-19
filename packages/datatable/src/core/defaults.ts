@@ -3,7 +3,7 @@ import type {
   DataTableQueryState,
   DataTableThemeTokens,
   PersistedTableState
-} from "./types";
+} from "./types.js";
 
 export const DEFAULT_PAGE_SIZE = 50;
 export const DEFAULT_OVERSCAN = 8;

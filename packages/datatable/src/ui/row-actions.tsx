@@ -1,13 +1,13 @@
 import { MoreVertical, Trash2 } from "lucide-react";
-import { cn } from "../core/cn";
+import { cn } from "../core/cn.js";
 import type {
   DataTableProps,
   DataTableRowAction,
   DataTableRowActionWithIcon,
   DataTableRowModel,
   RowId
-} from "../core/types";
-import { Button } from "./primitives";
+} from "../core/types.js";
+import { Button } from "./primitives.js";
 
 export type RowActionsPresentation = "compact" | "menu";
 

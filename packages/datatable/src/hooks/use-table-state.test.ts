@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { useTableState } from "./use-table-state";
+import { useTableState } from "./use-table-state.js";
 
 describe("useTableState", () => {
   beforeEach(() => {

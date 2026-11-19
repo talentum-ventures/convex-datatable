@@ -1,12 +1,12 @@
 import { useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, ChevronUp, EyeOff, Pin, PinOff } from "lucide-react";
-import type { FilterOperator, DataTableColumn, DataTableRowModel } from "../core/types";
-import { filterOperatorsForColumn, resolveAllowEmptyFilter } from "../core/filtering";
-import { getStaticOptions } from "../core/select-options";
-import type { ColumnMenuAnchor } from "../hooks/use-table-columns";
-import { useHeaderMenuPosition } from "../hooks/use-header-menu-position";
-import { Button, Checkbox, Input } from "./primitives";
+import type { FilterOperator, DataTableColumn, DataTableRowModel } from "../core/types.js";
+import { filterOperatorsForColumn, resolveAllowEmptyFilter } from "../core/filtering.js";
+import { getStaticOptions } from "../core/select-options.js";
+import type { ColumnMenuAnchor } from "../hooks/use-table-columns.js";
+import { useHeaderMenuPosition } from "../hooks/use-header-menu-position.js";
+import { Button, Checkbox, Input } from "./primitives.js";
 
 export type ColumnMenuProps<TRow extends DataTableRowModel> = {
   column: DataTableColumn<TRow>;

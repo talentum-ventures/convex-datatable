@@ -1,6 +1,6 @@
-import type { SelectOption } from "../../core/types";
-import { cn } from "../../core/cn";
-import { findOptionByValue } from "../../core/select-options";
+import type { SelectOption } from "../../core/types.js";
+import { cn } from "../../core/cn.js";
+import { findOptionByValue } from "../../core/select-options.js";
 
 export type MultiSelectBadgesProps = {
   columnId: string;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { validateCell, validateRow } from "./validation";
-import type { DataTableColumn } from "./types";
+import { validateCell, validateRow } from "./validation.js";
+import type { DataTableColumn } from "./types.js";
 
 type Row = {
   id: string;

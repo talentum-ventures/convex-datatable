@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
-import { DEFAULT_MIN_ROW_HEIGHT } from "../core/defaults";
-import type { RowId } from "../core/types";
+import { DEFAULT_MIN_ROW_HEIGHT } from "../core/defaults.js";
+import type { RowId } from "../core/types.js";
 
 export type UseRowHeightsArgs = {
   minRowHeight: number | undefined;

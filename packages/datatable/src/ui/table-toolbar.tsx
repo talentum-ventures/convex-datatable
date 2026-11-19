@@ -1,8 +1,8 @@
 import { memo } from "react";
 import { ChevronDown, Copy, LoaderCircle, Plus, Rows3, Trash2 } from "lucide-react";
-import { cn } from "../core/cn";
-import type { DataTableToolbarState } from "../core/types";
-import { Button } from "./primitives";
+import { cn } from "../core/cn.js";
+import type { DataTableToolbarState } from "../core/types.js";
+import { Button } from "./primitives.js";
 
 export type TableToolbarProps = {
   canAddRow: boolean;

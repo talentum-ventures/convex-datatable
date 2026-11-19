@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   useDropdownPosition,
   type NodeContainerRef
-} from "./use-dropdown-position";
+} from "./use-dropdown-position.js";
 
 const originalResizeObserver = globalThis.ResizeObserver;
 const originalInnerHeight = window.innerHeight;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { expandPasteMatrix, parseTsv, serializeTsv } from "./clipboard";
-import { normalizeRange, selectionDimensions } from "./range";
+import { expandPasteMatrix, parseTsv, serializeTsv } from "./clipboard.js";
+import { normalizeRange, selectionDimensions } from "./range.js";
 
 describe("selection helpers", () => {
   it("normalizes selection ranges", () => {

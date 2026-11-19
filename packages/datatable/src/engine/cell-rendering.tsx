@@ -1,17 +1,17 @@
 import type { ReactNode } from "react";
 import { Check, ExternalLink, Link as LinkIcon, Pencil } from "lucide-react";
-import { cn } from "../core/cn";
-import { formatColumnValue } from "../core/formatters";
-import { findOptionByValue, resolveOptions } from "../core/select-options";
+import { cn } from "../core/cn.js";
+import { formatColumnValue } from "../core/formatters.js";
+import { findOptionByValue, resolveOptions } from "../core/select-options.js";
 import type {
   DataTableCellValue,
   DataTableColumn,
   DataTableReactValue,
   DataTableRowModel,
   RowId
-} from "../core/types";
-import { DefaultEditor } from "../ui/cell-editors";
-import { MultiSelectBadges } from "../ui/cell-renderers";
+} from "../core/types.js";
+import { DefaultEditor } from "../ui/cell-editors/index.js";
+import { MultiSelectBadges } from "../ui/cell-renderers/index.js";
 
 export type SharedCellContentArgs<TRow extends DataTableRowModel> = {
   column: DataTableColumn<TRow>;

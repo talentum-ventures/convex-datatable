@@ -1,15 +1,15 @@
 import { Check, Pencil, X } from "lucide-react";
 import type { Column } from "@tanstack/react-table";
 import { useRef, type CSSProperties } from "react";
-import { cn } from "../core/cn";
+import { cn } from "../core/cn.js";
 import type {
   DataTableCellValue,
   DataTableColumn,
   DataTableRowModel
-} from "../core/types";
-import { renderColumnContent, renderColumnEditor } from "../engine/column-def-builder";
-import type { ColumnLayoutResult } from "./column-layout";
-import { Button } from "./primitives";
+} from "../core/types.js";
+import { renderColumnContent, renderColumnEditor } from "../engine/column-def-builder.js";
+import type { ColumnLayoutResult } from "./column-layout.js";
+import { Button } from "./primitives.js";
 
 function draftRowPinnedCellLayout<TRow extends DataTableRowModel>(
   column: Column<TRow, DataTableCellValue>,

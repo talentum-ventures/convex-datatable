@@ -8,10 +8,10 @@ import {
   type SetStateAction
 } from "react";
 import { toast } from "sonner";
-import type { CellCommit } from "../engine/column-def-builder";
-import { getColumnValue, setColumnValue } from "../core/column-utils";
-import { DELETE_UNDO_MS } from "../core/defaults";
-import { validateCell, validateRow } from "../core/validation";
+import type { CellCommit } from "../engine/column-def-builder.js";
+import { getColumnValue, setColumnValue } from "../core/column-utils.js";
+import { DELETE_UNDO_MS } from "../core/defaults.js";
+import { validateCell, validateRow } from "../core/validation.js";
 import type {
   DataTableCellValue,
   DataTableColumn,
@@ -21,8 +21,8 @@ import type {
   EditingCellState,
   RowId,
   RowSchema
-} from "../core/types";
-import { type UseUndoStackResult } from "./use-undo-stack";
+} from "../core/types.js";
+import { type UseUndoStackResult } from "./use-undo-stack.js";
 
 export function hasDraftCellValue(value: DataTableCellValue): boolean {
   if (Array.isArray(value)) {

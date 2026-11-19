@@ -4,7 +4,7 @@ import type {
   DataTableRowModel,
   RowPatch,
   RowId
-} from "./types";
+} from "./types.js";
 
 export function orderColumns<TRow extends DataTableRowModel>(
   columns: ReadonlyArray<DataTableColumn<TRow>>,

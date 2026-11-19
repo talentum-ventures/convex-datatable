@@ -7,7 +7,7 @@ import type {
   WithoutSystemFields
 } from "convex/server";
 import { v, type GenericId } from "convex/values";
-import type { ConvexPresenceEntry } from "../core/types";
+import type { ConvexPresenceEntry } from "../core/types.js";
 
 const DEFAULT_PRESENCE_STALE_AFTER_MS = 30_000;
 

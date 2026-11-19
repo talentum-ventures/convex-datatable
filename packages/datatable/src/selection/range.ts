@@ -1,4 +1,4 @@
-import type { CellCoord, CellRange } from "../core/types";
+import type { CellCoord, CellRange } from "../core/types.js";
 
 export function normalizeRange(range: CellRange): CellRange {
   return {

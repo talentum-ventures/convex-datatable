@@ -1,5 +1,5 @@
 import { createContext, useContext, useSyncExternalStore } from "react";
-import type { ColumnId, CollaboratorPresence, RowId } from "./types";
+import type { ColumnId, CollaboratorPresence, RowId } from "./types.js";
 
 const EMPTY_COLLABORATORS: ReadonlyArray<CollaboratorPresence> = [];
 

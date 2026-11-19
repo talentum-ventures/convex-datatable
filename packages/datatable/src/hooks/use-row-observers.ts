@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef } from "react";
-import type { RowId } from "../core/types";
+import type { RowId } from "../core/types.js";
 
 export function useRowObservers(): {
   connect: (rowId: RowId, node: HTMLTableRowElement | null, onResize: (height: number) => void) => void;

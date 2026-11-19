@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DELETE_UNDO_MS, DEFAULT_FEATURE_FLAGS, DEFAULT_PAGE_SIZE, DEFAULT_THEME_TOKENS } from "./defaults";
+import { DELETE_UNDO_MS, DEFAULT_FEATURE_FLAGS, DEFAULT_PAGE_SIZE, DEFAULT_THEME_TOKENS } from "./defaults.js";
 
 describe("defaults", () => {
   it("uses productive-safe feature profile", () => {

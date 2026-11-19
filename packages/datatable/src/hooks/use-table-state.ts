@@ -16,18 +16,18 @@ import type {
   Updater,
   VisibilityState
 } from "@tanstack/react-table";
-import type { DataTableOnError, PersistedTableState } from "../core/types";
+import type { DataTableOnError, PersistedTableState } from "../core/types.js";
 import {
   buildManagedColumnOrder,
   buildManagedColumnPinning,
   sanitizeDataColumnOrder,
   sanitizeDataColumnPinning
-} from "../engine/managed-columns";
+} from "../engine/managed-columns.js";
 import {
   internalToPersistedState,
   persistedStateToInternal
-} from "../engine/state-converters";
-import { usePersistedState } from "../persistence/use-persisted-state";
+} from "../engine/state-converters.js";
+import { usePersistedState } from "../persistence/use-persisted-state.js";
 
 function applyUpdater<TValue>(updater: Updater<TValue>, current: TValue): TValue {
   if (typeof updater === "function") {

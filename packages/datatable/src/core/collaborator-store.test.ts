@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { CollaboratorStore } from "./collaborator-store";
-import type { CollaboratorPresence } from "./types";
+import { CollaboratorStore } from "./collaborator-store.js";
+import type { CollaboratorPresence } from "./types.js";
 
 function collaborator(args: {
   userId: string;

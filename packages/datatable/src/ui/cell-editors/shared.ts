@@ -1,10 +1,10 @@
-import { parseDateValue, parseTextNumber } from "../../core/formatters";
+import { parseDateValue, parseTextNumber } from "../../core/formatters.js";
 import type {
   DataTableCellValue,
   DataTableColumn,
   DataTableRowModel
-} from "../../core/types";
-import type { NodeContainerRef } from "../../hooks/use-dropdown-position";
+} from "../../core/types.js";
+import type { NodeContainerRef } from "../../hooks/use-dropdown-position.js";
 
 export type DefaultEditorProps<TRow extends DataTableRowModel> = {
   column: DataTableColumn<TRow>;

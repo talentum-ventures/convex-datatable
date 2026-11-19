@@ -1,22 +1,22 @@
 import { memo, useEffect, useRef } from "react";
 import { flexRender, type Table } from "@tanstack/react-table";
 import { ChevronDown, ChevronUp, Filter, FilterX, GripVertical, MoreVertical } from "lucide-react";
-import { cn } from "../core/cn";
-import { isActiveFilterValue } from "../core/filtering";
+import { cn } from "../core/cn.js";
+import { isActiveFilterValue } from "../core/filtering.js";
 import type {
   DataTableColumn,
   DataTableFilter,
   DataTableRowModel,
   FilterOperator
-} from "../core/types";
-import type { ColumnLayoutResult } from "./column-layout";
+} from "../core/types.js";
+import type { ColumnLayoutResult } from "./column-layout.js";
 import type {
   ColumnMenuAnchor,
   DropPlacement
-} from "../hooks/use-table-columns";
-import { ACTIONS_COLUMN_ID } from "../engine/managed-columns";
-import { Button } from "./primitives";
-import { ColumnMenu } from "./column-menu";
+} from "../hooks/use-table-columns.js";
+import { ACTIONS_COLUMN_ID } from "../engine/managed-columns.js";
+import { Button } from "./primitives.js";
+import { ColumnMenu } from "./column-menu.js";
 
 function shouldCenterHeaderContent(columnId: string): boolean {
   return columnId === "__select__";

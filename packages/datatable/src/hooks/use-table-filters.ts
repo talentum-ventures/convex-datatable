@@ -10,17 +10,17 @@ import {
   defaultFilterOperatorForColumn,
   filterOperatorsForColumn,
   isActiveFilterValue
-} from "../core/filtering";
+} from "../core/filtering.js";
 import type {
   DataTableColumn,
   DataTableFilter,
   DataTableRowModel,
   FilterOperator
-} from "../core/types";
+} from "../core/types.js";
 import {
   fromTanStackFilters,
   toTanStackFilters
-} from "../engine/state-converters";
+} from "../engine/state-converters.js";
 
 export type UseTableFiltersArgs = {
   columnFilters: ColumnFiltersState;

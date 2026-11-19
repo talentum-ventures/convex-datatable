@@ -1,5 +1,5 @@
 import type { RowData, Table } from "@tanstack/react-table";
-import { isManagedUtilityColumnId } from "./managed-columns";
+import { isManagedUtilityColumnId } from "./managed-columns.js";
 
 export function getVisibleLeafColumnIdsInUiOrder<TRow extends RowData>(
   table: Table<TRow>

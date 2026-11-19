@@ -4,14 +4,14 @@ import type {
   DataTableReactValue,
   DataTableRowModel,
   SelectOption
-} from "./types";
-import { formatColumnValue, parseDateValue, parseTextNumber } from "./formatters";
+} from "./types.js";
+import { formatColumnValue, parseDateValue, parseTextNumber } from "./formatters.js";
 import {
   findOptionByValue,
   resolveMultiSelectTokens,
   resolveOptions,
   resolveOptionToken
-} from "./select-options";
+} from "./select-options.js";
 
 function optionLabel(options: ReadonlyArray<SelectOption>, value: string): string {
   return findOptionByValue(options, value)?.label ?? value;

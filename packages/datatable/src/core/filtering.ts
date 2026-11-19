@@ -1,6 +1,6 @@
-import { parseDateValue } from "./formatters";
-import { compareValues, comparableSortValue } from "./sorting";
-import type { DataTableCellValue, DataTableColumn, DataTableFilter, DataTableRowModel, FilterOperator } from "./types";
+import { parseDateValue } from "./formatters.js";
+import { compareValues, comparableSortValue } from "./sorting.js";
+import type { DataTableCellValue, DataTableColumn, DataTableFilter, DataTableRowModel, FilterOperator } from "./types.js";
 
 const TEXT_FILTER_OPERATORS: ReadonlyArray<FilterOperator> = [
   "contains",

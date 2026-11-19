@@ -5,11 +5,11 @@ import {
   type SetStateAction
 } from "react";
 import { toast } from "sonner";
-import { diffRows } from "../core/column-utils";
-import type { DataTableRowModel, EditingCellState, RowId, RowPatch } from "../core/types";
-import type { CellStore } from "../core/cell-store";
-import type { UseUndoStackResult, UndoEntry } from "./use-undo-stack";
-import { isEditableKeyboardTarget } from "./use-table-clipboard";
+import { diffRows } from "../core/column-utils.js";
+import type { DataTableRowModel, EditingCellState, RowId, RowPatch } from "../core/types.js";
+import type { CellStore } from "../core/cell-store.js";
+import type { UseUndoStackResult, UndoEntry } from "./use-undo-stack.js";
+import { isEditableKeyboardTarget } from "./use-table-clipboard.js";
 
 function mergePatchesIntoOptimistic<TRow extends DataTableRowModel>(
   current: Record<RowId, Partial<TRow>>,

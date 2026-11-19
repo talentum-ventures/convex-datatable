@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import type { ColumnMenuAnchor } from "./use-table-columns";
+import type { ColumnMenuAnchor } from "./use-table-columns.js";
 
 const HEADER_MENU_WIDTH_PX = 288;
 const HEADER_MENU_GAP_PX = 4;

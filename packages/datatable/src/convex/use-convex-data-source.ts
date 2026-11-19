@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DEFAULT_PAGE_SIZE } from "../core/defaults";
+import { DEFAULT_PAGE_SIZE } from "../core/defaults.js";
 import type {
   ConvexDataSourceConfig,
   DataTableDataSource,
   DataTableQueryState,
   DataTableRowModel
-} from "../core/types";
+} from "../core/types.js";
 
 function querySignature(state: DataTableQueryState): string {
   return JSON.stringify({

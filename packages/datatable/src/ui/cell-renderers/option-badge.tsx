@@ -1,5 +1,5 @@
-import type { SelectOption } from "../../core/types";
-import { cn } from "../../core/cn";
+import type { SelectOption } from "../../core/types.js";
+import { cn } from "../../core/cn.js";
 
 export type OptionBadgeProps = {
   option: SelectOption;

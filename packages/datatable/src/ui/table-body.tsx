@@ -12,16 +12,16 @@ import type {
   DataTableColumn,
   DataTableRowModel,
   RowId
-} from "../core/types";
-import { ACTIONS_COLUMN_ID } from "../engine/managed-columns";
+} from "../core/types.js";
+import { ACTIONS_COLUMN_ID } from "../engine/managed-columns.js";
 import {
   buildStaticVirtualItems,
   getStaticVirtualTotalHeight
-} from "../virtual/static-virtual-items";
-import type { UseRowHeightsResult } from "../virtual/row-heights";
-import type { ColumnLayoutResult } from "./column-layout";
-import { DraftRow } from "./draft-row";
-import { MemoRow } from "./memo-row";
+} from "../virtual/static-virtual-items.js";
+import type { UseRowHeightsResult } from "../virtual/row-heights.js";
+import type { ColumnLayoutResult } from "./column-layout.js";
+import { DraftRow } from "./draft-row.js";
+import { MemoRow } from "./memo-row.js";
 
 export type TableBodyHandle = {
   scrollToIndex: (index: number, align?: "auto" | "start" | "center" | "end") => void;

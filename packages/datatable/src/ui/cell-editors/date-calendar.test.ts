@@ -8,7 +8,7 @@ import {
   shiftCalendarMonth,
   todayIsoDate,
   weekdayLabels
-} from "./date-calendar";
+} from "./date-calendar.js";
 
 describe("date calendar helpers", () => {
   it("parses valid ISO dates and rejects invalid calendar days", () => {

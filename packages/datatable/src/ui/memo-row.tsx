@@ -1,13 +1,13 @@
 import { memo } from "react";
 import { flexRender, type Row } from "@tanstack/react-table";
-import { cn } from "../core/cn";
+import { cn } from "../core/cn.js";
 import type {
   DataTableRowModel,
   RowId
-} from "../core/types";
-import { ACTIONS_COLUMN_ID } from "../engine/managed-columns";
-import type { UseRowHeightsResult } from "../virtual/row-heights";
-import type { ColumnLayoutResult } from "./column-layout";
+} from "../core/types.js";
+import { ACTIONS_COLUMN_ID } from "../engine/managed-columns.js";
+import type { UseRowHeightsResult } from "../virtual/row-heights.js";
+import type { ColumnLayoutResult } from "./column-layout.js";
 
 export type MemoRowProps<TRow extends DataTableRowModel> = {
   rowModel: Row<TRow>;

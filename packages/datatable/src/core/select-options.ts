@@ -3,7 +3,7 @@ import type {
   MultiSelectColumn,
   SelectColumn,
   SelectOption
-} from "./types";
+} from "./types.js";
 
 type OptionColumn<TRow extends DataTableRowModel> =
   | SelectColumn<TRow>

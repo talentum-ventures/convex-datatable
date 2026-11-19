@@ -1,9 +1,9 @@
-import type { DataTableRowModel } from "../../core/types";
-import { DateEditor } from "./date-editor";
-import { InlineContentEditor } from "./inline-editor";
-import { MultiSelectMenuEditor } from "./multiselect-editor";
-import { SelectMenuEditor } from "./select-editor";
-import { editorTextValue, type DefaultEditorProps } from "./shared";
+import type { DataTableRowModel } from "../../core/types.js";
+import { DateEditor } from "./date-editor.js";
+import { InlineContentEditor } from "./inline-editor.js";
+import { MultiSelectMenuEditor } from "./multiselect-editor.js";
+import { SelectMenuEditor } from "./select-editor.js";
+import { editorTextValue, type DefaultEditorProps } from "./shared.js";
 
 export function DefaultEditor<TRow extends DataTableRowModel>({
   column,

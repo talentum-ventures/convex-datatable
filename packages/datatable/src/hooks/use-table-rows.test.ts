@@ -2,16 +2,16 @@ import { useState } from "react";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
-import { DELETE_UNDO_MS } from "../core/defaults";
-import { useUndoStack } from "./use-undo-stack";
-import { useTableRows } from "./use-table-rows";
+import { DELETE_UNDO_MS } from "../core/defaults.js";
+import { useUndoStack } from "./use-undo-stack.js";
+import { useTableRows } from "./use-table-rows.js";
 import type {
   DataTableColumn,
   DataTableDataSource,
   DataTableRowModel,
   EditingCellState,
   RowSchema
-} from "../core/types";
+} from "../core/types.js";
 
 vi.mock("sonner", () => ({
   toast: {

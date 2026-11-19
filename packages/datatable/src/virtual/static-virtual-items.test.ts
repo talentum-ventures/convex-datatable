@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildStaticVirtualItems, getStaticVirtualTotalHeight } from "./static-virtual-items";
+import { buildStaticVirtualItems, getStaticVirtualTotalHeight } from "./static-virtual-items.js";
 
 describe("static virtual items", () => {
   it("positions items cumulatively from measured row heights", () => {

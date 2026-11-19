@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { formatColumnValue, parseDateValue, parseTextNumber } from "./formatters";
-import type { DataTableColumn } from "./types";
+import { formatColumnValue, parseDateValue, parseTextNumber } from "./formatters.js";
+import type { DataTableColumn } from "./types.js";
 
 type Row = {
   id: string;

@@ -5,7 +5,7 @@ import type {
   SortingState,
   VisibilityState
 } from "@tanstack/react-table";
-import type { DataTableFilter, DataTableSort, PersistedTableState } from "../core/types";
+import type { DataTableFilter, DataTableSort, PersistedTableState } from "../core/types.js";
 
 const FILTER_PREFIX = "dtf1:";
 

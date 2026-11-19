@@ -1,5 +1,5 @@
-export { DataTable } from "./ui/data-table";
-export { DataTableContainer } from "./ui/data-table-container";
+export { DataTable } from "./ui/data-table.js";
+export { DataTableContainer } from "./ui/data-table-container.js";
 export type {
   CellCoord,
   CellRange,
@@ -48,11 +48,11 @@ export type {
   SortDirection,
   StringKey,
   TextColumn
-} from "./core/types";
-export { DEFAULT_FEATURE_FLAGS, DEFAULT_THEME_TOKENS, DEFAULT_PAGE_SIZE } from "./core/defaults";
+} from "./core/types.js";
+export { DEFAULT_FEATURE_FLAGS, DEFAULT_THEME_TOKENS, DEFAULT_PAGE_SIZE } from "./core/defaults.js";
 export {
   encodePersistedStateToUrl,
   decodePersistedStateFromUrl,
   mergePersistedState,
   storageKey
-} from "./persistence/query-codec";
+} from "./persistence/query-codec.js";
