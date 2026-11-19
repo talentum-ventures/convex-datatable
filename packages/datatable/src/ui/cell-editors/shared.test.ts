@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { editorOverflowsCell } from "./shared";
+import { editorOverflowsCell } from "./shared.js";
 
 describe("editorOverflowsCell", () => {
   it("only lets popover editors escape the cell", () => {
