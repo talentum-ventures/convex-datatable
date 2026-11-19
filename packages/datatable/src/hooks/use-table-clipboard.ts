@@ -1,14 +1,14 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
-import type { CellStore } from "../core/cell-store";
+import type { CellStore } from "../core/cell-store.js";
 import { toast } from "sonner";
 import {
   getColumnValue,
-} from "../core/column-utils";
+} from "../core/column-utils.js";
 import {
   parseClipboardToCellValue,
   serializeCellForClipboard
-} from "../core/cell-value";
-import { validateCell, validateRow } from "../core/validation";
+} from "../core/cell-value.js";
+import { validateCell, validateRow } from "../core/validation.js";
 import type {
   DataTableColumn,
   DataTableDataSource,
@@ -17,11 +17,11 @@ import type {
   RowId,
   RowPatch,
   RowSchema
-} from "../core/types";
-import { expandPasteMatrix, parseTsv, serializeTsv } from "../selection/clipboard";
-import { normalizeRange } from "../selection/range";
-import { cellRange } from "./use-table-selection";
-import type { UndoEntry, UseUndoStackResult } from "./use-undo-stack";
+} from "../core/types.js";
+import { expandPasteMatrix, parseTsv, serializeTsv } from "../selection/clipboard.js";
+import { normalizeRange } from "../selection/range.js";
+import { cellRange } from "./use-table-selection.js";
+import type { UndoEntry, UseUndoStackResult } from "./use-undo-stack.js";
 
 export type GridPasteEligibilityArgs = {
   clipboardPaste: boolean;

@@ -14,7 +14,7 @@ import {
   ACTIONS_COLUMN_ID,
   SELECT_COLUMN_ID,
   reorderDataColumnsByPinZone
-} from "../engine/managed-columns";
+} from "../engine/managed-columns.js";
 
 export type DropPlacement = "before" | "after";
 export type ColumnMenuAnchor = "left" | "right";

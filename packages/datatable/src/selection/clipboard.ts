@@ -1,5 +1,5 @@
-import type { CellRange } from "../core/types";
-import { normalizeRange } from "./range";
+import type { CellRange } from "../core/types.js";
+import { normalizeRange } from "./range.js";
 
 export function serializeTsv(values: ReadonlyArray<ReadonlyArray<string>>): string {
   return values.map((row) => row.join("\t")).join("\n");

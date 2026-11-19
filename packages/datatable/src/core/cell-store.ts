@@ -5,7 +5,7 @@ import {
   type Dispatch,
   type SetStateAction
 } from "react";
-import type { CellCoord, EditingCellState, RowId } from "./types";
+import type { CellCoord, EditingCellState, RowId } from "./types.js";
 
 type CellStoreSnapshot = {
   activeCell: CellCoord | null;

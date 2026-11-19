@@ -4,7 +4,7 @@ import type {
   CollaboratorPresence,
   ConvexPresenceConfig,
   ConvexPresenceEntry
-} from "../core/types";
+} from "../core/types.js";
 
 const DEFAULT_PRESENCE_DEBOUNCE_MS = 150;
 const DEFAULT_PRESENCE_HEARTBEAT_INTERVAL_MS = 10_000;

@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useHeaderMenuPosition } from "./use-header-menu-position";
+import { useHeaderMenuPosition } from "./use-header-menu-position.js";
 
 const originalResizeObserver = globalThis.ResizeObserver;
 const originalInnerWidth = window.innerWidth;

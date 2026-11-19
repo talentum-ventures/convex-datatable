@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { useUndoStack, type UndoEntry } from "./use-undo-stack";
+import { useUndoStack, type UndoEntry } from "./use-undo-stack.js";
 
 type TestRow = {
   id: string;

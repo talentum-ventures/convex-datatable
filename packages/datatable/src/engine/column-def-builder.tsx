@@ -5,9 +5,9 @@ export {
   renderEditIndicator,
   type SharedCellContentArgs,
   type SharedCellEditorArgs
-} from "./cell-rendering";
+} from "./cell-rendering.js";
 export {
   useColumnDefs,
   type BuildColumnsArgs,
   type CellCommit
-} from "./build-columns";
+} from "./build-columns.js";

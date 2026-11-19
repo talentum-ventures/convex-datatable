@@ -1,3 +1,3 @@
-export { DataTable } from "./data-table";
-export { DataTableContainer } from "./data-table-container";
-export { Button, Input, Checkbox, Badge } from "./primitives";
+export { DataTable } from "./data-table.js";
+export { DataTableContainer } from "./data-table-container.js";
+export { Button, Input, Checkbox, Badge } from "./primitives.js";

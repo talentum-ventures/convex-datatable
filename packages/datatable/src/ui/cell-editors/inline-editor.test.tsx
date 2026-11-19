@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { DataTableCellValue, DataTableColumn } from "../../core/types";
-import { InlineContentEditor } from "./inline-editor";
+import type { DataTableCellValue, DataTableColumn } from "../../core/types.js";
+import { InlineContentEditor } from "./inline-editor.js";
 
 type TestRow = {
   id: string;

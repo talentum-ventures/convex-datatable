@@ -7,7 +7,7 @@ import {
   reorderDataColumnsByPinZone,
   sanitizeDataColumnOrder,
   sanitizeDataColumnPinning
-} from "./managed-columns";
+} from "./managed-columns.js";
 
 describe("managed columns", () => {
   it("strips managed utility columns from persisted data order", () => {

@@ -6,9 +6,9 @@ import type {
   DataTableColumn,
   DataTableRowModel,
   RowId,
-} from "../core/types";
-import { getVisibleDataColumnIdsInUiOrder } from "./visible-column-order";
-import { DataCell } from "../ui/data-cell";
+} from "../core/types.js";
+import { getVisibleDataColumnIdsInUiOrder } from "./visible-column-order.js";
+import { DataCell } from "../ui/data-cell.js";
 
 export type CellCommit<TRow extends DataTableRowModel> = (args: {
   row: TRow;

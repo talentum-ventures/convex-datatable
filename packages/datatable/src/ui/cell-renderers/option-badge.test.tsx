@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { OptionBadge } from "./option-badge";
+import { OptionBadge } from "./option-badge.js";
 
 describe("OptionBadge", () => {
   it("applies inline color styles when provided", () => {

@@ -4,8 +4,8 @@ import {
   encodePersistedStateToUrl,
   mergePersistedState,
   storageKey
-} from "./query-codec";
-import type { PersistedTableState } from "../core/types";
+} from "./query-codec.js";
+import type { PersistedTableState } from "../core/types.js";
 
 const fixtureState: PersistedTableState = {
   sorting: [{ columnId: "name", direction: "asc" }],

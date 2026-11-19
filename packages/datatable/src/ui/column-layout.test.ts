@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeColumnLayout, type ColumnLayoutInput } from "./column-layout";
+import { computeColumnLayout, type ColumnLayoutInput } from "./column-layout.js";
 
 function layout(columns: ReadonlyArray<ColumnLayoutInput>, containerWidth: number) {
   return computeColumnLayout({

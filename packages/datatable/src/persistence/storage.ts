@@ -1,5 +1,5 @@
-import type { DataTableOnError, PersistedTableState } from "../core/types";
-import { emptyPersistedState } from "./query-codec";
+import type { DataTableOnError, PersistedTableState } from "../core/types.js";
+import { emptyPersistedState } from "./query-codec.js";
 
 export function readPersistedState(
   key: string,

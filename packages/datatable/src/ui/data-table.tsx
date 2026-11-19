@@ -19,25 +19,25 @@ import { LoaderCircle } from "lucide-react";
 import {
   CellStore,
   CellStoreContext,
-} from "../core/cell-store";
+} from "../core/cell-store.js";
 import {
   CollaboratorStore,
   CollaboratorStoreContext
-} from "../core/collaborator-store";
+} from "../core/collaborator-store.js";
 import {
   DEFAULT_FEATURE_FLAGS,
   DEFAULT_MIN_ROW_HEIGHT,
   DEFAULT_OVERSCAN,
   DEFAULT_PAGE_SIZE,
   DEFAULT_THEME_TOKENS
-} from "../core/defaults";
-import { cn } from "../core/cn";
-import { applyClientQuery } from "../core/filtering";
+} from "../core/defaults.js";
+import { cn } from "../core/cn.js";
+import { applyClientQuery } from "../core/filtering.js";
 import {
   orderColumns,
-} from "../core/column-utils";
-import { useTableSelection } from "../hooks/use-table-selection";
-import { useUndoStack } from "../hooks/use-undo-stack";
+} from "../core/column-utils.js";
+import { useTableSelection } from "../hooks/use-table-selection.js";
+import { useUndoStack } from "../hooks/use-undo-stack.js";
 import type {
   CellCoord,
   CollaboratorCellCoord,
@@ -51,36 +51,36 @@ import type {
   DataTableThemeTokens,
   EditingCellState,
   RowId
-} from "../core/types";
+} from "../core/types.js";
 import {
   fromTanStackFilters,
   fromTanStackSorting
-} from "../engine/state-converters";
-import { useColumnDefs } from "../hooks/use-column-defs";
-import { canHandleGridPaste, useTableClipboard } from "../hooks/use-table-clipboard";
-import { useTableKeyboard } from "../hooks/use-table-keyboard";
-import { useTableFilters } from "../hooks/use-table-filters";
-import { useTableState } from "../hooks/use-table-state";
-import { useTableColumns } from "../hooks/use-table-columns";
-import { hasDraftCellValue, useTableRows } from "../hooks/use-table-rows";
-import { useRowObservers } from "../hooks/use-row-observers";
-import { useRowHeights } from "../virtual/row-heights";
-import { scrollCellIntoView } from "../virtual/scroll";
-import { computeColumnLayout } from "./column-layout";
-import { DraftRow } from "./draft-row";
-import { RowActions, resolveRowActionsInput } from "./row-actions";
-import { TableBody, type TableBodyHandle } from "./table-body";
-import { TableHeader } from "./table-header";
-import { TableToolbar } from "./table-toolbar";
+} from "../engine/state-converters.js";
+import { useColumnDefs } from "../hooks/use-column-defs.js";
+import { canHandleGridPaste, useTableClipboard } from "../hooks/use-table-clipboard.js";
+import { useTableKeyboard } from "../hooks/use-table-keyboard.js";
+import { useTableFilters } from "../hooks/use-table-filters.js";
+import { useTableState } from "../hooks/use-table-state.js";
+import { useTableColumns } from "../hooks/use-table-columns.js";
+import { hasDraftCellValue, useTableRows } from "../hooks/use-table-rows.js";
+import { useRowObservers } from "../hooks/use-row-observers.js";
+import { useRowHeights } from "../virtual/row-heights.js";
+import { scrollCellIntoView } from "../virtual/scroll.js";
+import { computeColumnLayout } from "./column-layout.js";
+import { DraftRow } from "./draft-row.js";
+import { RowActions, resolveRowActionsInput } from "./row-actions.js";
+import { TableBody, type TableBodyHandle } from "./table-body.js";
+import { TableHeader } from "./table-header.js";
+import { TableToolbar } from "./table-toolbar.js";
 import {
   ACTIONS_COLUMN_ID,
   SELECT_COLUMN_ID,
-} from "../engine/managed-columns";
-import { getVisibleDataColumnIdsInUiOrder, getVisibleLeafColumnIdsInUiOrder } from "../engine/visible-column-order";
-import { Checkbox } from "./primitives";
+} from "../engine/managed-columns.js";
+import { getVisibleDataColumnIdsInUiOrder, getVisibleLeafColumnIdsInUiOrder } from "../engine/visible-column-order.js";
+import { Checkbox } from "./primitives.js";
 
-export { applyClientQuery } from "../core/filtering";
-export { canHandleGridPaste } from "../hooks/use-table-clipboard";
+export { applyClientQuery } from "../core/filtering.js";
+export { canHandleGridPaste } from "../hooks/use-table-clipboard.js";
 
 export function shouldCenterHeaderContent(columnId: string): boolean {
   return columnId === SELECT_COLUMN_ID;

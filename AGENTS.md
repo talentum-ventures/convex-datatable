@@ -193,6 +193,7 @@ DataTable (data-table.tsx)
 - **Feature flags are independent** — never assume one flag implies another. The default profile is "productive-safe" (read-only features on, write features off).
 - **Never export TanStack types** from the public API surface.
 - **Row schema uses structural typing** (`safeParse` interface) to avoid cross-package Zod identity coupling.
+- **Relative imports in `packages/datatable/src` use explicit `.js` extensions** (e.g. `./ui/data-table.js`, `./convex/index.js`). `tsc` emits specifiers verbatim, and the package is `"type": "module"`, so extensionless paths break consumers on `node16`/`nodenext` and Node ESM. The package tsconfig uses `NodeNext` resolution so `bun run typecheck` rejects missing extensions.
 - **Preserve round-trip tests** for persistence/state conversion.
 - **Preserve parser/formatter tests** for clipboard and column values.
 - **Library CSS** — never remove `@tailwind base` from `packages/datatable/src/styles.css` (see [CSS Architecture](#css-architecture-packagesdatatable)); keep `corePlugins.preflight: false` in `packages/datatable/tailwind.config.ts`; keep the post-build `@layer datatable` wrap in the package `build` pipeline so host apps do not suffer cascade-order conflicts.

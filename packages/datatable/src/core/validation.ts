@@ -4,7 +4,7 @@ import type {
   DataTableReactValue,
   DataTableRowModel,
   RowSchema
-} from "./types";
+} from "./types.js";
 
 export type ValidationResult = {
   ok: boolean;

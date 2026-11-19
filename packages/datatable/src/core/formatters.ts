@@ -1,8 +1,8 @@
 import type {
   DataTableColumn,
   DataTableRowModel
-} from "./types";
-import { findOptionByValue, getStaticOptions, resolveOptions } from "./select-options";
+} from "./types.js";
+import { findOptionByValue, getStaticOptions, resolveOptions } from "./select-options.js";
 
 const COMMON_DATE_LOCALES = ["en-US", "en-GB", "pt-BR", "pt-PT", "es-ES", "fr-FR", "de-DE", "it-IT"];
 const monthLookupCache = new Map<string, ReadonlyMap<string, number>>();

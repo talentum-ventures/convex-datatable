@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { comparableSortValue, compareValues } from "./sorting";
+import { comparableSortValue, compareValues } from "./sorting.js";
 
 describe("sorting", () => {
   it("normalizes mixed cell values into sortable values", () => {

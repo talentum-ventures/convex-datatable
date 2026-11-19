@@ -7,8 +7,8 @@ import type {
   DataTableDataSource,
   DataTableDeleteRequest,
   DataTableProps
-} from "../core/types";
-import { DataTable, canHandleGridPaste, shouldCenterHeaderContent } from "./data-table";
+} from "../core/types.js";
+import { DataTable, canHandleGridPaste, shouldCenterHeaderContent } from "./data-table.js";
 
 type TestRow = {
   id: string;

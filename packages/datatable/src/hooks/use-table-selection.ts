@@ -1,6 +1,6 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
-import type { CellStore } from "../core/cell-store";
-import type { CellCoord } from "../core/types";
+import type { CellStore } from "../core/cell-store.js";
+import type { CellCoord } from "../core/types.js";
 
 export function cellRange(
   start: CellCoord | null,

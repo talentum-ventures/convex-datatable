@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { cn } from "../../core/cn";
-import type { DataTableRowModel } from "../../core/types";
-import { useDropdownPosition } from "../../hooks/use-dropdown-position";
-import { Button } from "../primitives";
+import { cn } from "../../core/cn.js";
+import type { DataTableRowModel } from "../../core/types.js";
+import { useDropdownPosition } from "../../hooks/use-dropdown-position.js";
+import { Button } from "../primitives.js";
 import {
   calendarMonthFromIso,
   formatIsoDateLabel,
@@ -13,8 +13,8 @@ import {
   shiftCalendarMonth,
   todayIsoDate,
   weekdayLabels
-} from "./date-calendar";
-import { containsInRefs, dateInputValue, parseEditorValue, type DefaultEditorProps } from "./shared";
+} from "./date-calendar.js";
+import { containsInRefs, dateInputValue, parseEditorValue, type DefaultEditorProps } from "./shared.js";
 
 export type DateEditorProps<TRow extends DataTableRowModel> = DefaultEditorProps<TRow> & {
   initialText: string;

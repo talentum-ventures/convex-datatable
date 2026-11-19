@@ -5,8 +5,8 @@ import type {
   DataTableOnError,
   DataTableSort,
   PersistedTableState
-} from "../core/types";
-import { EMPTY_PERSISTED_STATE } from "../core/defaults";
+} from "../core/types.js";
+import { EMPTY_PERSISTED_STATE } from "../core/defaults.js";
 
 function key(tableId: string, suffix: string): string {
   return `dt_${tableId}_${suffix}`;

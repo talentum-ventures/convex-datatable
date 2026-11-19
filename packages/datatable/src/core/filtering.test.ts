@@ -6,8 +6,8 @@ import {
   isActiveFilterValue,
   resolveAllowEmptyFilter,
   rowMatchesFilter
-} from "./filtering";
-import type { DataTableColumn } from "./types";
+} from "./filtering.js";
+import type { DataTableColumn } from "./types.js";
 
 type TestRow = {
   id: string;

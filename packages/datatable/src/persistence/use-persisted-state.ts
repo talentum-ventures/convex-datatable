@@ -2,15 +2,15 @@ import { useEffect, useMemo, useRef } from "react";
 import {
   STORAGE_WRITE_DEBOUNCE_MS,
   URL_WRITE_DEBOUNCE_MS
-} from "../core/defaults";
-import type { DataTableOnError, PersistedTableState } from "../core/types";
+} from "../core/defaults.js";
+import type { DataTableOnError, PersistedTableState } from "../core/types.js";
 import {
   decodePersistedStateFromUrl,
   encodePersistedStateToUrl,
   mergePersistedState,
   storageKey
-} from "./query-codec";
-import { readPersistedState, writePersistedState } from "./storage";
+} from "./query-codec.js";
+import { readPersistedState, writePersistedState } from "./storage.js";
 
 export type UsePersistedStateArgs = {
   tableId: string;

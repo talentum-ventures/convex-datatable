@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import { cn } from "../../core/cn";
-import type { DataTableRowModel } from "../../core/types";
+import { cn } from "../../core/cn.js";
+import type { DataTableRowModel } from "../../core/types.js";
 import {
   focusEditableAtEnd,
   focusEditableAtOffset,
@@ -9,7 +9,7 @@ import {
   readEditableText,
   setEditableText,
   type DefaultEditorProps
-} from "./shared";
+} from "./shared.js";
 
 export type InlineContentEditorProps<TRow extends DataTableRowModel> = DefaultEditorProps<TRow> & {
   initialText: string;

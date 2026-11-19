@@ -3,7 +3,7 @@ import type { Column, Table } from "@tanstack/react-table";
 import {
   getVisibleDataColumnIdsInUiOrder,
   getVisibleLeafColumnIdsInUiOrder
-} from "./visible-column-order";
+} from "./visible-column-order.js";
 
 type TestRow = {
   id: string;

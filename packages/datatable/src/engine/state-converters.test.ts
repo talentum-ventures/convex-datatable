@@ -12,8 +12,8 @@ import {
   toColumnVisibility,
   toTanStackFilters,
   toTanStackSorting
-} from "./state-converters";
-import type { PersistedTableState } from "../core/types";
+} from "./state-converters.js";
+import type { PersistedTableState } from "../core/types.js";
 
 describe("state converters", () => {
   it("converts sorting both directions", () => {

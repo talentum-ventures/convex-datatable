@@ -1,4 +1,4 @@
-import type { DataTableCellValue } from "./types";
+import type { DataTableCellValue } from "./types.js";
 
 export function comparableSortValue(raw: DataTableCellValue): string | number | boolean | null {
   if (raw instanceof Date) {

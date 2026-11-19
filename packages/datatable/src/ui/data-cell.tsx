@@ -1,29 +1,29 @@
 import { memo, type CSSProperties } from "react";
-import { cn } from "../core/cn";
+import { cn } from "../core/cn.js";
 import {
   useCellIsEditing,
   useCellIsInRange,
   useCellIsSelected,
   useCellStore
-} from "../core/cell-store";
+} from "../core/cell-store.js";
 import {
   useCollaboratorStore,
   useCollaboratorsForCell
-} from "../core/collaborator-store";
+} from "../core/collaborator-store.js";
 import type {
   CellCoord,
   DataTableCellValue,
   DataTableColumn,
   DataTableRowModel,
   RowId
-} from "../core/types";
+} from "../core/types.js";
 import {
   type CellCommit,
   renderColumnContent,
   renderColumnEditor,
   renderEditableIndicator,
   renderEditIndicator
-} from "../engine/column-def-builder";
+} from "../engine/column-def-builder.js";
 
 export type DataCellProps<TRow extends DataTableRowModel> = {
   column: DataTableColumn<TRow>;

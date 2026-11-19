@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   parseClipboardToCellValue,
   serializeCellForClipboard
-} from "./cell-value";
-import type { DataTableColumn } from "./types";
+} from "./cell-value.js";
+import type { DataTableColumn } from "./types.js";
 
 type Row = {
   id: string;

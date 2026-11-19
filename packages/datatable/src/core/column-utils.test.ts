@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { diffRows, setColumnValue } from "./column-utils";
+import { diffRows, setColumnValue } from "./column-utils.js";
 
 type TestRow = {
   id: string;

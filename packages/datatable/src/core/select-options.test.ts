@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { filterSelectOptionsBySearch, getStaticOptions, resolveOptions } from "./select-options";
-import type { DataTableColumn } from "./types";
+import { filterSelectOptionsBySearch, getStaticOptions, resolveOptions } from "./select-options.js";
+import type { DataTableColumn } from "./types.js";
 
 type Row = {
   id: string;

@@ -1,2 +1,2 @@
-export { MultiSelectBadges } from "./multiselect-badges";
-export { OptionBadge } from "./option-badge";
+export { MultiSelectBadges } from "./multiselect-badges.js";
+export { OptionBadge } from "./option-badge.js";

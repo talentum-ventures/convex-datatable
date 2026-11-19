@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check } from "lucide-react";
-import { cn } from "../../core/cn";
-import { filterSelectOptionsBySearch, resolveOptions } from "../../core/select-options";
-import type { DataTableColumn, DataTableRowModel } from "../../core/types";
-import { useDropdownPosition } from "../../hooks/use-dropdown-position";
-import { usePortaledListboxFocus } from "../../hooks/use-portaled-listbox-focus";
-import { MultiSelectBadges, OptionBadge } from "../cell-renderers";
-import { containsInRefs, multiSelectValues, type DefaultEditorProps } from "./shared";
+import { cn } from "../../core/cn.js";
+import { filterSelectOptionsBySearch, resolveOptions } from "../../core/select-options.js";
+import type { DataTableColumn, DataTableRowModel } from "../../core/types.js";
+import { useDropdownPosition } from "../../hooks/use-dropdown-position.js";
+import { usePortaledListboxFocus } from "../../hooks/use-portaled-listbox-focus.js";
+import { MultiSelectBadges, OptionBadge } from "../cell-renderers/index.js";
+import { containsInRefs, multiSelectValues, type DefaultEditorProps } from "./shared.js";
 
 export type MultiSelectMenuEditorProps<TRow extends DataTableRowModel> = DefaultEditorProps<TRow> & {
   column: Extract<DataTableColumn<TRow>, { kind: "multiselect" }>;

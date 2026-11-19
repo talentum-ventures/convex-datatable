@@ -5,7 +5,7 @@ import {
   resolvePresenceColor,
   toCollaboratorPresence,
   useConvexPresence
-} from "./use-convex-presence";
+} from "./use-convex-presence.js";
 
 describe("useConvexPresence", () => {
   beforeEach(() => {
