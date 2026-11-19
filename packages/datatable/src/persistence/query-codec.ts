@@ -214,6 +214,22 @@ function decodeWidths(
   return result;
 }
 
+function setListParam(
+  params: URLSearchParams,
+  name: string,
+  value: ReadonlyArray<ColumnId>
+): void {
+  if (value.length === 0) {
+    params.delete(name);
+    return;
+  }
+  params.set(name, encodeList(value));
+}
+
+/**
+ * Encodes table state into URL params. Empty/default entries are omitted
+ * (and any stale param for them removed) so the URL is not polluted.
+ */
 export function encodePersistedStateToUrl(
   tableId: string,
   state: PersistedTableState,
@@ -231,10 +247,10 @@ export function encodePersistedStateToUrl(
     next.append(key(tableId, "filter"), filterEntry);
   }
 
-  next.set(key(tableId, "order"), encodeList(state.columnOrder));
-  next.set(key(tableId, "pin_left"), encodeList(state.pinLeft));
-  next.set(key(tableId, "pin_right"), encodeList(state.pinRight));
-  next.set(key(tableId, "hidden"), encodeList(state.hiddenColumns));
+  setListParam(next, key(tableId, "order"), state.columnOrder);
+  setListParam(next, key(tableId, "pin_left"), state.pinLeft);
+  setListParam(next, key(tableId, "pin_right"), state.pinRight);
+  setListParam(next, key(tableId, "hidden"), state.hiddenColumns);
 
   next.delete(key(tableId, "width"));
   for (const widthEntry of encodeWidths(state.widths)) {

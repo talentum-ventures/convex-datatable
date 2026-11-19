@@ -38,6 +38,24 @@ describe("query codec", () => {
     expect(decodePersistedStateFromUrl("orders", params, undefined)).toEqual(state);
   });
 
+  it("omits empty state from the URL", () => {
+    const params = encodePersistedStateToUrl(
+      "orders",
+      {
+        sorting: [],
+        filters: [],
+        columnOrder: [],
+        pinLeft: [],
+        pinRight: [],
+        hiddenColumns: [],
+        widths: {}
+      },
+      new URLSearchParams("page=2&dt_orders_order=a%2Cb&dt_orders_hidden=")
+    );
+
+    expect(params.toString()).toBe("page=2");
+  });
+
   it("merges with URL precedence", () => {
     const merged = mergePersistedState(
       {

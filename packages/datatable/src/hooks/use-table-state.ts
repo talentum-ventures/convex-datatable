@@ -94,6 +94,13 @@ export type UseTableStateResult = {
   onRowSelectionChange: (updater: Updater<RowSelectionState>) => void;
 };
 
+function isSameOrder(
+  left: ReadonlyArray<string>,
+  right: ReadonlyArray<string>
+): boolean {
+  return left.length === right.length && left.every((id, index) => id === right[index]);
+}
+
 export function useTableState({
   tableId,
   dataColumnIds,
@@ -157,7 +164,10 @@ export function useTableState({
       internalToPersistedState({
         sorting,
         filters: columnFilters,
-        columnOrder: normalizedColumnOrder,
+        // The default order is not persisted so it does not pollute the URL.
+        columnOrder: isSameOrder(normalizedColumnOrder, dataColumnIds)
+          ? []
+          : normalizedColumnOrder,
         columnVisibility,
         columnPinning: normalizedColumnPinning,
         columnSizing
@@ -166,6 +176,7 @@ export function useTableState({
       columnFilters,
       columnSizing,
       columnVisibility,
+      dataColumnIds,
       normalizedColumnOrder,
       normalizedColumnPinning,
       sorting

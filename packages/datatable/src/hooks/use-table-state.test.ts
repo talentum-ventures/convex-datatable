@@ -30,4 +30,22 @@ describe("useTableState", () => {
 
     expect(result.current.reactTableState.columnOrder).toEqual(["status", "name", "amount"]);
   });
+
+  it("does not write default state to the URL", async () => {
+    window.history.replaceState(null, "", "/?page=2");
+
+    renderHook(() =>
+      useTableState({
+        tableId: "orders",
+        dataColumnIds: ["name", "status", "amount"],
+        includeSelectColumn: false,
+        includeActionsColumn: false,
+        onError: undefined
+      })
+    );
+
+    await new Promise((resolve) => window.setTimeout(resolve, 300));
+
+    expect(window.location.search).toBe("?page=2");
+  });
 });
