@@ -2462,6 +2462,30 @@ describe("DataTable component", () => {
     cy.get("tr[data-row-id='__draft__'] [role='gridcell'][data-column-id='amount']").contains("42");
   });
 
+  it("wraps long draft text inside its cell instead of overflowing", () => {
+    cy.mount(<DefaultDraftRowHarness tableId="cypress-table-draft-text-wrap" />);
+
+    const longTitle = "Conseguir uma conta da Azure para que eu faça o setup da integração com o sistema";
+    cy.contains("Add row").click();
+    cy.findByLabelText("Edit Title").type(longTitle);
+
+    cy.get("tr[data-row-id='__draft__'] [role='gridcell'][data-column-id='title']").then(($cell) => {
+      const cellEl = expectNodeExists($cell);
+      const editorEl = cellEl.querySelector("[role='textbox']");
+      expect(editorEl, "draft title editor").to.not.equal(null);
+      if (!editorEl) {
+        return;
+      }
+      const cellRect = cellEl.getBoundingClientRect();
+      const editorRect = editorEl.getBoundingClientRect();
+      expect(editorRect.right, "editor stays within the cell").to.be.at.most(cellRect.right + 1);
+      expect(editorEl.scrollWidth, "text wraps instead of scrolling horizontally").to.be.at.most(
+        editorEl.clientWidth + 1
+      );
+      expect(getComputedStyle(cellEl).overflow, "cell clips its content").to.equal("hidden");
+    });
+  });
+
   it("supports keyboard editing trigger", () => {
     cy.mount(<Harness tableId="cypress-table-keyboard" />);
 

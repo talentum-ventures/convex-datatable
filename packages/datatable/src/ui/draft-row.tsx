@@ -9,6 +9,7 @@ import type {
 } from "../core/types.js";
 import { renderColumnContent, renderColumnEditor } from "../engine/column-def-builder.js";
 import type { ColumnLayoutResult } from "./column-layout.js";
+import { editorOverflowsCell } from "./cell-editors/shared.js";
 import { Button } from "./primitives.js";
 
 function draftRowPinnedCellLayout<TRow extends DataTableRowModel>(
@@ -261,7 +262,8 @@ export function DraftRow<TRow extends DataTableRowModel>({
               data-column-index={draftColumnIndex}
               className={cn(
                 "group relative box-border h-full min-h-10 w-full min-w-0 px-2 py-1 text-sm text-slate-800",
-                isEditingDraftCell ? "z-20 overflow-visible bg-white" : "overflow-hidden",
+                isEditingDraftCell ? "z-20 bg-white" : "",
+                isEditingDraftCell && editorOverflowsCell(columnConfig.kind) ? "overflow-visible" : "overflow-hidden",
                 isEditingDraftCell ? "outline outline-2 outline-[var(--dt-active-cell-ring)] outline-offset-[-2px]" : ""
               )}
               onClick={() => {

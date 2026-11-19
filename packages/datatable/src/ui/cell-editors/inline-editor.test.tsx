@@ -79,4 +79,45 @@ describe("InlineContentEditor", () => {
 
     unmount();
   });
+  it("wraps text columns and keeps single-line kinds confined to the cell", () => {
+    const { unmount } = render(
+      <InlineContentEditor
+        column={textColumn}
+        row={{ id: "row-1", title: "Alpha" }}
+        value="Alpha"
+        initialText="Alpha"
+        onCommit={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+
+    const textEditor = screen.getByRole("textbox", { name: "Edit Title" });
+    expect(textEditor.className).toContain("whitespace-pre-wrap");
+    expect(textEditor.className).toContain("break-words");
+    expect(textEditor.className).not.toContain("whitespace-nowrap");
+    unmount();
+
+    const numberColumn: DataTableColumn<TestRow> = {
+      id: "title",
+      field: "title",
+      header: "Amount",
+      kind: "number",
+      isEditable: true
+    };
+
+    render(
+      <InlineContentEditor
+        column={numberColumn}
+        row={{ id: "row-1", title: "1" }}
+        value={1}
+        initialText="1"
+        onCommit={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+
+    const numberEditor = screen.getByRole("textbox", { name: "Edit Amount" });
+    expect(numberEditor.className).toContain("whitespace-nowrap");
+    expect(numberEditor.className).toContain("overflow-hidden");
+  });
 });
