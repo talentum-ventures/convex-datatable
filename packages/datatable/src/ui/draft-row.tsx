@@ -1,6 +1,6 @@
 import { Check, Pencil, X } from "lucide-react";
 import type { Column } from "@tanstack/react-table";
-import { useRef, type CSSProperties } from "react";
+import { useRef, type CSSProperties, type SyntheticEvent } from "react";
 import { cn } from "../core/cn.js";
 import type {
   DataTableCellValue,
@@ -39,6 +39,16 @@ function draftRowPinnedCellLayout<TRow extends DataTableRowModel>(
       ? "sticky z-10 shadow-[var(--dt-pinned-shadow)] [background:var(--dt-pinned-row-bg)] group-hover:[background:var(--dt-pinned-row-hover-bg)]"
       : "bg-slate-50"
   };
+}
+
+/**
+ * React bubbles synthetic events through portals along the component tree, so
+ * clicks inside a portaled editor (e.g. the date picker on `document.body`)
+ * reach the draft cell's handlers. Only treat events whose DOM target is
+ * actually inside the cell as cell interactions.
+ */
+function isEventFromCellDom(event: SyntheticEvent<HTMLElement>): boolean {
+  return event.target instanceof Node && event.currentTarget.contains(event.target);
 }
 
 export type DraftRowProps<TRow extends DataTableRowModel> = {
@@ -266,10 +276,16 @@ export function DraftRow<TRow extends DataTableRowModel>({
                 isEditingDraftCell && editorOverflowsCell(columnConfig.kind) ? "overflow-visible" : "overflow-hidden",
                 isEditingDraftCell ? "outline outline-2 outline-[var(--dt-active-cell-ring)] outline-offset-[-2px]" : ""
               )}
-              onClick={() => {
+              onClick={(event) => {
+                if (!isEventFromCellDom(event)) {
+                  return;
+                }
                 onBeginDraftEdit(columnConfig.id);
               }}
-              onDoubleClick={() => {
+              onDoubleClick={(event) => {
+                if (!isEventFromCellDom(event)) {
+                  return;
+                }
                 onBeginDraftEdit(columnConfig.id);
               }}
               onKeyDownCapture={(event) => {
@@ -282,6 +298,9 @@ export function DraftRow<TRow extends DataTableRowModel>({
                 shouldAdvanceDraftCellRef.current = event.key === "Tab" || isCommitEnter;
               }}
               onKeyDown={(event) => {
+                if (!isEventFromCellDom(event)) {
+                  return;
+                }
                 if (event.key === "Enter" || event.key === "F2") {
                   event.preventDefault();
                   onBeginDraftEdit(columnConfig.id);
