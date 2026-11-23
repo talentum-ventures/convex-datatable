@@ -682,6 +682,34 @@ describe("DataTable toolbar rendering", () => {
     expect(screen.queryByText("Alpha")).not.toBeNull();
   });
 
+  it("uses getRowLabel for row-scoped accessible labels", () => {
+    const rows: ReadonlyArray<ToolbarRow> = [{ id: "k57abc", name: "Alpha", amount: 10 }];
+    render(
+      createElement(DataTable<ToolbarRow>, {
+        tableId: "row-label",
+        columns: toolbarColumns,
+        getRowId: (row: ToolbarRow) => row.id,
+        getRowLabel: (row: ToolbarRow) => row.name,
+        dataSource: {
+          ...createMutableToolbarDataSource(rows),
+          deleteRows: async () => undefined
+        },
+        rowActions: [
+          { id: "open", label: "Open", onSelect: () => undefined },
+          { id: "archive", label: "Archive", onSelect: () => undefined }
+        ],
+        features: { rowDelete: true, virtualization: false }
+      })
+    );
+
+    expect(screen.getByLabelText("Select row Alpha")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Delete row Alpha" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Resize row Alpha" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Open actions for row Alpha" }));
+    expect(screen.getByRole("menu", { name: "Actions for row Alpha" })).toBeTruthy();
+    expect(screen.queryByLabelText(/k57abc/)).toBeNull();
+  });
+
   it("deletes immediately when onDeleteRows is omitted", async () => {
     render(createElement(ToolbarHarness, { injectDeleteConfirmation: false }));
 

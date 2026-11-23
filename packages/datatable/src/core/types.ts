@@ -170,6 +170,12 @@ export type ColumnCommon<
   /** Enables "Is empty" / "Is not empty" filters. Defaults to true for select and multiselect columns, false otherwise. */
   allowEmptyFilter?: boolean;
   accessor?: (row: TRow) => TValue;
+  /**
+   * Value used to order rows when this column is sorted, instead of the cell value.
+   * Use it for columns whose display order is not alphabetical (priorities, stages, ranks).
+   * Filters still read the cell value.
+   */
+  sortValue?: (row: TRow) => string | number | boolean | null;
   validator?: ColumnValidator<TRow, TValue>;
   parseInput?: (input: string, row: TRow) => TValue;
   serializeClipboard?: (value: TValue, row: TRow) => string;
@@ -427,6 +433,11 @@ export type DataTableProps<TRow extends DataTableRowModel> = {
   tableId: string;
   columns: ReadonlyArray<DataTableColumn<TRow>>;
   getRowId: (row: TRow) => RowId;
+  /**
+   * Human-readable row name used in row-scoped accessible labels
+   * ("Select row …", "Delete row …", "Resize row …", row action menus). Defaults to the row id.
+   */
+  getRowLabel?: (row: TRow) => string;
   dataSource: DataTableDataSource<TRow>;
   rowSchema?: RowSchema<TRow>;
   features?: DataTableFeatureFlags;

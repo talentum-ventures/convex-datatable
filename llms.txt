@@ -50,6 +50,7 @@ Required props:
 - `dataSource: DataTableDataSource<TRow>` — data fetching and mutation interface
 
 Optional props:
+- `getRowLabel?: (row: TRow) => string` — readable row name for row-scoped accessible labels ("Select row …", "Delete row …", "Resize row …", row actions); defaults to the row id
 - `features?: DataTableFeatureFlags` — toggles merged with defaults
 - `rowActions?: DataTableRowActionWithIcon<TRow> | ReadonlyArray<DataTableRowAction<TRow>>` — bare object = compact icon button (icon required); array = overflow menu
 - `rowSchema?: RowSchema<TRow>` — validation schema for draft rows (Zod-compatible `safeParse` interface)
@@ -69,7 +70,7 @@ Optional gradient-background wrapper for visual polish. Place DataTable as a chi
 
 ## Column Kinds
 
-All columns share: `id`, `field` (typed as keyof TRow), `header`, `kind`, and optional: `description`, `width`, `minWidth`, `maxWidth`, `isEditable`, `isResizable`, `isReorderable`, `isPinnable`, `isHideable`, `isSortable`, `isFilterable`, `accessor`, `validator`, `parseInput`, `serializeClipboard`, `parseClipboard`, `renderCell`, `renderEditor`.
+All columns share: `id`, `field` (typed as keyof TRow), `header`, `kind`, and optional: `description`, `width`, `minWidth`, `maxWidth`, `isEditable`, `isResizable`, `isReorderable`, `isPinnable`, `isHideable`, `isSortable`, `isFilterable`, `accessor`, `sortValue` (`(row) => string | number | boolean | null`, used instead of the cell value when sorting; filters still use the cell value), `validator`, `parseInput`, `serializeClipboard`, `parseClipboard`, `renderCell`, `renderEditor`.
 
 ### text
 Single-line text. Extra: `placeholder?: string`.

@@ -36,6 +36,7 @@ export function resolveRowActionsInput<TRow extends DataTableRowModel>(
 export type RowActionsProps<TRow extends DataTableRowModel> = {
   row: TRow;
   rowId: RowId;
+  rowLabel: string;
   rowActions: ReadonlyArray<DataTableRowAction<TRow>>;
   presentation: RowActionsPresentation;
   isMenuOpen: boolean;
@@ -48,6 +49,7 @@ export type RowActionsProps<TRow extends DataTableRowModel> = {
 export function RowActions<TRow extends DataTableRowModel>({
   row,
   rowId,
+  rowLabel,
   rowActions,
   presentation,
   isMenuOpen,
@@ -89,7 +91,7 @@ export function RowActions<TRow extends DataTableRowModel>({
             variant="ghost"
             size="sm"
             className="h-7 w-7 px-0"
-            aria-label={`Open actions for row ${rowId}`}
+            aria-label={`Open actions for row ${rowLabel}`}
             aria-haspopup="menu"
             data-row-action-menu-trigger={rowId}
             aria-expanded={isMenuOpen}
@@ -101,7 +103,7 @@ export function RowActions<TRow extends DataTableRowModel>({
           {isMenuOpen ? (
             <div
               role="menu"
-              aria-label={`Actions for row ${rowId}`}
+              aria-label={`Actions for row ${rowLabel}`}
               className="absolute right-0 top-full z-50 mt-1 min-w-40 rounded-md border border-slate-200 bg-white p-1 shadow-xl"
             >
               {rowActions.map((action) => (
@@ -130,7 +132,7 @@ export function RowActions<TRow extends DataTableRowModel>({
           variant="ghost"
           size="sm"
           className="h-7 w-7 px-0 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
-          aria-label={`Delete row ${rowId}`}
+          aria-label={`Delete row ${rowLabel}`}
           onClick={onDelete}
         >
           <Trash2 className="h-3.5 w-3.5" />
