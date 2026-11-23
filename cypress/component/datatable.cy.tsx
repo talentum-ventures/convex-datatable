@@ -1031,7 +1031,7 @@ function VirtualizedDeleteMeasuredRowsHarness({ tableId }: { tableId: string }):
   );
 }
 
-function DateHarness({ tableId }: { tableId: string }): JSX.Element {
+function DateHarness({ tableId, rowAdd = false }: { tableId: string; rowAdd?: boolean }): JSX.Element {
   const [rows, setRows] = useState<ReadonlyArray<DateRow>>([{ id: "1", due: "2026-03-05" }]);
 
   const dataSource = useMemo<DataTableDataSource<DateRow>>(
@@ -1045,6 +1045,11 @@ function DateHarness({ tableId }: { tableId: string }): JSX.Element {
         loadMore: () => undefined,
         refresh: () => undefined
       }),
+      createRow: async (draft) => {
+        const created: DateRow = { id: String(rows.length + 1), due: draft.due ?? "" };
+        setRows((current) => [...current, created]);
+        return created;
+      },
       updateRows: async (changes) => {
         setRows((current) =>
           current.map((row) => {
@@ -1074,6 +1079,7 @@ function DateHarness({ tableId }: { tableId: string }): JSX.Element {
           clipboardPaste: true,
           rowSelect: false,
           rowActions: false,
+          rowAdd,
           infiniteScroll: false,
           virtualization: false
         }}
@@ -2528,6 +2534,32 @@ describe("DataTable component", () => {
     cy.get("[data-dt-date='2026-04-09']").click();
     cy.findByRole("dialog", { name: "Edit Due" }).should("not.exist");
     cy.get("[data-testid='due-raw']").should("have.text", "2026-04-09");
+  });
+
+  it("closes the draft row date picker after picking a date", () => {
+    cy.mount(<DateHarness tableId="cypress-table-date-draft-pick" rowAdd />);
+
+    cy.get("tr[data-row-id='__draft__'] [role='gridcell'][data-column-id='due']").click();
+    cy.findByRole("dialog", { name: "Edit Due" }).should("exist");
+    cy.findByLabelText("Next month").click();
+    cy.findByRole("dialog", { name: "Edit Due" }).should("exist");
+
+    cy.get("[data-dt-date$='-15']").first().click();
+    cy.findByRole("dialog", { name: "Edit Due" }).should("not.exist");
+    cy.get("tr[data-row-id='__draft__'] [role='gridcell'][data-column-id='due']").should(
+      "not.contain",
+      "Add Due"
+    );
+  });
+
+  it("closes the draft row date picker when clicking outside", () => {
+    cy.mount(<DateHarness tableId="cypress-table-date-draft-outside" rowAdd />);
+
+    cy.get("tr[data-row-id='__draft__'] [role='gridcell'][data-column-id='due']").click();
+    cy.findByRole("dialog", { name: "Edit Due" }).should("exist");
+
+    cy.get("body").click(0, 0);
+    cy.findByRole("dialog", { name: "Edit Due" }).should("not.exist");
   });
 
   it("copies date cells as ISO clipboard values", () => {
