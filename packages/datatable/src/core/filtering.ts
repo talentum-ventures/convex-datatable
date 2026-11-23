@@ -280,10 +280,14 @@ export function applyClientQuery<TRow extends DataTableRowModel>(
     return output;
   }
 
+  const sortColumn = columnById.get(sortEntry.columnId);
+  const sortValueOf = (row: TRow): string | number | boolean | null =>
+    sortColumn?.sortValue
+      ? sortColumn.sortValue(row)
+      : comparableSortValue(row[sortEntry.columnId as keyof TRow]);
+
   output.sort((left, right) => {
-    const leftValue = left[sortEntry.columnId as keyof TRow];
-    const rightValue = right[sortEntry.columnId as keyof TRow];
-    const result = compareValues(comparableSortValue(leftValue), comparableSortValue(rightValue));
+    const result = compareValues(sortValueOf(left), sortValueOf(right));
     return sortEntry.direction === "asc" ? result : -result;
   });
 

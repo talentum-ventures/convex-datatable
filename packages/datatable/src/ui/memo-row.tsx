@@ -12,6 +12,7 @@ import type { ColumnLayoutResult } from "./column-layout.js";
 export type MemoRowProps<TRow extends DataTableRowModel> = {
   rowModel: Row<TRow>;
   rowId: RowId;
+  rowLabel: string;
   rowIndex: number;
   top: number;
   hasCollaborators: boolean;
@@ -27,6 +28,7 @@ export type MemoRowProps<TRow extends DataTableRowModel> = {
 const MemoRowInner = <TRow extends DataTableRowModel>({
   rowModel,
   rowId,
+  rowLabel,
   rowIndex,
   top,
   hasCollaborators,
@@ -102,7 +104,7 @@ const MemoRowInner = <TRow extends DataTableRowModel>({
         <button
           type="button"
           className="block h-full w-full cursor-row-resize bg-transparent hover:bg-sky-200"
-          aria-label={`Resize row ${rowId}`}
+          aria-label={`Resize row ${rowLabel}`}
           onPointerDown={(event) => {
             event.preventDefault();
             onStartRowResize(rowId, event.clientY);

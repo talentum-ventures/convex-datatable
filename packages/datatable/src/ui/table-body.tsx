@@ -57,6 +57,7 @@ export type TableBodyProps<TRow extends DataTableRowModel> = {
   onDiscardDraftRow: () => void;
   collaboratorRowIds: ReadonlySet<RowId>;
   getRowId: (row: TRow) => RowId;
+  getRowLabel: (row: TRow) => string;
   rowActionMenuRowId: RowId | null;
   getRowRefHandler: (rowId: RowId) => (node: HTMLTableRowElement | null) => void;
   rowHeights: UseRowHeightsResult;
@@ -92,6 +93,7 @@ function TableBodyInner<TRow extends DataTableRowModel>({
   onDiscardDraftRow,
   collaboratorRowIds,
   getRowId,
+  getRowLabel,
   rowActionMenuRowId,
   getRowRefHandler,
   rowHeights,
@@ -204,6 +206,7 @@ function TableBodyInner<TRow extends DataTableRowModel>({
             key={rowModel.id}
             rowModel={rowModel}
             rowId={rowId}
+            rowLabel={getRowLabel(row)}
             rowIndex={rowIndex}
             top={top}
             hasCollaborators={hasCollaborators}

@@ -359,4 +359,33 @@ describe("public api", () => {
     expectTypeOf(explicitTextColumn.allowEmptyFilter).toEqualTypeOf<boolean | undefined>();
     expectTypeOf(explicitSelectColumn.allowEmptyFilter).toEqualTypeOf<boolean | undefined>();
   });
+
+  it("types sortValue against the row and restricts it to comparable primitives", () => {
+    const rankedColumn: DataTableColumn<InvoiceRow> = {
+      id: "status",
+      field: "status",
+      header: "Status",
+      kind: "select",
+      options: [{ value: "todo", label: "To Do", colorClass: "bg-amber-100 text-amber-700" }],
+      sortValue: (row) => (row.status === "todo" ? 0 : 1)
+    };
+
+    const invalidSortColumn: DataTableColumn<InvoiceRow> = {
+      id: "description",
+      field: "description",
+      header: "Description",
+      kind: "text",
+      // @ts-expect-error sortValue must return a string, number, boolean, or null
+      sortValue: (row) => row.tags
+    };
+
+    expectTypeOf(rankedColumn.id).toEqualTypeOf<string>();
+    expectTypeOf(invalidSortColumn.id).toEqualTypeOf<string>();
+  });
+
+  it("accepts an optional row-aware getRowLabel", () => {
+    expectTypeOf<DataTableProps<InvoiceRow>["getRowLabel"]>().toEqualTypeOf<
+      ((row: InvoiceRow) => string) | undefined
+    >();
+  });
 });

@@ -208,4 +208,45 @@ describe("filtering", () => {
       ).map((row) => row.id)
     ).toEqual(["2", "1"]);
   });
+
+  it("sorts by sortValue when a column provides one, while filters keep reading the cell value", () => {
+    type PriorityRow = { id: string; priority: string };
+    const rank: Record<string, number> = { high: 0, medium: 1, low: 2 };
+    const priorityColumn: DataTableColumn<PriorityRow> = {
+      id: "priority",
+      field: "priority",
+      header: "Priority",
+      kind: "text",
+      sortValue: (row) => rank[row.priority] ?? null
+    };
+    const priorityColumns = new Map([[priorityColumn.id, priorityColumn] as const]);
+    const priorityRows: ReadonlyArray<PriorityRow> = [
+      { id: "1", priority: "low" },
+      { id: "2", priority: "high" },
+      { id: "3", priority: "unknown" },
+      { id: "4", priority: "medium" }
+    ];
+
+    const sortedIds = (direction: "asc" | "desc"): ReadonlyArray<string> =>
+      applyClientQuery(
+        priorityRows,
+        { sorting: [{ columnId: "priority", direction }], filters: [] },
+        priorityColumns
+      ).map((row) => row.id);
+
+    // Alphabetical order would be high, low, medium, unknown. Unranked (null) values sort first ascending.
+    expect(sortedIds("asc")).toEqual(["3", "2", "4", "1"]);
+    expect(sortedIds("desc")).toEqual(["1", "4", "2", "3"]);
+
+    expect(
+      applyClientQuery(
+        priorityRows,
+        {
+          sorting: [{ columnId: "priority", direction: "asc" }],
+          filters: [{ columnId: "priority", op: "contains", value: "m" }]
+        },
+        priorityColumns
+      ).map((row) => row.id)
+    ).toEqual(["4"]);
+  });
 });

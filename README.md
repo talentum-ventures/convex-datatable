@@ -289,6 +289,7 @@ Every column kind shares these properties (from `ColumnCommon<TRow, K, TValue>`)
 | `isSortable`         | `boolean`                                        | No       | Override the global `columnSort` flag for this column.                         |
 | `isFilterable`       | `boolean`                                        | No       | Override the global `columnFilter` flag for this column.                       |
 | `accessor`           | `(row: TRow) => TValue`                          | No       | Custom value accessor. If omitted, the value is read from `row[field]`.        |
+| `sortValue`          | `(row: TRow) => string \| number \| boolean \| null` | No       | Value used to order rows when this column is sorted (e.g. a priority rank). Filters still use the cell value. |
 | `validator`          | `(value: TValue, row: TRow) => string | null`    | No       | Cell-level validation. Return an error message or `null`.                      |
 | `parseInput`         | `(input: string, row: TRow) => TValue`           | No       | Parse user-entered text into the cell's value type.                            |
 | `serializeClipboard` | `(value: TValue, row: TRow) => string`           | No       | Serialize the cell value for clipboard copy.                                   |
@@ -1150,6 +1151,7 @@ type DataTableProps<TRow extends DataTableRowModel> = {
   tableId: string;
   columns: ReadonlyArray<DataTableColumn<TRow>>;
   getRowId: (row: TRow) => RowId;
+  getRowLabel?: (row: TRow) => string;
   dataSource: DataTableDataSource<TRow>;
   rowSchema?: RowSchema<TRow>;
   features?: DataTableFeatureFlags;
@@ -1176,6 +1178,7 @@ type DataTableProps<TRow extends DataTableRowModel> = {
 | `tableId`            | `string`                        | Yes      | —                                       | Unique ID used for persistence keys.                  |
 | `columns`            | `DataTableColumn<TRow>[]`       | Yes      | —                                       | Column definitions.                                   |
 | `getRowId`           | `(row: TRow) => string`         | Yes      | —                                       | Extract a unique ID from each row.                    |
+| `getRowLabel`        | `(row: TRow) => string`         | No       | row id                                  | Readable row name used in row accessible labels ("Select row …", "Delete row …", "Resize row …", row actions). |
 | `dataSource`         | `DataTableDataSource<TRow>`     | Yes      | —                                       | Data fetching and mutation interface.                 |
 | `rowSchema`          | `RowSchema<TRow>`               | No       | —                                       | Schema for validating draft rows.                     |
 | `features`           | `DataTableFeatureFlags`         | No       | See [defaults](#feature-flags)          | Feature toggles (merged with defaults).               |

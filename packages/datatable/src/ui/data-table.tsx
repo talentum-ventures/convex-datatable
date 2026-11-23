@@ -176,6 +176,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
   tableId,
   columns,
   getRowId,
+  getRowLabel,
   dataSource,
   rowSchema,
   features,
@@ -196,6 +197,10 @@ const DataTableInner = <TRow extends DataTableRowModel>({
   const mergedTheme = useMemo(
     () => resolveThemeTokens(theme),
     [theme]
+  );
+  const resolveRowLabel = useCallback(
+    (row: TRow): string => getRowLabel?.(row) ?? getRowId(row),
+    [getRowId, getRowLabel]
   );
   const dataColumnIds = useMemo(() => columns.map((column) => column.id), [columns]);
   const minHeight = minRowHeight ?? DEFAULT_MIN_ROW_HEIGHT;
@@ -405,6 +410,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
           <RowActions
             row={row}
             rowId={rowId}
+            rowLabel={resolveRowLabel(row)}
             rowActions={visibleRowActions}
             presentation={resolvedRowActions.presentation}
             isMenuOpen={isMenuOpen}
@@ -432,6 +438,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
     getRowId,
     hasActionColumn,
     requestDelete,
+    resolveRowLabel,
     resolvedRowActions,
     setRowActionMenuRowId
   ]);
@@ -480,7 +487,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
         return (
           <div className="flex w-full items-center justify-center py-1">
             <Checkbox
-              aria-label={`Select row ${rowId}`}
+              aria-label={`Select row ${resolveRowLabel(row)}`}
               checked={Boolean(rowSelectionRef.current[rowId])}
               onChange={(event) => {
                 const checked = event.target.checked;
@@ -503,7 +510,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
     };
 
     return column;
-  }, [getRowId, mergedFeatures.rowSelect, setRowSelection]);
+  }, [getRowId, mergedFeatures.rowSelect, resolveRowLabel, setRowSelection]);
 
   const coreRowModel = useMemo(() => getCoreRowModel(), []);
 
@@ -1340,6 +1347,7 @@ const DataTableInner = <TRow extends DataTableRowModel>({
                   onDiscardDraftRow={clearDraftRow}
                   collaboratorRowIds={collaboratorRowIds}
                   getRowId={getRowId}
+                  getRowLabel={resolveRowLabel}
                   rowActionMenuRowId={rowActionMenuRowId}
                   getRowRefHandler={getRowRefHandler}
                   rowHeights={rowHeights}
